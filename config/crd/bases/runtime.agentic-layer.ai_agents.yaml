@@ -39,10 +39,41 @@ spec:
           spec:
             description: AgentSpec defines the desired state of Agent.
             properties:
-              foo:
-                description: Foo is an example field of Agent. Edit agent_types.go
-                  to remove/update
+              framework:
+                description: Framework defines the supported agent frameworks
+                enum:
+                - google-adk
+                - flokk
+                - autogen
                 type: string
+              image:
+                description: Image is the Docker image and tag to use for the microservice
+                  deployment
+                type: string
+              ports:
+                description: Ports defines the ports exposed by the agent
+                items:
+                  description: Port defines a port configuration for the agent
+                  properties:
+                    name:
+                      description: Name is the name of the port
+                      type: string
+                    port:
+                      description: Port is the port number
+                      format: int32
+                      maximum: 65535
+                      minimum: 1
+                      type: integer
+                  required:
+                  - port
+                  type: object
+                type: array
+              replicas:
+                description: Replicas is the number of replicas for the microservice
+                  deployment
+                format: int32
+                minimum: 0
+                type: integer
             type: object
           status:
             description: AgentStatus defines the observed state of Agent.
