@@ -9,7 +9,7 @@ of framework specific configuration and wiring of all essentiell corss-cutting
 components, like the model router.
 
 ```yaml
-apiVersion: runtime.agentic-layer.ai/v1
+apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent
 metadata:
   name: cross-selling-agent
