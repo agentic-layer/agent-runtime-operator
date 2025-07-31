@@ -20,6 +20,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Port defines a port configuration for the agent
+type Port struct {
+	// Name is the name of the port
+	Name string `json:"name,omitempty"`
+
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// Port is the port number
+	Port int32 `json:"port"`
+}
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -28,8 +39,19 @@ type AgentSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Agent. Edit agent_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Enum=google-adk;flokk;autogen
+	// Framework defines the supported agent frameworks
+	Framework string `json:"framework,omitempty"`
+
+	// +kubebuilder:validation:Minimum=0
+	// Replicas is the number of replicas for the microservice deployment
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// Image is the Docker image and tag to use for the microservice deployment
+	Image string `json:"image,omitempty"`
+
+	// Ports defines the ports exposed by the agent
+	Ports []Port `json:"ports,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent.
