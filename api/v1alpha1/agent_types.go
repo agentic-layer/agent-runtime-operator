@@ -20,44 +20,45 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Port defines a port configuration for the agent
-type Port struct {
+// AgentProtocol defines a port configuration for the agent
+type AgentProtocol struct {
 	// Name is the name of the port
 	Name string `json:"name,omitempty"`
 
+	// Type of the protocol used by the agent
+	// +kubebuilder:validation:Enum=A2A;OpenAI
+	Type string `json:"type"`
+
+	// Port is the port number, defaults to the default port for the protocol
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	// Port is the port number
-	Port int32 `json:"port"`
-}
+	Port int32 `json:"port,omitempty"`
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+	// +kubebuilder:validation:Pattern=`^/[a-zA-Z0-9/_-]*$`
+	// Path is the path used for HTTP-based protocols
+	Path string `json:"path,omitempty"`
+}
 
 // AgentSpec defines the desired state of Agent.
 type AgentSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// +kubebuilder:validation:Enum=google-adk;flokk;autogen
 	// Framework defines the supported agent frameworks
+	// +kubebuilder:validation:Enum=google-adk;flokk;autogen
 	Framework string `json:"framework,omitempty"`
 
-	// +kubebuilder:validation:Minimum=0
 	// Replicas is the number of replicas for the microservice deployment
-	Replicas int32 `json:"replicas,omitempty"`
+	// +kubebuilder:validation:Minimum=0
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Image is the Docker image and tag to use for the microservice deployment
 	Image string `json:"image,omitempty"`
 
-	// Ports defines the ports exposed by the agent
-	Ports []Port `json:"ports,omitempty"`
+	// Protocols defines the protocols supported by the agent
+	Protocols []AgentProtocol `json:"protocols,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent.
 type AgentStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +kubebuilder:object:root=true
