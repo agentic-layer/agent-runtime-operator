@@ -19,7 +19,13 @@ package controller
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -36,28 +42,247 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Agent object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Fetch the Agent instance
+	var agent runtimev1alpha1.Agent
+	if err := r.Get(ctx, req.NamespacedName, &agent); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Agent resource not found")
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Failed to get Agent")
+		return ctrl.Result{}, err
+	}
+
+	// Apply default values to Agent and update in cluster if needed
+	if err := r.applyDefaultsAndUpdate(ctx, &agent); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Reconciling Agent", "name", agent.Name, "namespace", agent.Namespace)
+
+	// Check if deployment already exists
+	deployment := &appsv1.Deployment{}
+	deploymentName := agent.Name
+	err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agent.Namespace}, deployment)
+
+	if err != nil && errors.IsNotFound(err) {
+		// Deployment does not exist, create it
+		log.Info("Creating new Deployment", "name", deploymentName, "namespace", agent.Namespace)
+
+		deployment, err = r.createDeploymentForAgent(&agent, deploymentName)
+		if err != nil {
+			log.Error(err, "Failed to create deployment for Agent")
+			return ctrl.Result{}, err
+		}
+
+		if err := r.Create(ctx, deployment); err != nil {
+			log.Error(err, "Failed to create new Deployment", "name", deploymentName)
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Successfully created Deployment", "name", deploymentName, "namespace", agent.Namespace)
+	} else if err != nil {
+		log.Error(err, "Failed to get Deployment")
+		return ctrl.Result{}, err
+	}
+
+	// Create service if protocols are defined
+	if len(agent.Spec.Protocols) > 0 {
+		service := &corev1.Service{}
+		serviceName := agent.Name
+		err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: agent.Namespace}, service)
+
+		if err != nil && errors.IsNotFound(err) {
+			log.Info("Creating new Service", "name", serviceName, "namespace", agent.Namespace)
+
+			service, err = r.createServiceForAgent(&agent, serviceName)
+			if err != nil {
+				log.Error(err, "Failed to create service for Agent")
+				return ctrl.Result{}, err
+			}
+
+			if err := r.Create(ctx, service); err != nil {
+				log.Error(err, "Failed to create new Service", "name", serviceName)
+				return ctrl.Result{}, err
+			}
+
+			log.Info("Successfully created Service", "name", serviceName, "namespace", agent.Namespace)
+		} else if err != nil {
+			log.Error(err, "Failed to get Service")
+			return ctrl.Result{}, err
+		}
+	}
 
 	return ctrl.Result{}, nil
+}
+
+// applyDefaultsAndUpdate applies default values to the Agent and updates the cluster if needed
+func (r *AgentReconciler) applyDefaultsAndUpdate(ctx context.Context, agent *runtimev1alpha1.Agent) error {
+	log := logf.FromContext(ctx)
+	needsUpdate := false
+
+	// Set default replicas if not specified
+	if agent.Spec.Replicas == nil {
+		agent.Spec.Replicas = new(int32)
+		*agent.Spec.Replicas = 1
+		needsUpdate = true
+	}
+
+	// Set default ports for protocols if not specified
+	for i, protocol := range agent.Spec.Protocols {
+		if protocol.Port == 0 {
+			agent.Spec.Protocols[i].Port = frameworkDefaultPort(agent.Spec.Framework)
+			needsUpdate = true
+		}
+	}
+
+	// Update the Agent resource in the cluster if defaults were applied
+	if needsUpdate {
+		if err := r.Update(ctx, agent); err != nil {
+			log.Error(err, "Failed to update Agent with default values")
+			return err
+		}
+		log.Info("Updated Agent with default values", "name", agent.Name, "namespace", agent.Namespace)
+	}
+
+	return nil
+}
+
+func frameworkDefaultPort(framework string) int32 {
+	// Default ports based on framework
+	switch framework {
+	case "google-adk":
+		return 8000
+	default:
+		return 8080 // Default port for unknown frameworks
+	}
+}
+
+// createDeploymentForAgent creates a deployment for the given Agent
+func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent, deploymentName string) (*appsv1.Deployment, error) {
+	replicas := agent.Spec.Replicas
+	if replicas == nil {
+		replicas = new(int32)
+		*replicas = 1 // Default to 1 replica if not specified
+	}
+
+	labels := map[string]string{
+		"app":       agent.Name,
+		"framework": agent.Spec.Framework,
+	}
+
+	// Create container ports from protocols
+	var containerPorts []corev1.ContainerPort
+	for _, protocol := range agent.Spec.Protocols {
+		port := protocol.Port
+		if port == 0 {
+			port = frameworkDefaultPort(agent.Spec.Framework)
+		}
+
+		containerPorts = append(containerPorts, corev1.ContainerPort{
+			Name:          protocol.Name,
+			ContainerPort: port,
+			Protocol:      corev1.ProtocolTCP,
+		})
+	}
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: agent.Namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "agent",
+							Image: agent.Spec.Image,
+							Ports: containerPorts,
+							Env: []corev1.EnvVar{
+								{
+									Name:  "AGENT_NAME",
+									Value: agent.Name,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Set Agent as the owner of the Deployment
+	if err := ctrl.SetControllerReference(agent, deployment, r.Scheme); err != nil {
+		return nil, err
+	}
+
+	return deployment, nil
+}
+
+// createServiceForAgent creates a service for the given Agent
+func (r *AgentReconciler) createServiceForAgent(agent *runtimev1alpha1.Agent, serviceName string) (*corev1.Service, error) {
+	labels := map[string]string{
+		"app": agent.Name,
+	}
+
+	// Create service ports from protocols
+	var servicePorts []corev1.ServicePort
+	for _, protocol := range agent.Spec.Protocols {
+		servicePorts = append(servicePorts, corev1.ServicePort{
+			Name:       protocol.Name,
+			Port:       protocol.Port,
+			TargetPort: intstr.FromInt32(protocol.Port),
+			Protocol:   corev1.ProtocolTCP,
+		})
+	}
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: agent.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: labels,
+			Ports:    servicePorts,
+			Type:     corev1.ServiceTypeClusterIP,
+		},
+	}
+
+	// Set Agent as the owner of the Service
+	if err := ctrl.SetControllerReference(agent, service, r.Scheme); err != nil {
+		return nil, err
+	}
+
+	return service, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&runtimev1alpha1.Agent{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
 		Named("agent").
 		Complete(r)
 }
