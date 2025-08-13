@@ -1,0 +1,5 @@
+{
+  "extends": [
+    "github>agentic-layer/renovate-config"
+  ]
+}
