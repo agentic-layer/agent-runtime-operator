@@ -67,16 +67,13 @@ func (d *AgentCustomDefaulter) Default(_ context.Context, obj runtime.Object) er
 	}
 	agentlog.Info("Defaulting for Agent", "name", agent.GetName())
 
-	err := d.applyDefaults(agent)
-	if err != nil {
-		return fmt.Errorf("cannot apply defaults for Agent: %w", err)
-	}
+	d.applyDefaults(agent)
 
 	return nil
 }
 
 // applyDefaultsAndUpdate applies default values to the Agent and updates the cluster if needed
-func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) error {
+func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 	// Set default replicas if not specified
 	if agent.Spec.Replicas == nil {
 		agent.Spec.Replicas = new(int32)
@@ -89,8 +86,6 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) error
 			agent.Spec.Protocols[i].Port = d.frameworkDefaultPort(agent.Spec.Framework)
 		}
 	}
-
-	return nil
 }
 
 func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {

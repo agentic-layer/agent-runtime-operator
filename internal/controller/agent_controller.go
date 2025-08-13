@@ -136,7 +136,7 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 	}
 
 	// Create container ports from protocols
-	var containerPorts []corev1.ContainerPort
+	containerPorts := make([]corev1.ContainerPort, 0, len(agent.Spec.Protocols))
 	for _, protocol := range agent.Spec.Protocols {
 		port := protocol.Port
 
@@ -196,7 +196,7 @@ func (r *AgentReconciler) createServiceForAgent(agent *runtimev1alpha1.Agent, se
 	}
 
 	// Create service ports from protocols
-	var servicePorts []corev1.ServicePort
+	servicePorts := make([]corev1.ServicePort, 0, len(agent.Spec.Protocols))
 	for _, protocol := range agent.Spec.Protocols {
 		servicePorts = append(servicePorts, corev1.ServicePort{
 			Name:       protocol.Name,
