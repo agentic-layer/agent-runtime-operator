@@ -8,6 +8,9 @@ jobs:
   lint:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
