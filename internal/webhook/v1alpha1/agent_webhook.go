@@ -35,11 +35,13 @@ var agentlog = logf.Log.WithName("agent-resource")
 // SetupAgentWebhookWithManager registers the webhook for Agent in the manager.
 func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.Agent{}).
-		WithDefaulter(&AgentCustomDefaulter{}).
+		WithDefaulter(&AgentCustomDefaulter{
+			DefaultReplicas:      1,
+			DefaultPort:          8080,
+			DefaultPortGoogleAdk: 8000,
+		}).
 		Complete()
 }
-
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
 // +kubebuilder:webhook:path=/mutate-runtime-agentic-layer-ai-v1alpha1-agent,mutating=true,failurePolicy=fail,sideEffects=None,groups=runtime.agentic-layer.ai,resources=agents,verbs=create;update,versions=v1alpha1,name=magent-v1alpha1.kb.io,admissionReviewVersions=v1
 
@@ -49,7 +51,9 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
 type AgentCustomDefaulter struct {
-	// TODO(user): Add more fields as needed for defaulting
+	DefaultReplicas      int32
+	DefaultPort          int32
+	DefaultPortGoogleAdk int32
 }
 
 var _ webhook.CustomDefaulter = &AgentCustomDefaulter{}
@@ -63,7 +67,37 @@ func (d *AgentCustomDefaulter) Default(_ context.Context, obj runtime.Object) er
 	}
 	agentlog.Info("Defaulting for Agent", "name", agent.GetName())
 
-	// TODO(user): fill in your defaulting logic.
+	err := d.applyDefaults(agent)
+	if err != nil {
+		return fmt.Errorf("cannot apply defaults for Agent: %w", err)
+	}
 
 	return nil
+}
+
+// applyDefaultsAndUpdate applies default values to the Agent and updates the cluster if needed
+func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) error {
+	// Set default replicas if not specified
+	if agent.Spec.Replicas == nil {
+		agent.Spec.Replicas = new(int32)
+		*agent.Spec.Replicas = d.DefaultReplicas
+	}
+
+	// Set default ports for protocols if not specified
+	for i, protocol := range agent.Spec.Protocols {
+		if protocol.Port == 0 {
+			agent.Spec.Protocols[i].Port = d.frameworkDefaultPort(agent.Spec.Framework)
+		}
+	}
+
+	return nil
+}
+
+func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
+	switch framework {
+	case "google-adk":
+		return d.DefaultPortGoogleAdk
+	default:
+		return d.DefaultPort // Default port for unknown frameworks
+	}
 }

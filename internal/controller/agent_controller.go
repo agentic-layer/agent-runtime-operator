@@ -64,11 +64,6 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	// Apply default values to Agent and update in cluster if needed
-	if err := r.applyDefaultsAndUpdate(ctx, &agent); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	log.Info("Reconciling Agent", "name", agent.Name, "namespace", agent.Namespace)
 
 	// Check if deployment already exists
@@ -127,48 +122,6 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
-// applyDefaultsAndUpdate applies default values to the Agent and updates the cluster if needed
-func (r *AgentReconciler) applyDefaultsAndUpdate(ctx context.Context, agent *runtimev1alpha1.Agent) error {
-	log := logf.FromContext(ctx)
-	needsUpdate := false
-
-	// Set default replicas if not specified
-	if agent.Spec.Replicas == nil {
-		agent.Spec.Replicas = new(int32)
-		*agent.Spec.Replicas = 1
-		needsUpdate = true
-	}
-
-	// Set default ports for protocols if not specified
-	for i, protocol := range agent.Spec.Protocols {
-		if protocol.Port == 0 {
-			agent.Spec.Protocols[i].Port = frameworkDefaultPort(agent.Spec.Framework)
-			needsUpdate = true
-		}
-	}
-
-	// Update the Agent resource in the cluster if defaults were applied
-	if needsUpdate {
-		if err := r.Update(ctx, agent); err != nil {
-			log.Error(err, "Failed to update Agent with default values")
-			return err
-		}
-		log.Info("Updated Agent with default values", "name", agent.Name, "namespace", agent.Namespace)
-	}
-
-	return nil
-}
-
-func frameworkDefaultPort(framework string) int32 {
-	// Default ports based on framework
-	switch framework {
-	case "google-adk":
-		return 8000
-	default:
-		return 8080 // Default port for unknown frameworks
-	}
-}
-
 // createDeploymentForAgent creates a deployment for the given Agent
 func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent, deploymentName string) (*appsv1.Deployment, error) {
 	replicas := agent.Spec.Replicas
@@ -186,9 +139,6 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 	var containerPorts []corev1.ContainerPort
 	for _, protocol := range agent.Spec.Protocols {
 		port := protocol.Port
-		if port == 0 {
-			port = frameworkDefaultPort(agent.Spec.Framework)
-		}
 
 		containerPorts = append(containerPorts, corev1.ContainerPort{
 			Name:          protocol.Name,
