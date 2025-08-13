@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -38,7 +40,7 @@ var _ = Describe("Agent Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		agent := &runtimev1alpha1.Agent{}
 
@@ -51,14 +53,22 @@ var _ = Describe("Agent Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: runtimev1alpha1.AgentSpec{
+						Framework: "google-adk",
+						Image:     "europe-west3-docker.pkg.dev/qaware-paal/agentic-layer/weather-agent:v0.1.1",
+						Protocols: []runtimev1alpha1.AgentProtocol{
+							{
+								Type: "A2A",
+								Port: 8000,
+							},
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &runtimev1alpha1.Agent{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
@@ -77,8 +87,28 @@ var _ = Describe("Agent Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			By("Checking that deployment was created")
+			deployment := &appsv1.Deployment{}
+			deploymentKey := types.NamespacedName{
+				Name:      resourceName,
+				Namespace: "default",
+			}
+			err = k8sClient.Get(ctx, deploymentKey, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("europe-west3-docker.pkg.dev/qaware-paal/agentic-layer/weather-agent:v0.1.1"))
+
+			By("Checking that service was created")
+			service := &corev1.Service{}
+			serviceKey := types.NamespacedName{
+				Name:      resourceName,
+				Namespace: "default",
+			}
+			err = k8sClient.Get(ctx, serviceKey, service)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(service.Spec.Ports).To(HaveLen(1))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8000)))
 		})
 	})
 })
