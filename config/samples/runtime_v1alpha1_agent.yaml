@@ -4,6 +4,9 @@ metadata:
   labels:
     app.kubernetes.io/name: agent-runtime-operator
     app.kubernetes.io/managed-by: kustomize
-  name: agent-sample
+  name: weather-agent
 spec:
-  # TODO(user): Add fields here
+  framework: google-adk
+  image: europe-west3-docker.pkg.dev/qaware-paal/agentic-layer/weather-agent:v0.1.1
+  protocols:
+    - type: A2A
