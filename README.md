@@ -40,9 +40,28 @@ Install the CRDs into your current Kubernetes cluster:
 make install
 ```
 
+Prepare the environment for running the operator:
+
+```shell
+# Ensure you have a local Kubernetes cluster running.
+kind create cluster
+
+# Install cert-manager for webhook support
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+
+# Build the operator image and push it to the local registry
+make docker-build
+make kind-load
+
+# Apply the operator manifests to your current Kubernetes cluster
+make deploy
+```
+
 Run the operator locally against your current Kubernetes cluster:
 
 ```shell
+# Run only the controller locally.
+# Note: If you deployed everything using `make deploy`, a controller is already running and may interfere with this.
 make run
 ```
 
