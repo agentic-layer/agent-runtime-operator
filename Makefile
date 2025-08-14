@@ -363,3 +363,13 @@ catalog-push: ## Push a catalog image.
 .PHONY: kind
 kind-load:
 	$(KIND) load docker-image $(IMG)
+
+HELMIFY ?= $(LOCALBIN)/helmify
+
+.PHONY: helmify
+helmify: $(HELMIFY) ## Download helmify locally if necessary.
+$(HELMIFY): $(LOCALBIN)
+	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
+
+helm: manifests kustomize helmify
+	$(KUSTOMIZE) build config/default | $(HELMIFY)
