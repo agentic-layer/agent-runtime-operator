@@ -107,7 +107,7 @@ metadata:
   name: weather-agent
 spec:
   framework: google-adk
-  image: eu.gcr.io/agentic-layer/weather-agent:v0.1.2
+  image: eu.gcr.io/agentic-layer/weather-agent:0.1.2
   protocols:
     - type: A2A
   replicas: 1

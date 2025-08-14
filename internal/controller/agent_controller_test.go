@@ -55,7 +55,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 					Spec: runtimev1alpha1.AgentSpec{
 						Framework: "google-adk",
-						Image:     "eu.gcr.io/agentic-layer/weather-agent:v0.1.2",
+						Image:     "eu.gcr.io/agentic-layer/weather-agent:0.1.2",
 						Protocols: []runtimev1alpha1.AgentProtocol{
 							{
 								Type: "A2A",
@@ -97,7 +97,7 @@ var _ = Describe("Agent Controller", func() {
 			err = k8sClient.Get(ctx, deploymentKey, deployment)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:v0.1.2"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.1.2"))
 
 			By("Checking that service was created")
 			service := &corev1.Service{}
