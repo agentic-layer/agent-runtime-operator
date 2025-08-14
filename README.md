@@ -62,6 +62,8 @@ Run the operator locally against your current Kubernetes cluster:
 ```shell
 # Run only the controller locally.
 # Note: If you deployed everything using `make deploy`, a controller is already running and may interfere with this.
+# See also: https://book.kubebuilder.io/cronjob-tutorial/running
+export ENABLE_WEBHOOKS=false
 make run
 ```
 
