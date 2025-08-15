@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -107,11 +108,10 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			deployment.Spec.Template.Labels = desiredDeployment.Spec.Template.Labels
 			// Note: Selector is immutable in Kubernetes, so we don't update it
 
-			// Update container image and ports (assuming first container is our agent)
-			if len(deployment.Spec.Template.Spec.Containers) > 0 && len(desiredDeployment.Spec.Template.Spec.Containers) > 0 {
-				deployment.Spec.Template.Spec.Containers[0].Image = desiredDeployment.Spec.Template.Spec.Containers[0].Image
-				deployment.Spec.Template.Spec.Containers[0].Ports = desiredDeployment.Spec.Template.Spec.Containers[0].Ports
-				deployment.Spec.Template.Spec.Containers[0].Env = desiredDeployment.Spec.Template.Spec.Containers[0].Env
+			// Update agent container by finding it by name (addressing PR feedback)
+			if err := r.updateAgentContainer(deployment, desiredDeployment); err != nil {
+				log.Error(err, "Failed to update agent container")
+				return ctrl.Result{}, err
 			}
 
 			if err := r.Update(ctx, deployment); err != nil {
@@ -308,95 +308,196 @@ func (r *AgentReconciler) createServiceForAgent(agent *runtimev1alpha1.Agent, se
 	return service, nil
 }
 
-// needsDeploymentUpdate compares existing deployment with desired deployment to determine if update is needed
-func (r *AgentReconciler) needsDeploymentUpdate(existing *appsv1.Deployment, desired *appsv1.Deployment) bool {
+// needsDeploymentUpdate compares existing and desired deployment (addresses PR feedback)
+func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deployment) bool {
 	// Check replicas
 	if *existing.Spec.Replicas != *desired.Spec.Replicas {
 		return true
 	}
 
-	// Check image
-	if len(existing.Spec.Template.Spec.Containers) > 0 && len(desired.Spec.Template.Spec.Containers) > 0 {
-		if existing.Spec.Template.Spec.Containers[0].Image != desired.Spec.Template.Spec.Containers[0].Image {
-			return true
-		}
-	}
-
 	// Check labels
-	if !mapsEqual(existing.Labels, desired.Labels) {
+	if !r.mapsEqual(existing.Labels, desired.Labels) {
 		return true
 	}
 
-	if !mapsEqual(existing.Spec.Template.Labels, desired.Spec.Template.Labels) {
+	if !r.mapsEqual(existing.Spec.Template.Labels, desired.Spec.Template.Labels) {
 		return true
 	}
 
-	// Note: We don't check selector as it's immutable in Kubernetes
+	// Check agent container
+	existingContainer := r.findAgentContainer(existing.Spec.Template.Spec.Containers)
+	desiredContainer := r.findAgentContainer(desired.Spec.Template.Spec.Containers)
 
-	// Check container ports
-	existingPorts := existing.Spec.Template.Spec.Containers[0].Ports
-	desiredPorts := desired.Spec.Template.Spec.Containers[0].Ports
+	if existingContainer == nil || desiredContainer == nil {
+		return existingContainer != desiredContainer
+	}
 
-	if len(existingPorts) != len(desiredPorts) {
+	// Check image
+	if existingContainer.Image != desiredContainer.Image {
 		return true
 	}
 
-	for i, existingPort := range existingPorts {
-		if i >= len(desiredPorts) {
-			return true
-		}
-		desiredPort := desiredPorts[i]
-		if existingPort.Name != desiredPort.Name ||
-			existingPort.ContainerPort != desiredPort.ContainerPort ||
-			existingPort.Protocol != desiredPort.Protocol {
-			return true
-		}
+	// Check environment variables (addresses PR feedback)
+	if !r.envVarsEqual(existingContainer.Env, desiredContainer.Env) {
+		return true
+	}
+
+	// Check container ports by name (addresses PR feedback)
+	if !r.containerPortsEqual(existingContainer.Ports, desiredContainer.Ports) {
+		return true
 	}
 
 	return false
 }
 
-// needsServiceUpdate compares existing service with desired service to determine if update is needed
-func (r *AgentReconciler) needsServiceUpdate(existing *corev1.Service, desired *corev1.Service) bool {
+// needsServiceUpdate compares existing and desired service (addresses PR feedback)
+func (r *AgentReconciler) needsServiceUpdate(existing, desired *corev1.Service) bool {
 	// Check labels
-	if !mapsEqual(existing.Labels, desired.Labels) {
+	if !r.mapsEqual(existing.Labels, desired.Labels) {
 		return true
 	}
 
-	// Note: Selector should remain stable, so we don't check for changes
-
-	// Check ports
-	existingPorts := existing.Spec.Ports
-	desiredPorts := desired.Spec.Ports
-
-	if len(existingPorts) != len(desiredPorts) {
+	// Check ports by name (addresses PR feedback)
+	if !r.servicePortsEqual(existing.Spec.Ports, desired.Spec.Ports) {
 		return true
-	}
-
-	for i, existingPort := range existingPorts {
-		if i >= len(desiredPorts) {
-			return true
-		}
-		desiredPort := desiredPorts[i]
-		if existingPort.Name != desiredPort.Name ||
-			existingPort.Port != desiredPort.Port ||
-			existingPort.Protocol != desiredPort.Protocol ||
-			existingPort.TargetPort != desiredPort.TargetPort {
-			return true
-		}
 	}
 
 	return false
+}
+
+// updateAgentContainer finds and updates the agent container by name (addresses PR feedback)
+func (r *AgentReconciler) updateAgentContainer(deployment, desiredDeployment *appsv1.Deployment) error {
+	agentContainer := r.findAgentContainer(deployment.Spec.Template.Spec.Containers)
+	desiredAgentContainer := r.findAgentContainer(desiredDeployment.Spec.Template.Spec.Containers)
+
+	if agentContainer == nil {
+		return fmt.Errorf("agent container not found in existing deployment")
+	}
+	if desiredAgentContainer == nil {
+		return fmt.Errorf("agent container not found in desired deployment")
+	}
+
+	// Update container fields
+	agentContainer.Image = desiredAgentContainer.Image
+	agentContainer.Ports = desiredAgentContainer.Ports
+	agentContainer.Env = desiredAgentContainer.Env
+
+	return nil
+}
+
+// findAgentContainer finds the agent container by name in a container slice
+func (r *AgentReconciler) findAgentContainer(containers []corev1.Container) *corev1.Container {
+	for i := range containers {
+		if containers[i].Name == "agent" {
+			return &containers[i]
+		}
+	}
+	// Fallback to first container if no "agent" container found (backwards compatibility)
+	if len(containers) > 0 {
+		return &containers[0]
+	}
+	return nil
 }
 
 // mapsEqual compares two string maps for equality
-func mapsEqual(a, b map[string]string) bool {
+func (r *AgentReconciler) mapsEqual(a, b map[string]string) bool {
 	if len(a) != len(b) {
 		return false
 	}
 
 	for key, valueA := range a {
 		if valueB, ok := b[key]; !ok || valueA != valueB {
+			return false
+		}
+	}
+
+	return true
+}
+
+// envVarsEqual compares environment variable slices (addresses PR feedback)
+func (r *AgentReconciler) envVarsEqual(existing, desired []corev1.EnvVar) bool {
+	if len(existing) != len(desired) {
+		return false
+	}
+
+	// Create maps for comparison by name
+	existingMap := make(map[string]string)
+	desiredMap := make(map[string]string)
+
+	for _, env := range existing {
+		existingMap[env.Name] = env.Value
+	}
+	for _, env := range desired {
+		desiredMap[env.Name] = env.Value
+	}
+
+	return r.mapsEqual(existingMap, desiredMap)
+}
+
+// containerPortsEqual compares container ports by name (addresses PR feedback)
+func (r *AgentReconciler) containerPortsEqual(existing, desired []corev1.ContainerPort) bool {
+	if len(existing) != len(desired) {
+		return false
+	}
+
+	// Create maps for comparison by name
+	existingMap := make(map[string]corev1.ContainerPort)
+	desiredMap := make(map[string]corev1.ContainerPort)
+
+	for _, port := range existing {
+		existingMap[port.Name] = port
+	}
+	for _, port := range desired {
+		desiredMap[port.Name] = port
+	}
+
+	if len(existingMap) != len(desiredMap) {
+		return false
+	}
+
+	for name, existingPort := range existingMap {
+		desiredPort, ok := desiredMap[name]
+		if !ok {
+			return false
+		}
+		if existingPort.ContainerPort != desiredPort.ContainerPort ||
+			existingPort.Protocol != desiredPort.Protocol {
+			return false
+		}
+	}
+
+	return true
+}
+
+// servicePortsEqual compares service ports by name (addresses PR feedback)
+func (r *AgentReconciler) servicePortsEqual(existing, desired []corev1.ServicePort) bool {
+	if len(existing) != len(desired) {
+		return false
+	}
+
+	// Create maps for comparison by name
+	existingMap := make(map[string]corev1.ServicePort)
+	desiredMap := make(map[string]corev1.ServicePort)
+
+	for _, port := range existing {
+		existingMap[port.Name] = port
+	}
+	for _, port := range desired {
+		desiredMap[port.Name] = port
+	}
+
+	if len(existingMap) != len(desiredMap) {
+		return false
+	}
+
+	for name, existingPort := range existingMap {
+		desiredPort, ok := desiredMap[name]
+		if !ok {
+			return false
+		}
+		if existingPort.Port != desiredPort.Port ||
+			existingPort.Protocol != desiredPort.Protocol ||
+			existingPort.TargetPort != desiredPort.TargetPort {
 			return false
 		}
 	}
