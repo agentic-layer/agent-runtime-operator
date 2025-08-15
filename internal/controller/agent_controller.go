@@ -90,6 +90,37 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
+	} else {
+		// Deployment exists, check if it needs to be updated
+		desiredDeployment, err := r.createDeploymentForAgent(&agent, deploymentName)
+		if err != nil {
+			log.Error(err, "Failed to create desired deployment spec for Agent")
+			return ctrl.Result{}, err
+		}
+
+		if r.needsDeploymentUpdate(deployment, desiredDeployment) {
+			log.Info("Updating existing Deployment", "name", deploymentName, "namespace", agent.Namespace)
+
+			// Update deployment spec - only fields we manage
+			deployment.Spec.Replicas = desiredDeployment.Spec.Replicas
+			deployment.Labels = desiredDeployment.Labels
+			deployment.Spec.Template.Labels = desiredDeployment.Spec.Template.Labels
+			// Note: Selector is immutable in Kubernetes, so we don't update it
+
+			// Update container image and ports (assuming first container is our agent)
+			if len(deployment.Spec.Template.Spec.Containers) > 0 && len(desiredDeployment.Spec.Template.Spec.Containers) > 0 {
+				deployment.Spec.Template.Spec.Containers[0].Image = desiredDeployment.Spec.Template.Spec.Containers[0].Image
+				deployment.Spec.Template.Spec.Containers[0].Ports = desiredDeployment.Spec.Template.Spec.Containers[0].Ports
+				deployment.Spec.Template.Spec.Containers[0].Env = desiredDeployment.Spec.Template.Spec.Containers[0].Env
+			}
+
+			if err := r.Update(ctx, deployment); err != nil {
+				log.Error(err, "Failed to update Deployment", "name", deploymentName)
+				return ctrl.Result{}, err
+			}
+
+			log.Info("Successfully updated Deployment", "name", deploymentName, "namespace", agent.Namespace)
+		}
 	}
 
 	// Create service if protocols are defined
@@ -116,6 +147,45 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		} else if err != nil {
 			log.Error(err, "Failed to get Service")
 			return ctrl.Result{}, err
+		} else {
+			// Service exists, check if it needs to be updated
+			desiredService, err := r.createServiceForAgent(&agent, serviceName)
+			if err != nil {
+				log.Error(err, "Failed to create desired service spec for Agent")
+				return ctrl.Result{}, err
+			}
+
+			if r.needsServiceUpdate(service, desiredService) {
+				log.Info("Updating existing Service", "name", serviceName, "namespace", agent.Namespace)
+
+				// Update service spec
+				// Note: Selector should remain stable, only update ports and labels
+				service.Spec.Ports = desiredService.Spec.Ports
+				service.Labels = desiredService.Labels
+
+				if err := r.Update(ctx, service); err != nil {
+					log.Error(err, "Failed to update Service", "name", serviceName)
+					return ctrl.Result{}, err
+				}
+
+				log.Info("Successfully updated Service", "name", serviceName, "namespace", agent.Namespace)
+			}
+		}
+	} else {
+		// No protocols defined, ensure service is deleted if it exists
+		service := &corev1.Service{}
+		serviceName := agent.Name
+		err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: agent.Namespace}, service)
+
+		if err == nil {
+			log.Info("Deleting Service as no protocols are defined", "name", serviceName, "namespace", agent.Namespace)
+			if err := r.Delete(ctx, service); err != nil {
+				log.Error(err, "Failed to delete Service", "name", serviceName)
+				return ctrl.Result{}, err
+			}
+		} else if !errors.IsNotFound(err) {
+			log.Error(err, "Failed to get Service")
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -133,6 +203,11 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 	labels := map[string]string{
 		"app":       agent.Name,
 		"framework": agent.Spec.Framework,
+	}
+
+	// Selector labels should be stable (immutable in Kubernetes)
+	selectorLabels := map[string]string{
+		"app": agent.Name,
 	}
 
 	// Create container ports from protocols
@@ -156,7 +231,7 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 		Spec: appsv1.DeploymentSpec{
 			Replicas: replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: selectorLabels,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -192,6 +267,12 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 // createServiceForAgent creates a service for the given Agent
 func (r *AgentReconciler) createServiceForAgent(agent *runtimev1alpha1.Agent, serviceName string) (*corev1.Service, error) {
 	labels := map[string]string{
+		"app":       agent.Name,
+		"framework": agent.Spec.Framework,
+	}
+
+	// Service selector should match deployment selector (stable labels only)
+	selectorLabels := map[string]string{
 		"app": agent.Name,
 	}
 
@@ -213,7 +294,7 @@ func (r *AgentReconciler) createServiceForAgent(agent *runtimev1alpha1.Agent, se
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: labels,
+			Selector: selectorLabels,
 			Ports:    servicePorts,
 			Type:     corev1.ServiceTypeClusterIP,
 		},
@@ -225,6 +306,102 @@ func (r *AgentReconciler) createServiceForAgent(agent *runtimev1alpha1.Agent, se
 	}
 
 	return service, nil
+}
+
+// needsDeploymentUpdate compares existing deployment with desired deployment to determine if update is needed
+func (r *AgentReconciler) needsDeploymentUpdate(existing *appsv1.Deployment, desired *appsv1.Deployment) bool {
+	// Check replicas
+	if *existing.Spec.Replicas != *desired.Spec.Replicas {
+		return true
+	}
+
+	// Check image
+	if len(existing.Spec.Template.Spec.Containers) > 0 && len(desired.Spec.Template.Spec.Containers) > 0 {
+		if existing.Spec.Template.Spec.Containers[0].Image != desired.Spec.Template.Spec.Containers[0].Image {
+			return true
+		}
+	}
+
+	// Check labels
+	if !mapsEqual(existing.Labels, desired.Labels) {
+		return true
+	}
+
+	if !mapsEqual(existing.Spec.Template.Labels, desired.Spec.Template.Labels) {
+		return true
+	}
+
+	// Note: We don't check selector as it's immutable in Kubernetes
+
+	// Check container ports
+	existingPorts := existing.Spec.Template.Spec.Containers[0].Ports
+	desiredPorts := desired.Spec.Template.Spec.Containers[0].Ports
+
+	if len(existingPorts) != len(desiredPorts) {
+		return true
+	}
+
+	for i, existingPort := range existingPorts {
+		if i >= len(desiredPorts) {
+			return true
+		}
+		desiredPort := desiredPorts[i]
+		if existingPort.Name != desiredPort.Name ||
+			existingPort.ContainerPort != desiredPort.ContainerPort ||
+			existingPort.Protocol != desiredPort.Protocol {
+			return true
+		}
+	}
+
+	return false
+}
+
+// needsServiceUpdate compares existing service with desired service to determine if update is needed
+func (r *AgentReconciler) needsServiceUpdate(existing *corev1.Service, desired *corev1.Service) bool {
+	// Check labels
+	if !mapsEqual(existing.Labels, desired.Labels) {
+		return true
+	}
+
+	// Note: Selector should remain stable, so we don't check for changes
+
+	// Check ports
+	existingPorts := existing.Spec.Ports
+	desiredPorts := desired.Spec.Ports
+
+	if len(existingPorts) != len(desiredPorts) {
+		return true
+	}
+
+	for i, existingPort := range existingPorts {
+		if i >= len(desiredPorts) {
+			return true
+		}
+		desiredPort := desiredPorts[i]
+		if existingPort.Name != desiredPort.Name ||
+			existingPort.Port != desiredPort.Port ||
+			existingPort.Protocol != desiredPort.Protocol ||
+			existingPort.TargetPort != desiredPort.TargetPort {
+			return true
+		}
+	}
+
+	return false
+}
+
+// mapsEqual compares two string maps for equality
+func mapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for key, valueA := range a {
+		if valueB, ok := b[key]; !ok || valueA != valueB {
+			return false
+		}
+	}
+
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager.
