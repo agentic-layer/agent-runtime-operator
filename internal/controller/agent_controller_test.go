@@ -193,7 +193,48 @@ var _ = Describe("Agent Controller", func() {
 			deployment := &appsv1.Deployment{}
 			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
-			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.2.0"))
+			// Find agent container using our improved method (addresses PR feedback)
+			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
+			Expect(agentContainer).NotTo(BeNil())
+			Expect(agentContainer.Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.2.0"))
+		})
+
+		It("should detect environment variable changes and update deployment", func() {
+			By("Verifying initial environment variables")
+			deployment := &appsv1.Deployment{}
+			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
+			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
+
+			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
+			Expect(agentContainer).NotTo(BeNil())
+			Expect(agentContainer.Env).To(HaveLen(1))
+			Expect(agentContainer.Env[0].Name).To(Equal("AGENT_NAME"))
+			Expect(agentContainer.Env[0].Value).To(Equal(resourceName))
+
+			By("Manually updating environment variables to simulate external changes")
+			agentContainer.Env = append(agentContainer.Env, corev1.EnvVar{
+				Name:  "NEW_VAR",
+				Value: "test-value",
+			})
+			Expect(k8sClient.Update(ctx, deployment)).To(Succeed())
+
+			By("Reconciling should detect the difference and restore proper env vars")
+			controllerReconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying environment variables were restored to expected state")
+			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
+			agentContainer = findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
+			Expect(agentContainer).NotTo(BeNil())
+			Expect(agentContainer.Env).To(HaveLen(1))
+			Expect(agentContainer.Env[0].Name).To(Equal("AGENT_NAME"))
+			Expect(agentContainer.Env[0].Value).To(Equal(resourceName))
 		})
 
 		It("should update Deployment when replicas change", func() {
@@ -379,9 +420,25 @@ var _ = Describe("Agent Controller", func() {
 
 			By("Verifying the image was updated but resource limits were preserved")
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
-			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.4.0"))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).To(Equal(resourceQuantity("100m")))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceMemory]).To(Equal(resourceQuantity("128Mi")))
+			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
+			Expect(agentContainer).NotTo(BeNil())
+			Expect(agentContainer.Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.4.0"))
+			Expect(agentContainer.Resources.Limits[corev1.ResourceCPU]).To(Equal(resourceQuantity("100m")))
+			Expect(agentContainer.Resources.Limits[corev1.ResourceMemory]).To(Equal(resourceQuantity("128Mi")))
 		})
 	})
 })
+
+// Helper functions for tests (addresses PR feedback)
+func findAgentContainerHelper(containers []corev1.Container) *corev1.Container {
+	for i := range containers {
+		if containers[i].Name == "agent" {
+			return &containers[i]
+		}
+	}
+	// Fallback to first container for backwards compatibility
+	if len(containers) > 0 {
+		return &containers[0]
+	}
+	return nil
+}
