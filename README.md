@@ -1,6 +1,6 @@
 # Agent Runtime Operator
 
-The Agent Runtime Operator is a Kubernetes operator built with the Kubebuilder framework. Its purpose is to provide a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses a Custom Resource Definition (CRD) to abstract away framework-specific configurations, simplifying the management of components like the model router.
+The Agent Runtime Operator is a Kubernetes operator built with the [Operator SDK](https://sdk.operatorframework.io/) framework. Its purpose is to provide a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the management of components like wiring of agents with a observability stack or model routers.
 
 ## Table of Contents
 
@@ -142,23 +142,6 @@ make cleanup-test-e2e
 
 ## Testing Tools and Configuration
 
-### Testing Frameworks
-
-This project uses the following testing tools:
-
-- **Ginkgo v2** - BDD testing framework for Go
-- **Gomega** - Matcher library for Ginkgo
-- **controller-runtime/envtest** - Testing environment for Kubernetes controllers
-- **Kind** - Kubernetes clusters for integration testing
-
-### Test Configuration
-
-  * **Unit Test Configuration**: Uses `envtest`. Test files are located alongside the source code in `internal/controller/*_test.go` and `internal/webhook/v1alpha1/*_test.go`.
-  * **E2E Test Configuration**: The main configuration file is `test/e2e/e2e_suite_test.go`. All E2E test scripts are located in the `test/e2e/` directory.
-
-  * **Example Configuration Setting:**
-    A key setting is the name of the Kubernetes cluster used for testing, which is defined as `agent-runtime-operator-test-e2e`.
-
 ## Sample Data
 
 The project includes sample `Agent` custom resources to help you get started.
@@ -170,7 +153,7 @@ The project includes sample `Agent` custom resources to help you get started.
     You can deploy the sample "weather-agent" with the following `kubectl` command:
 
     ```bash
-    kubectl apply -f config/samples/runtime_v1alpha1_agent.yaml
+    kubectl apply -k config/samples/
     ```
 
   * **How to verify the sample agent?**
@@ -193,12 +176,7 @@ We welcome contributions to the Agent Runtime Operator! Please follow these guid
 1. **Fork and clone the repository**
 2. **Install pre-commit hooks** (mandatory for all contributors):
    ```bash
-   # Install pre-commit (if not already installed)
-   pip install pre-commit
-   ```
-   ```bash
-   # or
-   brew install pre-commit
+   brew bundle
    ```
    ```bash
    # Install hooks for this repository
