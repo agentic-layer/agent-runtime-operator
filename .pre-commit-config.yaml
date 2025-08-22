@@ -1,0 +1,25 @@
+# See https://pre-commit.com for more information
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-json
+      - id: check-toml
+      - id: name-tests-test
+        args: [ --pytest-test-first ]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: requirements-txt-fixer
+      - id: mixed-line-ending
+
+  - repo: local
+    hooks:
+      - id: make-fmt
+        language: system
+        entry: "make fmt"
+        pass_filenames: false
