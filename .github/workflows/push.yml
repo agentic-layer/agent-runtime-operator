@@ -32,10 +32,18 @@ jobs:
       - name: 'Configure Docker for Artifact Registry'
         run: gcloud auth configure-docker eu.gcr.io
 
+      - name: 'Generate Version Tag'
+        id: 'generate_version'
+        run: |
+          GIT_BRANCH="${{ github.ref_name }}"
+          GIT_SHA="${{ github.sha }}"
+          VERSION="${GIT_BRANCH}-${GIT_SHA:0:7}-$(date +%s)"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: 'Docker Build'
         run: |
-          make docker-build
+          VERSION=${{ steps.generate_version.outputs.version }} make docker-build
 
       - name: 'Docker Push'
         run: |
-          make docker-push
+          VERSION=${{ steps.generate_version.outputs.version }} make docker-push
