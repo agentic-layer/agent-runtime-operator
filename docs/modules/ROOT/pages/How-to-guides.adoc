@@ -1,0 +1,508 @@
+= How-to Guides
+
+Practical guides to solve specific problems and achieve particular goals with the Agent Runtime Operator.
+
+== Installation
+
+=== How to Install the Operator
+
+==== Prerequisites
+
+Before installing, ensure you have:
+
+* Kubernetes cluster (v1.19+)
+* kubectl configured to access your cluster
+* cert-manager installed (for webhooks)
+
+==== Install cert-manager
+
+If cert-manager isn't already installed:
+
+[source,bash]
+----
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+
+# Wait for cert-manager pods to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=300s
+----
+
+==== Installation Methods
+
+===== Method 1: From Release Manifests
+
+[source,bash]
+----
+# Install CRDs and operator from latest release
+kubectl apply -f https://github.com/agentic-layer/agent-runtime-operator/releases/latest/download/install.yaml
+----
+
+===== Method 2: Using Kustomize
+
+[source,bash]
+----
+# Clone the repository
+git clone https://github.com/agentic-layer/agent-runtime-operator
+cd agent-runtime-operator
+
+# Install CRDs
+make install
+
+# Deploy using kustomize
+kubectl apply -k config/default
+----
+
+===== Method 3: Development Installation
+
+For development or customization:
+
+[source,bash]
+----
+# Clone and build locally
+git clone https://github.com/agentic-layer/agent-runtime-operator
+cd agent-runtime-operator
+
+# Install CRDs
+make install
+
+# Build and deploy
+make docker-build docker-push IMG=<your-registry>/agent-runtime-operator:tag
+make deploy IMG=<your-registry>/agent-runtime-operator:tag
+----
+
+==== Verify Installation
+
+[source,bash]
+----
+# Check operator pods
+kubectl get pods -n agent-runtime-operator-system
+
+# Verify CRDs are installed
+kubectl get crds | grep runtime.agentic-layer.ai
+
+# Check webhook configuration
+kubectl get validatingwebhookconfiguration | grep agent-runtime-operator
+----
+
+=== How to Uninstall the Operator
+
+[source,bash]
+----
+# Delete all agent resources first
+kubectl delete agents --all
+
+# Remove the operator
+make undeploy
+
+# Remove CRDs (this will delete all agent resources)
+make uninstall
+----
+
+== Configuration
+
+=== How to Configure Different Agent Types
+
+==== Google ADK Agents
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: adk-agent
+spec:
+  framework: google-adk
+  image: my-registry/adk-agent:v1.0.0
+  protocols:
+    - type: A2A
+  replicas: 2
+----
+
+==== Flokk Agents
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: flokk-agent
+spec:
+  framework: flokk
+  image: my-registry/flokk-agent:latest
+  protocols:
+    - type: A2A
+----
+
+==== Autogen Agents
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: autogen-agent
+spec:
+  framework: autogen
+  image: my-registry/autogen-agent:v2.1.0
+  protocols:
+    - type: A2A
+  replicas: 1
+----
+
+=== How to Configure Environment Variables
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: configured-agent
+spec:
+  framework: google-adk
+  image: my-registry/my-agent:latest
+  protocols:
+    - type: A2A
+  env:
+    - name: LOG_LEVEL
+      value: "debug"
+    - name: MODEL_ENDPOINT
+      value: "https://api.openai.com/v1"
+    - name: API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: agent-secrets
+          key: api-key
+----
+
+=== How to Set Resource Limits
+
+[source,yaml]
+----
+spec:
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "100m" 
+      memory: "128Mi"
+----
+
+=== How to Configure Node Placement
+
+[source,yaml]
+----
+spec:
+  nodeSelector:
+    node-type: compute
+  tolerations:
+    - key: "agent-workload"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["my-agent"]
+            topologyKey: kubernetes.io/hostname
+----
+
+== Scaling and Management
+
+=== How to Scale Agents
+
+==== Manual Scaling
+
+[source,bash]
+----
+# Scale to 5 replicas using kubectl patch
+kubectl patch agent my-agent -p '{"spec":{"replicas":5}}'
+
+# Or edit the agent resource directly
+kubectl edit agent my-agent
+----
+
+==== Update Agent Image
+
+[source,bash]
+----
+# Update to new image version
+kubectl patch agent my-agent -p '{"spec":{"image":"my-registry/my-agent:v2.0.0"}}'
+----
+
+=== How to Monitor Agent Health
+
+[source,bash]
+----
+# Check agent status
+kubectl get agents
+
+# Get detailed agent information
+kubectl describe agent my-agent
+
+# Check created deployments
+kubectl get deployments -l app.kubernetes.io/name=my-agent
+
+# Monitor resource usage
+kubectl top pods -l app.kubernetes.io/name=my-agent
+----
+
+=== How to View Agent Logs
+
+[source,bash]
+----
+# View logs from all replicas
+kubectl logs -l app.kubernetes.io/name=my-agent
+
+# Follow logs in real-time
+kubectl logs -f deployment/my-agent
+
+# View logs from specific pod
+kubectl logs my-agent-xyz123
+
+# View previous container logs if pod restarted
+kubectl logs my-agent-xyz123 --previous
+----
+
+== Testing
+
+=== How to Run Unit Tests
+
+[source,bash]
+----
+# Run all unit tests
+make test
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run tests with coverage
+make test-coverage
+
+# View coverage report
+go tool cover -html=cover.out
+----
+
+=== How to Run End-to-End Tests
+
+[source,bash]
+----
+# Run complete e2e test suite (creates/destroys Kind cluster)
+make test-e2e
+
+# Run e2e tests with existing cluster
+go test -v ./test/e2e/... -use-existing-cluster
+----
+
+=== How to Test with Real Agents
+
+[source,bash]
+----
+# Test with sample agent
+kubectl apply -f config/samples/runtime_v1alpha1_agent.yaml
+
+# Verify agent deployment
+kubectl get agents
+kubectl get deployments
+kubectl get pods
+----
+
+== Troubleshooting
+
+=== How to Debug Operator Issues
+
+==== Check Operator Logs
+
+[source,bash]
+----
+# View operator logs
+kubectl logs -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager
+
+# Follow logs in real-time
+kubectl logs -f -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager
+
+# Check specific container logs
+kubectl logs -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager -c manager
+----
+
+==== Check Operator Status
+
+[source,bash]
+----
+# Check operator pods
+kubectl get pods -n agent-runtime-operator-system
+
+# Check operator deployment
+kubectl describe deployment -n agent-runtime-operator-system agent-runtime-operator-controller-manager
+
+# Check operator service account
+kubectl get serviceaccount -n agent-runtime-operator-system
+----
+
+=== How to Debug Agent Deployment Issues
+
+[source,bash]
+----
+# Check agent resource status
+kubectl get agents
+kubectl describe agent my-agent
+
+# Check created resources
+kubectl get deployments -l app.kubernetes.io/name=my-agent
+kubectl get services -l app.kubernetes.io/name=my-agent
+kubectl get pods -l app.kubernetes.io/name=my-agent
+
+# Check pod events
+kubectl describe pod <pod-name>
+
+# Check deployment events
+kubectl describe deployment my-agent
+----
+
+=== How to Debug Webhook Issues
+
+[source,bash]
+----
+# Check webhook configuration
+kubectl get validatingwebhookconfigurations
+kubectl get mutatingwebhookconfigurations
+
+# Verify webhook certificates
+kubectl get certificates -n agent-runtime-operator-system
+kubectl describe certificate agent-runtime-operator-serving-cert -n agent-runtime-operator-system
+
+# Test webhook validation
+kubectl apply -f - <<EOF
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: invalid-agent
+spec:
+  framework: invalid-framework  # Should be rejected
+  image: test:latest
+  protocols: []  # Should be rejected (empty)
+EOF
+----
+
+=== How to Fix Common Problems
+
+==== Image Pull Errors
+
+Problem: `ErrImagePull` or `ImagePullBackOff`
+
+Solutions:
+1. Verify image exists and tag is correct
+2. Check registry credentials
+3. Ensure image registry is accessible from cluster
+
+[source,bash]
+----
+# Check image pull secrets
+kubectl get secrets
+kubectl describe secret <image-pull-secret>
+
+# Test image pull manually
+docker pull <image-name>
+----
+
+==== Resource Constraints
+
+Problem: Pod stuck in `Pending` state
+
+Solutions:
+1. Check node resources: `kubectl describe nodes`
+2. Reduce resource requests in agent spec
+3. Add more nodes or use smaller resource limits
+
+[source,bash]
+----
+# Check node capacity
+kubectl describe nodes | grep -A 5 "Allocated resources"
+
+# Check resource quotas
+kubectl describe quota
+----
+
+==== Webhook Certificate Issues
+
+Problem: Webhook admission failures
+
+Solutions:
+1. Verify cert-manager is running
+2. Check certificate status
+3. Restart operator pods
+
+[source,bash]
+----
+# Check cert-manager
+kubectl get pods -n cert-manager
+
+# Check certificates
+kubectl get certificates -A
+
+# Restart operator
+kubectl rollout restart deployment -n agent-runtime-operator-system agent-runtime-operator-controller-manager
+----
+
+== Development
+
+=== How to Contribute to the Project
+
+[source,bash]
+----
+# Fork and clone the repository
+git clone https://github.com/<your-username>/agent-runtime-operator
+cd agent-runtime-operator
+
+# Create feature branch
+git checkout -b feature/my-new-feature
+
+# Make changes and test
+make test
+make test-e2e
+
+# Commit and push
+git add .
+git commit -m "Add new feature"
+git push origin feature/my-new-feature
+----
+
+=== How to Build Custom Images
+
+[source,bash]
+----
+# Build custom operator image
+make docker-build IMG=my-registry/agent-runtime-operator:custom
+
+# Push to registry
+make docker-push IMG=my-registry/agent-runtime-operator:custom
+
+# Deploy custom image
+make deploy IMG=my-registry/agent-runtime-operator:custom
+----
+
+=== How to Extend Framework Support
+
+To add support for a new agent framework:
+
+1. **Update the CRD** to include the new framework in validation
+2. **Extend the controller** to handle framework-specific logic
+3. **Add tests** for the new framework
+4. **Update documentation** with examples
+
+[source,go]
+----
+// In agent_types.go, add to framework validation
+// +kubebuilder:validation:Enum=google-adk;flokk;autogen;my-new-framework
+
+// In agent_controller.go, add framework handling
+switch agent.Spec.Framework {
+case "my-new-framework":
+    // Add framework-specific deployment logic
+}
+----

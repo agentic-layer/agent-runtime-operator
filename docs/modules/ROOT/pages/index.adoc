@@ -1,6 +1,6 @@
 = Agent Runtime Operator
 
-The Agent Runtime Operator is a Kubernetes operator built with the https://sdk.operatorframework.io/[Operator SDK] framework. Its purpose is to provide a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the management of components like wiring of agents with a observability stack or model routers.
+The Agent Runtime Operator is a Kubernetes operator that provides a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the deployment and management of agents across different frameworks.
 
 == What is the Agent Runtime Operator?
 
@@ -19,21 +19,53 @@ The Agent Runtime Operator enables you to:
 * **Observability**: Built-in integration with monitoring stacks
 * **Scalable**: Deploy multiple agent replicas
 
+== Documentation Structure
+
+This documentation follows the Diataxis framework to help you find the information you need:
+
+=== 📚 xref:Tutorials.adoc[Tutorials]
+**Learning-oriented** - Step-by-step lessons to get you started
+
+* Getting Started Tutorial - Deploy your first agent
+* Multi-Framework Tutorial - Work with different agent frameworks
+* Scaling and Monitoring Tutorial - Learn to scale and monitor agents
+
+=== 🛠️ xref:How-to-guides.adoc[How-to Guides] 
+**Problem-oriented** - Practical guides to solve specific problems
+
+* Installation guides for different environments
+* Configuration guides for various use cases
+* Troubleshooting guides for common issues
+* Testing guides for validation
+
+=== 📖 xref:Reference.adoc[Reference]
+**Information-oriented** - Comprehensive reference material
+
+* Complete Agent Custom Resource Definition
+* Environment variables reference
+* CLI commands reference  
+* Error messages and solutions
+* Sample configurations
+
+=== 💡 xref:Explanation.adoc[Explanation]
+**Understanding-oriented** - Conceptual guides to deepen understanding
+
+* Architecture overview and design decisions
+* Framework abstraction concepts
+* Security model and best practices
+* Scalability considerations
+
 == Quick Start
 
-To get started with the Agent Runtime Operator:
+New to the Agent Runtime Operator? Start with:
 
-1. Ensure you have the xref:prerequisites.adoc[prerequisites] installed
-2. Follow the xref:getting-started.adoc[getting started guide] to deploy the operator
-3. Configure your first agent using xref:custom-resources.adoc[custom resources]
+1. **xref:Tutorials.adoc#getting-started-tutorial[Getting Started Tutorial]** - Learn the basics
+2. **xref:How-to-guides.adoc#how-to-install-the-operator[Installation Guide]** - Deploy the operator
+3. **xref:Reference.adoc#agent-custom-resource-definition[Agent Reference]** - Understand the configuration options
 
-== Architecture
+== Need Help?
 
-The operator manages `Agent` custom resources and creates the necessary Kubernetes deployments, services, and configurations to run your agentic workloads.
-
-== Next Steps
-
-* xref:getting-started.adoc[Get Started] with a local deployment
-* Learn about xref:configuration.adoc[configuration options]
-* Explore xref:sample-data.adoc[sample agents]
-* Read about xref:contributing.adoc[contributing] to the project
+* **Learning**: Start with xref:Tutorials.adoc[Tutorials]
+* **Solving Problems**: Check xref:How-to-guides.adoc[How-to Guides]
+* **Looking Up Details**: Browse xref:Reference.adoc[Reference]
+* **Understanding Concepts**: Read xref:Explanation.adoc[Explanation]

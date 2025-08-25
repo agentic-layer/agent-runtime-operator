@@ -1,0 +1,353 @@
+= Tutorials
+
+Learn by doing with these step-by-step tutorials that will teach you the fundamentals of the Agent Runtime Operator.
+
+== Getting Started Tutorial
+
+This tutorial will walk you through setting up the Agent Runtime Operator and deploying your first agent. By the end, you'll have a working operator deployment and understand the basic workflow.
+
+=== What You'll Learn
+
+* How to set up a local Kubernetes cluster
+* How to deploy the Agent Runtime Operator
+* How to create and deploy your first agent
+* How to verify your deployment works
+
+=== What You'll Need
+
+* Docker installed and running
+* kubectl command-line tool
+* kind (Kubernetes in Docker) for local testing
+
+=== Step 1: Set Up Your Environment
+
+First, let's create a local Kubernetes cluster using kind:
+
+[source,bash]
+----
+# Create a new kind cluster
+kind create cluster --name agent-operator-tutorial
+
+# Verify the cluster is running
+kubectl cluster-info --context kind-agent-operator-tutorial
+----
+
+=== Step 2: Install Prerequisites
+
+The operator requires cert-manager for webhook certificates:
+
+[source,bash]
+----
+# Install cert-manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+
+# Wait for cert-manager to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=300s
+----
+
+=== Step 3: Clone and Deploy the Operator
+
+[source,bash]
+----
+# Clone the repository
+git clone https://github.com/agentic-layer/agent-runtime-operator
+cd agent-runtime-operator
+
+# Install the Custom Resource Definitions
+make install
+
+# Build the operator container image
+make docker-build
+
+# Load the image into your kind cluster
+make kind-load
+
+# Deploy the operator
+make deploy
+----
+
+=== Step 4: Verify the Operator
+
+Check that the operator is running:
+
+[source,bash]
+----
+# Check the operator pods
+kubectl get pods -n agent-runtime-operator-system
+
+# You should see output like:
+# NAME                                                     READY   STATUS    RESTARTS   AGE
+# agent-runtime-operator-controller-manager-xxxxx         2/2     Running   0          60s
+----
+
+=== Step 5: Deploy Your First Agent
+
+Create a simple agent configuration:
+
+[source,bash]
+----
+cat << EOF > my-first-agent.yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: my-first-agent
+spec:
+  framework: google-adk
+  image: eu.gcr.io/agentic-layer/weather-agent:0.1.2
+  protocols:
+    - type: A2A
+  replicas: 1
+EOF
+
+# Apply the configuration
+kubectl apply -f my-first-agent.yaml
+----
+
+=== Step 6: Verify Your Agent
+
+Check that your agent is deployed and running:
+
+[source,bash]
+----
+# Check the agent resource
+kubectl get agents
+
+# Check the created deployment
+kubectl get deployments
+
+# Check the running pods
+kubectl get pods
+----
+
+You should see your agent pod in a "Running" state.
+
+=== What You've Accomplished
+
+Congratulations! You've successfully:
+
+✅ Set up a local Kubernetes cluster
+✅ Deployed the Agent Runtime Operator  
+✅ Created and deployed your first agent
+✅ Verified everything is working
+
+=== Next Steps
+
+Now that you have the basics working, you can:
+
+* Learn how to configure different agent types
+* Explore the complete custom resource reference
+* Understand how the operator works under the hood
+
+=== Troubleshooting
+
+If you encounter issues:
+
+1. **Operator not starting**: Check the logs with `kubectl logs -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager`
+2. **Agent not deploying**: Check the agent status with `kubectl describe agent my-first-agent`  
+3. **Pods stuck pending**: Check resource constraints with `kubectl describe pod <pod-name>`
+
+=== Clean Up
+
+To clean up your tutorial environment:
+
+[source,bash]
+----
+# Delete the agent
+kubectl delete agent my-first-agent
+
+# Delete the operator
+make undeploy
+
+# Delete the kind cluster
+kind delete cluster --name agent-operator-tutorial
+----
+
+== Multi-Framework Tutorial
+
+Learn how to deploy agents from different frameworks and understand their differences.
+
+=== What You'll Learn
+
+* How to deploy Google ADK agents
+* How to deploy Flokk agents  
+* How to deploy Autogen agents
+* Framework-specific configuration differences
+
+=== Prerequisites
+
+* Completed the Getting Started tutorial
+* Agent Runtime Operator deployed and running
+
+=== Google ADK Agent
+
+[source,bash]
+----
+cat << EOF > adk-agent.yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: adk-weather-agent
+spec:
+  framework: google-adk
+  image: eu.gcr.io/agentic-layer/weather-agent:0.1.2
+  protocols:
+    - type: A2A
+  replicas: 1
+EOF
+
+kubectl apply -f adk-agent.yaml
+----
+
+=== Flokk Agent
+
+[source,bash]
+----
+cat << EOF > flokk-agent.yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: flokk-assistant-agent
+spec:
+  framework: flokk
+  image: my-registry/flokk-assistant:latest
+  protocols:
+    - type: A2A
+  replicas: 2
+EOF
+
+kubectl apply -f flokk-agent.yaml
+----
+
+=== Autogen Agent
+
+[source,bash]
+----
+cat << EOF > autogen-agent.yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: autogen-research-agent
+spec:
+  framework: autogen
+  image: my-registry/autogen-research:v2.1.0
+  protocols:
+    - type: A2A
+  replicas: 1
+EOF
+
+kubectl apply -f autogen-agent.yaml
+----
+
+=== Verify All Agents
+
+[source,bash]
+----
+# Check all agents
+kubectl get agents
+
+# Check all deployments
+kubectl get deployments
+
+# Check pods from all agents
+kubectl get pods -l app.kubernetes.io/component=agent
+----
+
+=== Compare Framework Behaviors
+
+Examine how different frameworks behave:
+
+[source,bash]
+----
+# Check logs from different framework agents
+kubectl logs -l app.kubernetes.io/name=adk-weather-agent
+kubectl logs -l app.kubernetes.io/name=flokk-assistant-agent  
+kubectl logs -l app.kubernetes.io/name=autogen-research-agent
+----
+
+== Scaling and Monitoring Tutorial
+
+Learn how to scale agents and monitor their performance.
+
+=== What You'll Learn
+
+* How to scale agent replicas
+* How to monitor agent health
+* How to troubleshoot common issues
+
+=== Scale an Agent
+
+[source,bash]
+----
+# Scale up to 5 replicas
+kubectl patch agent my-first-agent -p '{"spec":{"replicas":5}}'
+
+# Watch the scaling progress
+kubectl get pods -w
+
+# Verify all replicas are running
+kubectl get deployments
+----
+
+=== Monitor Agent Status
+
+[source,bash]
+----
+# Check agent status
+kubectl get agents -o wide
+
+# Get detailed agent information
+kubectl describe agent my-first-agent
+
+# Monitor resource usage
+kubectl top pods -l app.kubernetes.io/name=my-first-agent
+----
+
+=== View Agent Logs
+
+[source,bash]
+----
+# View logs from all replicas
+kubectl logs -l app.kubernetes.io/name=my-first-agent
+
+# Follow logs in real-time
+kubectl logs -f deployment/my-first-agent
+
+# View previous container logs if pod restarted
+kubectl logs my-first-agent-xyz123 --previous
+----
+
+=== Troubleshoot Issues
+
+Practice troubleshooting common problems:
+
+[source,bash]
+----
+# Create an agent with an invalid image
+cat << EOF > broken-agent.yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: broken-agent
+spec:
+  framework: google-adk
+  image: invalid/image:does-not-exist
+  protocols:
+    - type: A2A
+EOF
+
+kubectl apply -f broken-agent.yaml
+
+# Investigate the issue
+kubectl get agents broken-agent
+kubectl describe agent broken-agent
+kubectl get pods -l app.kubernetes.io/name=broken-agent
+kubectl describe pod <pod-name>
+----
+
+=== Clean Up
+
+[source,bash]
+----
+# Delete all tutorial agents
+kubectl delete agents --all
+----

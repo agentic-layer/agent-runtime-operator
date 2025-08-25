@@ -1,0 +1,676 @@
+= Reference
+
+Comprehensive reference documentation for the Agent Runtime Operator.
+
+== Agent Custom Resource Definition
+
+Complete reference for the Agent custom resource definition.
+
+=== API Version
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+----
+
+=== Agent Specification
+
+==== Required Fields
+
+[cols="1,1,2,3"]
+|===
+|Field |Type |Required |Description
+
+|`framework`
+|string
+|Yes
+|Agent framework type. Supported values: `google-adk`, `flokk`, `autogen`
+
+|`image`
+|string  
+|Yes
+|Container image for the agent. Must include registry and tag.
+
+|`protocols`
+|[]Protocol
+|Yes
+|List of communication protocols the agent supports
+|===
+
+==== Optional Fields
+
+[cols="1,1,2,2,1"]
+|===
+|Field |Type |Required |Description |Default
+
+|`replicas`
+|integer
+|No
+|Number of agent instances to run
+|1
+
+|`env`
+|[]EnvVar
+|No
+|Environment variables for the agent container
+|[]
+
+|`resources`
+|ResourceRequirements
+|No
+|CPU and memory resource constraints
+|{}
+
+|`nodeSelector`
+|map[string]string
+|No
+|Node selection constraints
+|{}
+
+|`tolerations`
+|[]Toleration
+|No
+|Pod tolerations for node taints
+|[]
+
+|`affinity`
+|Affinity
+|No
+|Pod scheduling preferences
+|{}
+|===
+
+=== Protocol Configuration
+
+==== Protocol Object
+
+[cols="1,1,2,3"]
+|===
+|Field |Type |Required |Description
+
+|`type`
+|string
+|Yes
+|Protocol type. Currently supported: `A2A`
+
+|`config`
+|map[string]string
+|No
+|Protocol-specific configuration parameters
+|===
+
+==== Supported Protocol Types
+
+===== A2A (Agent-to-Agent)
+
+Used for direct agent-to-agent communication.
+
+[source,yaml]
+----
+protocols:
+  - type: A2A
+    config:
+      port: "8080"  # Optional: custom port
+----
+
+=== Environment Variables
+
+Standard Kubernetes EnvVar specification:
+
+[source,yaml]
+----
+env:
+  - name: ENV_NAME
+    value: "direct-value"
+  - name: SECRET_VALUE
+    valueFrom:
+      secretKeyRef:
+        name: my-secret
+        key: secret-key
+  - name: CONFIG_VALUE
+    valueFrom:
+      configMapKeyRef:
+        name: my-config
+        key: config-key
+----
+
+=== Resource Requirements
+
+Standard Kubernetes ResourceRequirements:
+
+[source,yaml]
+----
+resources:
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+    ephemeral-storage: "1Gi"
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+    ephemeral-storage: "500Mi"
+----
+
+=== Status Fields
+
+The operator updates these status fields:
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`conditions`
+|[]Condition
+|Current status conditions
+
+|`replicas`
+|integer
+|Number of desired replicas
+
+|`readyReplicas` 
+|integer
+|Number of ready replicas
+
+|`observedGeneration`
+|integer
+|Last observed generation
+|===
+
+==== Condition Types
+
+[cols="1,3,2"]
+|===
+|Type |Description |Possible Reasons
+
+|`Ready`
+|Agent is ready and serving
+|`Available`, `Progressing`, `Failure`
+
+|`Progressing`
+|Deployment is progressing
+|`NewReplicaSetAvailable`, `FoundNewReplicaSet`
+
+|`Available`
+|Deployment has minimum availability
+|`MinimumReplicasAvailable`
+|===
+
+=== Complete Example
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: production-weather-agent
+  namespace: agents
+  labels:
+    app: weather-service
+    component: agent
+    version: v1.2.0
+    environment: production
+  annotations:
+    deployment.kubernetes.io/revision: "3"
+spec:
+  framework: google-adk
+  image: eu.gcr.io/my-project/weather-agent:v1.2.0
+  protocols:
+    - type: A2A
+      config:
+        port: "8080"
+  replicas: 3
+  env:
+    - name: LOG_LEVEL
+      value: "info"
+    - name: MODEL_ENDPOINT
+      value: "https://api.openai.com/v1"
+    - name: API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: openai-credentials
+          key: api-key
+    - name: NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  nodeSelector:
+    node-type: compute
+  tolerations:
+    - key: "agent-workload"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["weather-service"]
+            topologyKey: kubernetes.io/hostname
+----
+
+=== Validation Rules
+
+The operator validates:
+
+* `framework` must be one of: `google-adk`, `flokk`, `autogen`
+* `image` must be a valid container image reference
+* `protocols` array must not be empty
+* `replicas` must be >= 1 if specified
+* Resource requests must not exceed limits
+* Protocol `type` must be supported
+
+=== Generated Resources
+
+For each Agent, the operator creates:
+
+* **Deployment**: Manages agent pods
+* **Service**: Exposes agent protocols (if applicable)
+* **ServiceMonitor**: Enables Prometheus monitoring (if enabled)
+
+==== Resource Naming
+
+* Deployment: `{agent-name}`
+* Service: `{agent-name}-svc`
+* ServiceMonitor: `{agent-name}-metrics`
+
+==== Labels
+
+All generated resources include:
+
+[source,yaml]
+----
+labels:
+  app.kubernetes.io/name: {agent-name}
+  app.kubernetes.io/instance: {agent-name}
+  app.kubernetes.io/component: agent
+  app.kubernetes.io/managed-by: agent-runtime-operator
+  runtime.agentic-layer.ai/framework: {framework}
+----
+
+== Operator Environment Variables
+
+Environment variables that control the Agent Runtime Operator behavior.
+
+=== ENABLE_WEBHOOKS
+
+* **Type**: Boolean
+* **Default**: `true`
+* **Description**: Controls whether admission webhooks are enabled
+
+When set to `false`, the operator will not register or use admission webhooks. This can be useful for development scenarios or environments where webhook certificates are not properly configured.
+
+[source,bash]
+----
+ENABLE_WEBHOOKS=false
+----
+
+=== METRICS_BIND_ADDRESS
+
+* **Type**: String (host:port)
+* **Default**: `:8443`
+* **Description**: Address and port for the metrics server
+
+The operator exposes Prometheus metrics on this address. Use this to configure monitoring integration.
+
+[source,bash]
+----
+METRICS_BIND_ADDRESS=:9090
+----
+
+=== HEALTH_PROBE_BIND_ADDRESS
+
+* **Type**: String (host:port)  
+* **Default**: `:8081`
+* **Description**: Address and port for health probe endpoints
+
+Kubernetes uses these endpoints for readiness and liveness probes.
+
+[source,bash]
+----
+HEALTH_PROBE_BIND_ADDRESS=:8080
+----
+
+=== Configuration in Deployment
+
+Set environment variables in the operator deployment manifest:
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-runtime-operator-controller-manager
+  namespace: agent-runtime-operator-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        image: controller:latest
+        env:
+        - name: ENABLE_WEBHOOKS
+          value: "true"
+        - name: METRICS_BIND_ADDRESS
+          value: ":8443"
+        - name: HEALTH_PROBE_BIND_ADDRESS
+          value: ":8081"
+        ports:
+        - containerPort: 8443
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+----
+
+== Sample Configurations
+
+The project includes sample `Agent` custom resources to help you get started.
+
+=== Weather Agent Sample
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: weather-agent
+spec:
+  framework: google-adk
+  image: eu.gcr.io/agentic-layer/weather-agent:0.1.2
+  protocols:
+    - type: A2A
+  replicas: 1
+----
+
+=== Framework Examples
+
+==== Google ADK Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: adk-agent
+spec:
+  framework: google-adk
+  image: my-registry/adk-agent:v1.0.0
+  protocols:
+    - type: A2A
+  replicas: 2
+----
+
+==== Flokk Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: flokk-agent
+spec:
+  framework: flokk
+  image: my-registry/flokk-agent:latest
+  protocols:
+    - type: A2A
+----
+
+==== Autogen Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: autogen-agent
+spec:
+  framework: autogen
+  image: my-registry/autogen-agent:v2.1.0
+  protocols:
+    - type: A2A
+  replicas: 1
+----
+
+=== Production Configuration Examples
+
+==== High-Availability Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: ha-agent
+  labels:
+    tier: critical
+spec:
+  framework: google-adk
+  image: my-registry/critical-agent:v1.2.0
+  protocols:
+    - type: A2A
+  replicas: 3
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+  env:
+    - name: HEALTH_CHECK_INTERVAL
+      value: "30s"
+----
+
+==== Development Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: dev-agent
+  labels:
+    environment: development
+spec:
+  framework: flokk
+  image: my-registry/dev-agent:latest
+  protocols:
+    - type: A2A
+  replicas: 1
+  env:
+    - name: LOG_LEVEL
+      value: "debug"
+    - name: DEBUG_MODE
+      value: "true"
+----
+
+== CLI Commands Reference
+
+=== kubectl Commands
+
+==== Agent Management
+
+[source,bash]
+----
+# List all agents
+kubectl get agents
+
+# Get agent details
+kubectl describe agent <agent-name>
+
+# Get agent YAML
+kubectl get agent <agent-name> -o yaml
+
+# Edit agent
+kubectl edit agent <agent-name>
+
+# Delete agent
+kubectl delete agent <agent-name>
+
+# Delete all agents
+kubectl delete agents --all
+----
+
+==== Deployment Verification
+
+[source,bash]
+----
+# Check deployments created by agents
+kubectl get deployments -l app.kubernetes.io/managed-by=agent-runtime-operator
+
+# Check services created by agents  
+kubectl get services -l app.kubernetes.io/managed-by=agent-runtime-operator
+
+# Check pods from agent deployments
+kubectl get pods -l app.kubernetes.io/component=agent
+
+# Monitor resource usage
+kubectl top pods -l app.kubernetes.io/component=agent
+----
+
+=== make Commands
+
+==== Development Commands
+
+[source,bash]
+----
+# Build the operator binary
+make build
+
+# Run tests (unit tests excluding e2e)
+make test
+
+# Run e2e tests with isolated Kind cluster
+make test-e2e
+
+# Run linting
+make lint
+
+# Fix linting issues automatically
+make lint-fix
+
+# Format code
+make fmt
+
+# Run go vet
+make vet
+----
+
+==== Local Development
+
+[source,bash]
+----
+# Generate CRDs, RBAC, and webhooks
+make manifests
+
+# Generate deep copy methods
+make generate
+
+# Run controller locally against current cluster
+make run
+
+# Install CRDs into cluster
+make install
+
+# Deploy operator to cluster
+make deploy
+
+# Remove operator from cluster
+make undeploy
+
+# Remove CRDs from cluster
+make uninstall
+----
+
+==== Container Operations
+
+[source,bash]
+----
+# Build Docker image
+make docker-build
+
+# Load image into Kind cluster
+make kind-load
+
+# Push image to registry
+make docker-push
+
+# Build and deploy with custom image
+make docker-build docker-push deploy IMG=<your-registry>/agent-runtime-operator:tag
+----
+
+== Error Messages Reference
+
+=== Common Validation Errors
+
+==== Invalid Framework
+
+**Error**: `admission webhook denied the request: unsupported framework "invalid-framework"`
+
+**Cause**: The specified framework is not supported.
+
+**Solution**: Use one of the supported frameworks: `google-adk`, `flokk`, `autogen`.
+
+==== Empty Protocols
+
+**Error**: `admission webhook denied the request: protocols array cannot be empty`
+
+**Cause**: The protocols field is empty or not specified.
+
+**Solution**: Add at least one protocol configuration:
+
+[source,yaml]
+----
+protocols:
+  - type: A2A
+----
+
+==== Invalid Replicas
+
+**Error**: `admission webhook denied the request: replicas must be >= 1`
+
+**Cause**: Replicas is set to 0 or negative number.
+
+**Solution**: Set replicas to 1 or higher, or omit the field (defaults to 1).
+
+=== Runtime Errors
+
+==== ImagePullBackOff
+
+**Error**: Pod status shows `ImagePullBackOff`
+
+**Cause**: Cannot pull the specified container image.
+
+**Solutions**:
+* Verify image name and tag are correct
+* Check image registry is accessible from cluster
+* Verify image pull secrets if using private registry
+
+==== Pending Pods
+
+**Error**: Pods stuck in `Pending` state
+
+**Cause**: Insufficient cluster resources or scheduling constraints.
+
+**Solutions**:
+* Check node resources: `kubectl describe nodes`
+* Reduce resource requests in agent specification
+* Check node selectors and tolerations
+* Verify cluster has sufficient capacity
