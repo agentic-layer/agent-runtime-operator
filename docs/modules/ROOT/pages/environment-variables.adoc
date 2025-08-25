@@ -1,0 +1,94 @@
+= Environment Variables
+
+This page provides detailed information about environment variables that control the Agent Runtime Operator behavior.
+
+== Operator Environment Variables
+
+=== ENABLE_WEBHOOKS
+
+* **Type**: Boolean
+* **Default**: `true`
+* **Description**: Controls whether admission webhooks are enabled
+
+When set to `false`, the operator will not register or use admission webhooks. This can be useful for development scenarios or environments where webhook certificates are not properly configured.
+
+[source,bash]
+----
+ENABLE_WEBHOOKS=false
+----
+
+=== METRICS_BIND_ADDRESS
+
+* **Type**: String (host:port)
+* **Default**: `:8443`
+* **Description**: Address and port for the metrics server
+
+The operator exposes Prometheus metrics on this address. Use this to configure monitoring integration.
+
+[source,bash]
+----
+METRICS_BIND_ADDRESS=:9090
+----
+
+=== HEALTH_PROBE_BIND_ADDRESS
+
+* **Type**: String (host:port)  
+* **Default**: `:8081`
+* **Description**: Address and port for health probe endpoints
+
+Kubernetes uses these endpoints for readiness and liveness probes.
+
+[source,bash]
+----
+HEALTH_PROBE_BIND_ADDRESS=:8080
+----
+
+== Configuration in Deployment
+
+Set environment variables in the operator deployment manifest:
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-runtime-operator-controller-manager
+  namespace: agent-runtime-operator-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        image: controller:latest
+        env:
+        - name: ENABLE_WEBHOOKS
+          value: "true"
+        - name: METRICS_BIND_ADDRESS
+          value: ":8443"
+        - name: HEALTH_PROBE_BIND_ADDRESS
+          value: ":8081"
+        ports:
+        - containerPort: 8443
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+----
+
+== Development Settings
+
+For local development, you might want to use these settings:
+
+[source,bash]
+----
+export ENABLE_WEBHOOKS=false
+export METRICS_BIND_ADDRESS=:9090
+export HEALTH_PROBE_BIND_ADDRESS=:9091
+----
+
+== Security Considerations
+
+* Ensure metrics endpoints are not exposed publicly in production
+* Use proper RBAC to restrict access to health probe endpoints
+* Consider using TLS for metrics collection in production environments

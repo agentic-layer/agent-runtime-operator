@@ -1,0 +1,33 @@
+= Prerequisites
+
+Before working with this project, ensure you have the following tools installed on your system:
+
+== Required Tools
+
+* **Go**: version 1.24.0 or higher
+* **Docker**: version 20.10+ (or a compatible alternative like Podman)  
+* **kubectl**: The Kubernetes command-line tool
+* **kind**: For running Kubernetes locally in Docker
+* **make**: The build automation tool
+* **Git**: For version control
+
+== Installation Links
+
+* https://golang.org/doc/install[Go Installation Guide]
+* https://docs.docker.com/get-docker/[Docker Installation]
+* https://kubernetes.io/docs/tasks/tools/[kubectl Installation]
+* https://kind.sigs.k8s.io/docs/user/quick-start/#installation[kind Installation]
+
+== Verification
+
+You can verify your installation by running:
+
+[source,bash]
+----
+go version
+docker --version
+kubectl version --client
+kind version
+make --version
+git --version
+----

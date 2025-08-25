@@ -1,0 +1,67 @@
+= Installation
+
+This page covers the detailed installation process for the Agent Runtime Operator.
+
+== Installation Methods
+
+=== Local Development with kind
+
+For local development and testing, we recommend using kind (Kubernetes in Docker):
+
+[source,bash]
+----
+# Create cluster
+kind create cluster
+
+# Install cert-manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+
+# Wait for cert-manager
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
+
+# Install and deploy operator
+make install
+make docker-build
+make kind-load
+make deploy
+----
+
+=== Production Installation
+
+For production deployments, you can use the provided Kubernetes manifests:
+
+[source,bash]
+----
+# Install CRDs
+make install
+
+# Deploy operator
+kubectl apply -k config/default
+----
+
+== Verification
+
+Verify the installation by checking the operator pods:
+
+[source,bash]
+----
+kubectl get pods -n agent-runtime-operator-system
+kubectl get crds | grep runtime.agentic-layer.ai
+----
+
+== Troubleshooting
+
+=== Common Issues
+
+* **cert-manager not ready**: Ensure cert-manager pods are running before deploying the operator
+* **Image pull errors**: For local development, ensure you've run `make kind-load` to load the image into kind
+* **Webhook failures**: Check that cert-manager is properly installed and running
+
+=== Logs
+
+Check operator logs for troubleshooting:
+
+[source,bash]
+----
+kubectl logs -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager
+----

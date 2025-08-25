@@ -1,0 +1,39 @@
+= Agent Runtime Operator
+
+The Agent Runtime Operator is a Kubernetes operator built with the https://sdk.operatorframework.io/[Operator SDK] framework. Its purpose is to provide a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the management of components like wiring of agents with a observability stack or model routers.
+
+== What is the Agent Runtime Operator?
+
+The Agent Runtime Operator enables you to:
+
+* Deploy and manage agentic workloads on Kubernetes
+* Abstract framework-specific configurations using CRDs
+* Wire agents with observability stacks and model routers
+* Support multiple agent frameworks (Google ADK, Flokk, Autogen)
+
+== Key Features
+
+* **Framework Agnostic**: Support for multiple agent frameworks
+* **Kubernetes Native**: Built using Kubernetes operator patterns
+* **Custom Resources**: Simplified agent deployment through CRDs
+* **Observability**: Built-in integration with monitoring stacks
+* **Scalable**: Deploy multiple agent replicas
+
+== Quick Start
+
+To get started with the Agent Runtime Operator:
+
+1. Ensure you have the xref:prerequisites.adoc[prerequisites] installed
+2. Follow the xref:getting-started.adoc[getting started guide] to deploy the operator
+3. Configure your first agent using xref:custom-resources.adoc[custom resources]
+
+== Architecture
+
+The operator manages `Agent` custom resources and creates the necessary Kubernetes deployments, services, and configurations to run your agentic workloads.
+
+== Next Steps
+
+* xref:getting-started.adoc[Get Started] with a local deployment
+* Learn about xref:configuration.adoc[configuration options]
+* Explore xref:sample-data.adoc[sample agents]
+* Read about xref:contributing.adoc[contributing] to the project

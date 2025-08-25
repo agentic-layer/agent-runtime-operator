@@ -1,0 +1,78 @@
+= Testing
+
+The Agent Runtime Operator includes comprehensive testing capabilities including unit tests and end-to-end (E2E) tests.
+
+== Test Types
+
+=== Unit Tests
+
+Run unit tests for quick validation during development:
+
+[source,bash]
+----
+make test
+----
+
+=== Integration Tests
+
+Run integration tests that verify component interactions:
+
+[source,bash]
+----
+go test ./internal/... -v
+----
+
+=== End-to-End Tests
+
+E2E tests validate the complete operator functionality in a real Kubernetes environment. See xref:e2e-testing.adoc[E2E Testing] for detailed information.
+
+== Development Testing Workflow
+
+During development, run this sequence to validate your changes:
+
+[source,bash]
+----
+# Format code
+make fmt
+
+# Run static analysis  
+make vet
+
+# Run linting
+make lint
+
+# Run unit tests
+make test
+
+# Generate updated manifests if needed
+make manifests generate
+
+# Run E2E tests
+make test-e2e
+----
+
+== Test Coverage
+
+Generate test coverage reports:
+
+[source,bash]
+----
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+----
+
+== Testing Best Practices
+
+* Write unit tests for all new functionality
+* Include integration tests for complex interactions
+* Run E2E tests before submitting pull requests
+* Maintain test coverage above 80%
+* Use table-driven tests where appropriate
+
+== Continuous Integration
+
+The project uses automated testing in CI/CD pipelines:
+
+* Unit tests run on every pull request
+* E2E tests run on main branch commits
+* Coverage reports are generated automatically

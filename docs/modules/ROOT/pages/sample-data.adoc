@@ -1,0 +1,138 @@
+= Sample Data
+
+The project includes sample `Agent` custom resources to help you get started with the Agent Runtime Operator.
+
+== Where to Find Sample Data
+
+Sample manifests are located in the `config/samples/` directory of the repository.
+
+== Weather Agent Sample
+
+The primary sample is a "weather-agent" that demonstrates basic agent configuration:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: weather-agent
+spec:
+  framework: google-adk
+  image: eu.gcr.io/agentic-layer/weather-agent:0.1.2
+  protocols:
+    - type: A2A
+  replicas: 1
+----
+
+== Deploying Sample Agents
+
+=== Deploy All Samples
+
+You can deploy all sample agents with a single command:
+
+[source,bash]
+----
+kubectl apply -k config/samples/
+----
+
+=== Deploy Specific Sample
+
+To deploy a specific sample:
+
+[source,bash]
+----
+kubectl apply -f config/samples/weather-agent.yaml
+----
+
+== Verifying Sample Deployment
+
+=== Check Agent Status
+
+After applying the sample, check the agent's status:
+
+[source,bash]
+----
+# Check the agent's status
+kubectl get agents weather-agent -o yaml
+----
+
+=== Check Generated Resources
+
+Verify the deployment created by the operator:
+
+[source,bash]
+----
+# Check the deployment created by the operator
+kubectl get deployments -l app.kubernetes.io/name=weather-agent
+
+# Check pods
+kubectl get pods -l app.kubernetes.io/name=weather-agent
+
+# Check services
+kubectl get services -l app.kubernetes.io/name=weather-agent
+----
+
+== Understanding the Sample
+
+The weather-agent sample demonstrates:
+
+* **Framework Selection**: Uses `google-adk` framework
+* **Container Image**: References a pre-built weather agent image
+* **Protocol Configuration**: Configures A2A (Agent-to-Agent) protocol
+* **Scaling**: Set to 1 replica (default)
+
+== Customizing Samples
+
+You can customize the samples for your needs:
+
+=== Change Framework
+
+[source,yaml]
+----
+spec:
+  framework: flokk  # or autogen
+----
+
+=== Update Image
+
+[source,yaml]
+----
+spec:
+  image: my-registry/my-agent:v1.0.0
+----
+
+=== Scale Replicas
+
+[source,yaml]
+----
+spec:
+  replicas: 3
+----
+
+== Creating Your Own Agent
+
+Use the sample as a template for your own agents:
+
+[source,bash]
+----
+# Copy sample as starting point
+cp config/samples/weather-agent.yaml my-agent.yaml
+
+# Edit configuration
+vim my-agent.yaml
+
+# Deploy your agent
+kubectl apply -f my-agent.yaml
+----
+
+== Cleanup
+
+Remove sample agents when done:
+
+[source,bash]
+----
+kubectl delete -k config/samples/
+----

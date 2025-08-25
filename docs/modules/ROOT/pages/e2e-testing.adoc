@@ -1,0 +1,122 @@
+= End-to-End Testing
+
+End-to-end (E2E) tests validate the complete operator functionality in a real Kubernetes environment.
+
+== Prerequisites for E2E Tests
+
+* **kind** must be installed and available in PATH
+* **Docker** running and accessible  
+* **kubectl** configured and working
+
+== Running E2E Tests
+
+=== Automated E2E Tests
+
+The E2E tests automatically create an isolated Kind cluster, deploy the operator, run comprehensive tests, and clean up afterwards.
+
+[source,bash]
+----
+# Run complete E2E test suite
+make test-e2e
+----
+
+The E2E test suite includes:
+
+* Operator deployment verification
+* CRD installation testing  
+* Webhook functionality testing
+* Metrics endpoint validation
+* Certificate management verification
+
+=== Manual E2E Test Setup
+
+If you need to run E2E tests manually or inspect the test environment:
+
+[source,bash]
+----
+# Set up test cluster (will create 'agent-runtime-operator-test-e2e' cluster)
+make setup-test-e2e
+----
+
+[source,bash]
+----
+# Run E2E tests against the existing cluster
+KIND_CLUSTER=agent-runtime-operator-test-e2e go test ./test/e2e/ -v -ginkgo.v
+----
+
+[source,bash]
+----
+# Clean up test cluster when done
+make cleanup-test-e2e
+----
+
+== E2E Test Structure
+
+The E2E tests are organized into several test suites:
+
+=== Operator Deployment Tests
+
+* Verify operator pods start successfully
+* Check CRD installation
+* Validate RBAC permissions
+
+=== Agent Lifecycle Tests
+
+* Test agent creation from custom resources
+* Verify deployment generation
+* Test agent updates and deletions
+
+=== Webhook Tests
+
+* Validate admission webhook configuration
+* Test webhook certificate management
+* Verify webhook functionality
+
+=== Metrics and Monitoring Tests
+
+* Check metrics endpoint availability
+* Validate prometheus metrics format
+* Test health probe endpoints
+
+== Test Configuration
+
+E2E tests use the following configuration:
+
+* Test cluster name: `agent-runtime-operator-test-e2e`
+* Test timeout: 10 minutes per test suite
+* Test images: Built and loaded into test cluster
+
+== Troubleshooting E2E Tests
+
+=== Common Issues
+
+* **Cluster creation fails**: Ensure Docker is running and kind is installed
+* **Image load fails**: Verify the operator image was built successfully
+* **Test timeouts**: Check cluster resources and network connectivity
+
+=== Debugging
+
+To debug failing E2E tests:
+
+[source,bash]
+----
+# Keep test cluster running for inspection
+make setup-test-e2e
+
+# Run specific test
+go test ./test/e2e/ -v -ginkgo.focus="Agent Creation"
+
+# Inspect cluster state
+kubectl --context kind-agent-runtime-operator-test-e2e get pods -A
+
+# Clean up when done
+make cleanup-test-e2e
+----
+
+== CI/CD Integration
+
+E2E tests run automatically in the CI/CD pipeline:
+
+* Triggered on pull requests to main branch
+* Run in parallel with unit tests
+* Results reported in pull request status

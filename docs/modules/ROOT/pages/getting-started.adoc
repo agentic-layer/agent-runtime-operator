@@ -1,0 +1,55 @@
+= Getting Started
+
+Follow these steps to get the operator up and running on a local Kubernetes cluster.
+
+== Step 1: Clone the Repository
+
+[source,bash]
+----
+git clone https://github.com/agentic-layer/agent-runtime-operator
+cd agent-runtime-operator
+----
+
+== Step 2: Set up Local Cluster
+
+This command creates a local `kind` cluster and installs `cert-manager`, which is required for the operator's webhooks.
+
+[source,bash]
+----
+kind create cluster
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+----
+
+Wait for `cert-manager` to be ready before proceeding:
+
+[source,bash]
+----
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
+----
+
+== Step 3: Build and Deploy the Operator
+
+These commands will install the CRDs, build the operator's container image, load it into your `kind` cluster, and deploy it.
+
+[source,bash]
+----
+make install
+make docker-build
+make kind-load
+make deploy
+----
+
+== Step 4: Verify the Deployment
+
+After a successful start, you should see the controller manager pod running in the `agent-runtime-operator-system` namespace.
+
+[source,bash]
+----
+kubectl get pods -n agent-runtime-operator-system
+----
+
+== Next Steps
+
+* Learn about xref:configuration.adoc[configuration options]
+* Deploy your first agent using xref:sample-data.adoc[sample data]
+* Explore xref:custom-resources.adoc[custom resource definitions]
