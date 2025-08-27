@@ -228,10 +228,12 @@ We welcome contributions to the Agent Runtime Operator! Please follow these guid
    # Run E2E tests to ensure everything works
    make test-e2e
    ```
+5. **Update Documentation**:
+   Documentation is located in the [`/docs`](/docs) directory. We use the **[Diátaxis framework](https://diataxis.fr/)** for structure and **Antora** to build the site. Please adhere to these conventions when making updates.
 
-5. **Commit your changes** with a descriptive commit message
+6. **Commit your changes** with a descriptive commit message
 
-6. **Submit a pull request** with:
+7**Submit a pull request** with:
    - Clear description of the changes
    - Reference to any related issues
    - Screenshots/logs if applicable

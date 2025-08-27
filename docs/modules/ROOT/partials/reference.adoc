@@ -1,0 +1,15 @@
+////
+Reference
+Update reference material when you add or change code, configuration, or data schemas. This is the technical source of truth.
+
+When to write one: As you modify a function, class, API endpoint, or A2A message schema. This is often done directly in the code via docstrings that are auto-generated into docs.
+
+Think: A dictionary or encyclopedia entry for your code.
+////
+
+:repo-name: agentic-layer/agent-runtime-operator
+
+== Reference 1 ({repo-name})
+
+
+Todo

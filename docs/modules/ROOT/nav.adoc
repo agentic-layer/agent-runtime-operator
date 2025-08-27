@@ -1,0 +1,7 @@
+:repo-name: agentic-layer/agent-runtime-operator
+
+* {repo-name}
+** xref:tutorials.adoc[Tutorials]
+** xref:how-to-guides.adoc[How-to Guides]
+** xref:reference.adoc[Reference]
+** xref:explanation.adoc[Explanation]
