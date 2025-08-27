@@ -7,8 +7,11 @@ When to write one: Documenting the primary "happy path" for a major new feature.
 Think: "Your first agent" or a "getting started" guide.
 ////
 
+////
+Setup example:
 :repo-name: agentic-layer/agent-runtime-operator
 
 == Tutorial 1 ({repo-name})
 
-Todo
+TBD
+////
