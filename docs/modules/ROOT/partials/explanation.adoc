@@ -7,8 +7,12 @@ When to write one: To explain the architecture of a new service, the trade-offs 
 Think: An architecture design record (ADR) or a conceptual overview.
 ////
 
+////
+Setup example:
+
 :repo-name: agentic-layer/agent-runtime-operator
 
 == Explanation ({repo-name})
 
-Todo
+TBD
+////
