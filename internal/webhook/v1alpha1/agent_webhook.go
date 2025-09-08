@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -39,6 +41,7 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 			DefaultReplicas:      1,
 			DefaultPort:          8080,
 			DefaultPortGoogleAdk: 8000,
+			Recorder:             mgr.GetEventRecorderFor("agent-defaulter-webhook"),
 		}).
 		Complete()
 }
@@ -54,6 +57,7 @@ type AgentCustomDefaulter struct {
 	DefaultReplicas      int32
 	DefaultPort          int32
 	DefaultPortGoogleAdk int32
+	Recorder             record.EventRecorder
 }
 
 var _ webhook.CustomDefaulter = &AgentCustomDefaulter{}
@@ -72,7 +76,7 @@ func (d *AgentCustomDefaulter) Default(_ context.Context, obj runtime.Object) er
 	return nil
 }
 
-// applyDefaultsAndUpdate applies default values to the Agent and updates the cluster if needed
+// applyDefaults applies default values to the Agent.
 func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 	// Set default replicas if not specified
 	if agent.Spec.Replicas == nil {
@@ -86,6 +90,20 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 			agent.Spec.Protocols[i].Port = d.frameworkDefaultPort(agent.Spec.Framework)
 		}
 	}
+
+	// Filter out protected environment variables and create an event if found.
+	protectedVar := "AGENT_NAME"
+	var filteredEnvs []corev1.EnvVar
+
+	for _, env := range agent.Spec.Env {
+		if env.Name != protectedVar {
+			filteredEnvs = append(filteredEnvs, env)
+		} else {
+			agentlog.Info("removing protected environment variable from spec", "variable", protectedVar, "agent", agent.GetName())
+			d.Recorder.Eventf(agent, "Warning", "SpecModified", "The user-defined '%s' environment variable was removed as it is system-managed.", protectedVar)
+		}
+	}
+	agent.Spec.Env = filteredEnvs
 }
 
 func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {

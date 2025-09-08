@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,6 +55,15 @@ type AgentSpec struct {
 
 	// Protocols defines the protocols supported by the agent
 	Protocols []AgentProtocol `json:"protocols,omitempty"`
+
+	// +optional
+	// Env defines environment variables to be injected into the agent container
+	// Note: The 'AGENT_NAME' variable is system-managed and will automatically be removed if set.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// +optional
+	// EnvFrom defines sources to populate environment variables from.
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent.

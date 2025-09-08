@@ -10,3 +10,11 @@ spec:
   image: eu.gcr.io/agentic-layer/weather-agent:0.1.2
   protocols:
     - type: A2A
+  env:
+    - name: PORT
+      value: "8080"
+    - name: LOG_LEVEL
+      value: "info"
+  envFrom:
+    - configMapRef:
+        name: agent-config-map

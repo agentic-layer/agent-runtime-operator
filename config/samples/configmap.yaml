@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config-map
+data:
+  LOG_LEVEL: "debug"
+  TIMEOUT_SECONDS: "30"

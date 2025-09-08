@@ -96,6 +96,12 @@ spec:
   protocols:
     - type: A2A  # Agent-to-Agent protocol
   replicas: 1  # Number of agent replicas (optional, default: 1)
+  env:
+    - name: PORT
+      value: "8080"
+  envFrom:
+    - secretRef:
+        name: api-key-secret
 ```
 
 
@@ -209,16 +215,16 @@ We welcome contributions to the Agent Runtime Operator! Please follow these guid
    ```bash
    # Format code
    make fmt
-   
+
    # Run static analysis
    make vet
-   
+
    # Run linting
    make lint
-   
-   # Run unit tests  
+
+   # Run unit tests
    make test
-   
+
    # Generate updated manifests if needed
    make manifests generate
    ```
