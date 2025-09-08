@@ -426,6 +426,152 @@ var _ = Describe("Agent Controller", func() {
 			Expect(agentContainer.Resources.Limits[corev1.ResourceCPU]).To(Equal(resourceQuantity("100m")))
 			Expect(agentContainer.Resources.Limits[corev1.ResourceMemory]).To(Equal(resourceQuantity("128Mi")))
 		})
+
+		It("should update Deployment when env field is added", func() {
+			By("Updating the Agent with a new env field")
+			agent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, agent)).To(Succeed())
+
+			newEnvVar := corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: "new-value",
+			}
+			agent.Spec.Env = []corev1.EnvVar{newEnvVar}
+			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
+
+			By("Reconciling the updated resource")
+			controllerReconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the Deployment was updated with the new env var")
+			deployment := &appsv1.Deployment{}
+			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
+			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
+
+			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
+			Expect(agentContainer).NotTo(BeNil())
+
+			// Check for both the default and the new env var
+			Expect(agentContainer.Env).To(HaveLen(2))
+			Expect(agentContainer.Env).To(ContainElement(newEnvVar))
+			Expect(agentContainer.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "AGENT_NAME",
+				Value: resourceName,
+			}))
+		})
+
+		It("should update Deployment when envFrom field is added", func() {
+			By("Updating the Agent with a new envFrom field")
+			agent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, agent)).To(Succeed())
+
+			newEnvFromSource := corev1.EnvFromSource{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "new-secret-ref",
+					},
+				},
+			}
+			agent.Spec.EnvFrom = []corev1.EnvFromSource{newEnvFromSource}
+			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
+
+			By("Reconciling the updated resource")
+			controllerReconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the Deployment was updated with the new envFrom source")
+			deployment := &appsv1.Deployment{}
+			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
+			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
+
+			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
+			Expect(agentContainer).NotTo(BeNil())
+
+			Expect(agentContainer.EnvFrom).To(HaveLen(1))
+			Expect(agentContainer.EnvFrom).To(ContainElement(newEnvFromSource))
+		})
+
+		It("should fail reconciliation when an invalid envFrom source is added", func() {
+			By("Creating prerequisite ConfigMap for this test only")
+			configMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "initial-config-for-invalid-test",
+					Namespace: "default",
+				},
+				Data: map[string]string{"KEY": "VALUE"},
+			}
+			Expect(k8sClient.Create(ctx, configMap)).To(Succeed())
+			// Use defer to ensure cleanup happens at the end of the test.
+			defer func() {
+				By("Cleaning up the prerequisite ConfigMap")
+				Expect(k8sClient.Delete(ctx, configMap)).To(Succeed())
+			}()
+
+			By("Updating the Agent with an initial, valid envFrom source")
+			agent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, agent)).To(Succeed())
+
+			validEnvFrom := corev1.EnvFromSource{
+				ConfigMapRef: &corev1.ConfigMapEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: configMap.Name,
+					},
+				},
+			}
+			agent.Spec.EnvFrom = []corev1.EnvFromSource{validEnvFrom}
+			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
+
+			By("Reconciling the valid update")
+			controllerReconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Fetching the deployment to check its initial state")
+			deployment := &appsv1.Deployment{}
+			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
+			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
+			initialDeploymentEnvFrom := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers).EnvFrom
+
+			By("Updating the Agent with an additional, invalid envFrom source")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, agent)).To(Succeed())
+			invalidEnvFrom := corev1.EnvFromSource{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "", // This name is invalid
+					},
+				},
+			}
+			agent.Spec.EnvFrom = append(agent.Spec.EnvFrom, invalidEnvFrom)
+			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
+
+			By("Reconciling again, which should now fail")
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).To(HaveOccurred())
+
+			By("Verifying the Deployment's envFrom was not changed")
+			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
+			currentDeploymentEnvFrom := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers).EnvFrom
+			Expect(currentDeploymentEnvFrom).To(Equal(initialDeploymentEnvFrom))
+		})
 	})
 })
 

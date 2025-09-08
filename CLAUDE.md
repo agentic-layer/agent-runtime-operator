@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 For more details, refer to the [README.md](README.md) file.
 
 ## Overview
@@ -112,6 +112,12 @@ spec:
   protocols:
     - type: A2A
   replicas: 1
+  env:
+    - name: PORT
+      value: "8080"
+  envFrom:
+    - secretRef:
+        name: api-key-secret
 ```
 
 ## Testing

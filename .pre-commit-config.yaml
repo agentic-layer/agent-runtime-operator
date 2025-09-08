@@ -20,6 +20,7 @@ repos:
   - repo: local
     hooks:
       - id: make-fmt
+        name: Run make fmt
         language: system
         entry: "make fmt"
         pass_filenames: false

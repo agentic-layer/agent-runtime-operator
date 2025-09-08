@@ -32,6 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
+	"github.com/agentic-layer/agent-runtime-operator/internal/equality"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -243,12 +244,11 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 							Name:  "agent",
 							Image: agent.Spec.Image,
 							Ports: containerPorts,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "AGENT_NAME",
-									Value: agent.Name,
-								},
-							},
+							Env: append(agent.Spec.Env, corev1.EnvVar{
+								Name:  "AGENT_NAME",
+								Value: agent.Name,
+							}),
+							EnvFrom: agent.Spec.EnvFrom,
 						},
 					},
 				},
@@ -338,7 +338,12 @@ func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deploy
 	}
 
 	// Check environment variables (addresses PR feedback)
-	if !r.envVarsEqual(existingContainer.Env, desiredContainer.Env) {
+	if !equality.EnvVarsEqual(existingContainer.Env, desiredContainer.Env) {
+		return true
+	}
+
+	// Check environment variable sources
+	if !equality.EnvFromEqual(existingContainer.EnvFrom, desiredContainer.EnvFrom) {
 		return true
 	}
 
@@ -381,6 +386,7 @@ func (r *AgentReconciler) updateAgentContainer(deployment, desiredDeployment *ap
 	agentContainer.Image = desiredAgentContainer.Image
 	agentContainer.Ports = desiredAgentContainer.Ports
 	agentContainer.Env = desiredAgentContainer.Env
+	agentContainer.EnvFrom = desiredAgentContainer.EnvFrom
 
 	return nil
 }
@@ -412,26 +418,6 @@ func (r *AgentReconciler) mapsEqual(a, b map[string]string) bool {
 	}
 
 	return true
-}
-
-// envVarsEqual compares environment variable slices (addresses PR feedback)
-func (r *AgentReconciler) envVarsEqual(existing, desired []corev1.EnvVar) bool {
-	if len(existing) != len(desired) {
-		return false
-	}
-
-	// Create maps for comparison by name
-	existingMap := make(map[string]string)
-	desiredMap := make(map[string]string)
-
-	for _, env := range existing {
-		existingMap[env.Name] = env.Value
-	}
-	for _, env := range desired {
-		desiredMap[env.Name] = env.Value
-	}
-
-	return r.mapsEqual(existingMap, desiredMap)
 }
 
 // containerPortsEqual compares container ports by name (addresses PR feedback)
