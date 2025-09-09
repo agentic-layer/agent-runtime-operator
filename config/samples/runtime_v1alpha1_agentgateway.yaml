@@ -1,0 +1,101 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: main-gateway
+spec:
+  # Base domain for the gateway
+  domain: "agents.example.com"
+  
+  # Use path-based routing (/weather, /chatbot, etc.)
+  routingStrategy: path
+  
+  # List of agents to expose through this gateway
+  agents:
+    - name: weather-agent
+      routePrefix: "/weather"
+      targetProtocol: "A2A"
+      enabled: true
+    - name: chatbot-agent
+      namespace: default
+      routePrefix: "/chat"
+      targetProtocol: "OpenAI"
+      enabled: true
+  
+  # Gateway configuration using KrakenD
+  gateway:
+    provider: krakend
+    image: devopsfaith/krakend:2.7
+    replicas: 2
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    config:
+      timeout: "5s"
+      cache_ttl: "300s"
+      
+  # IAP configuration for security
+  iap:
+    enabled: true
+    clientId: "your-oauth-client-id.apps.googleusercontent.com"
+    clientSecretRef:
+      name: iap-secret
+      key: client-secret
+    allowedDomains:
+      - "example.com"
+      - "trusted-partner.com"
+      
+  # TLS configuration
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    hosts:
+      - "agents.example.com"
+      - "*.agents.example.com"
+  
+  # Additional labels and annotations for gateway resources
+  labels:
+    environment: production
+    team: ai-platform
+  annotations:
+    gateway.agentic-layer.ai/managed-by: "agent-runtime-operator"
+    
+---
+# Example using subdomain-based routing
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: subdomain-gateway
+spec:
+  domain: "agents.example.com"
+  routingStrategy: subdomain
+  
+  agents:
+    - name: weather-agent
+      routePrefix: "weather"  # Routes weather.agents.example.com
+      enabled: true
+    - name: finance-agent
+      routePrefix: "finance"  # Routes finance.agents.example.com
+      enabled: true
+  
+  gateway:
+    provider: krakend
+    replicas: 1
+    
+  iap:
+    enabled: false  # Disabled for this example
+    
+  tls:
+    enabled: true
+    secretName: wildcard-tls
+    hosts:
+      - "*.agents.example.com"
