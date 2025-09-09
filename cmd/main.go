@@ -210,6 +210,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Agent")
 		os.Exit(1)
 	}
+	if err := (&controller.AgentGatewayReconciler{
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		ErrorClassifier: controller.NewErrorClassifier(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AgentGateway")
+		os.Exit(1)
+	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupAgentWebhookWithManager(mgr); err != nil {

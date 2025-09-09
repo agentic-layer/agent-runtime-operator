@@ -85,6 +85,15 @@ make docker-push
   - Managing Services for protocol exposure
   - Handling framework-specific configurations
 
+- **AgentGateway Controller** (`internal/controller/agentgateway_controller.go`): Reconciles AgentGateway resources by:
+  - Discovering and validating referenced Agent resources
+  - Generating gateway configuration (KrakenD JSON)
+  - Creating/updating ConfigMaps with gateway configuration
+  - Managing Kubernetes Deployments for gateway instances
+  - Creating Services and Ingress resources for traffic routing
+  - Handling IAP and TLS security configurations
+  - Tracking status conditions (Ready, Configured, Secured)
+
 - **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent resources
 
 ### Project Structure

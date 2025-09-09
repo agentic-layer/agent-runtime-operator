@@ -66,6 +66,21 @@ spec:
                   description: AgentReference defines a reference to an Agent resource
                     that should be exposed
                   properties:
+                    allowedMethods:
+                      description: |-
+                        AllowedMethods defines the HTTP methods that should be routed to this agent
+                        If empty, defaults to protocol-appropriate methods (e.g., GET for most, POST for OpenAI)
+                      items:
+                        enum:
+                        - GET
+                        - POST
+                        - PUT
+                        - DELETE
+                        - PATCH
+                        - HEAD
+                        - OPTIONS
+                        type: string
+                      type: array
                     enabled:
                       default: true
                       description: Enabled allows selective enabling/disabling of
@@ -120,8 +135,6 @@ spec:
                     description: Provider specifies the gateway technology to use
                     enum:
                     - krakend
-                    - envoy
-                    - nginx
                     type: string
                   replicas:
                     default: 2

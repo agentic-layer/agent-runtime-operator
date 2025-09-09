@@ -17,11 +17,13 @@ spec:
     - name: weather-agent
       routePrefix: "/weather"
       targetProtocol: "A2A"
+      allowedMethods: ["GET", "POST"]
       enabled: true
     - name: chatbot-agent
       namespace: default
       routePrefix: "/chat"
       targetProtocol: "OpenAI"
+      allowedMethods: ["POST", "GET"]
       enabled: true
   
   # Gateway configuration using KrakenD
