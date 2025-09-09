@@ -1,0 +1,309 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: agentgateways.runtime.agentic-layer.ai
+spec:
+  group: runtime.agentic-layer.ai
+  names:
+    kind: AgentGateway
+    listKind: AgentGatewayList
+    plural: agentgateways
+    singular: agentgateway
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.domain
+      name: Domain
+      type: string
+    - jsonPath: .spec.routingStrategy
+      name: Strategy
+      type: string
+    - jsonPath: .spec.gateway.provider
+      name: Provider
+      type: string
+    - description: Number of exposed agents
+      jsonPath: .status.exposedAgents[*]
+      name: Agents
+      type: integer
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: AgentGateway is the Schema for the agentgateways API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AgentGatewaySpec defines the desired state of AgentGateway
+            properties:
+              agents:
+                description: Agents defines the list of Agent resources to expose
+                  through this gateway
+                items:
+                  description: AgentReference defines a reference to an Agent resource
+                    that should be exposed
+                  properties:
+                    enabled:
+                      default: true
+                      description: Enabled allows selective enabling/disabling of
+                        agent exposure
+                      type: boolean
+                    name:
+                      description: Name of the Agent resource
+                      type: string
+                    namespace:
+                      description: Namespace of the Agent resource (defaults to same
+                        namespace as AgentGateway)
+                      type: string
+                    routePrefix:
+                      description: |-
+                        RoutePrefix defines the path prefix or subdomain for this agent
+                        For path-based routing: "/weather" -> routes /weather/* to this agent
+                        For subdomain-based routing: "weather" -> routes weather.domain.com to this agent
+                      type: string
+                    targetProtocol:
+                      description: |-
+                        TargetProtocol specifies which protocol of the agent to target
+                        If empty, defaults to the first protocol defined in the Agent spec
+                      type: string
+                  required:
+                  - name
+                  - routePrefix
+                  type: object
+                type: array
+              annotations:
+                additionalProperties:
+                  type: string
+                description: Annotations to be added to the gateway resources
+                type: object
+              domain:
+                description: Domain is the base domain for the gateway (e.g., "agents.example.com")
+                pattern: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$
+                type: string
+              gateway:
+                description: Gateway defines the gateway provider and configuration
+                properties:
+                  config:
+                    additionalProperties:
+                      type: string
+                    description: Config contains provider-specific configuration as
+                      key-value pairs
+                    type: object
+                  image:
+                    description: Image specifies the container image for the gateway
+                    type: string
+                  provider:
+                    default: krakend
+                    description: Provider specifies the gateway technology to use
+                    enum:
+                    - krakend
+                    - envoy
+                    - nginx
+                    type: string
+                  replicas:
+                    default: 2
+                    description: Replicas is the number of gateway replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  resources:
+                    description: Resources defines compute resources for the gateway
+                    properties:
+                      limits:
+                        additionalProperties:
+                          type: string
+                        description: Limits defines maximum allowed resources
+                        type: object
+                      requests:
+                        additionalProperties:
+                          type: string
+                        description: Requests defines minimum required resources
+                        type: object
+                    type: object
+                type: object
+              iap:
+                description: IAP defines Identity-Aware Proxy configuration
+                properties:
+                  allowedDomains:
+                    description: AllowedDomains defines the list of email domains
+                      allowed through IAP
+                    items:
+                      type: string
+                    type: array
+                  allowedUsers:
+                    description: AllowedUsers defines the list of users allowed through
+                      IAP
+                    items:
+                      type: string
+                    type: array
+                  clientId:
+                    description: ClientID is the OAuth 2.0 client ID for IAP
+                    type: string
+                  clientSecretRef:
+                    description: |-
+                      ClientSecret is the OAuth 2.0 client secret for IAP
+                      Should reference a Kubernetes Secret
+                    properties:
+                      key:
+                        description: Key within the secret
+                        type: string
+                      name:
+                        description: Name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace of the secret (defaults to same namespace
+                          as AgentGateway)
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  enabled:
+                    default: false
+                    description: Enabled determines if IAP should be configured
+                    type: boolean
+                type: object
+              labels:
+                additionalProperties:
+                  type: string
+                description: Labels to be added to the gateway resources
+                type: object
+              routingStrategy:
+                default: path
+                description: RoutingStrategy defines how traffic should be routed
+                  to agents
+                enum:
+                - path
+                - subdomain
+                type: string
+              tls:
+                description: TLS defines TLS configuration for the gateway
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled determines if TLS should be configured
+                    type: boolean
+                  hosts:
+                    description: Hosts defines the list of hostnames covered by the
+                      TLS certificate
+                    items:
+                      type: string
+                    type: array
+                  secretName:
+                    description: SecretName is the name of the Kubernetes Secret containing
+                      TLS certificate and key
+                    type: string
+                type: object
+            required:
+            - agents
+            - domain
+            type: object
+          status:
+            description: AgentGatewayStatus defines the observed state of AgentGateway
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the gateway's state
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              configHash:
+                description: ConfigHash represents the hash of the current gateway
+                  configuration
+                type: string
+              exposedAgents:
+                description: ExposedAgents lists the agents currently exposed through
+                  this gateway
+                items:
+                  type: string
+                type: array
+              gatewayEndpoint:
+                description: GatewayEndpoint is the external endpoint where the gateway
+                  can be reached
+                type: string
+              lastUpdated:
+                description: LastUpdated is the timestamp when the gateway was last
+                  updated
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
