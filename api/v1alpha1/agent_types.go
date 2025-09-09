@@ -108,6 +108,9 @@ type AgentSpec struct {
 	// Protocols defines the protocols supported by the agent
 	Protocols []AgentProtocol `json:"protocols,omitempty"`
 
+	// Exposed indicates whether this agent should be exposed via the AgentGateway
+	Exposed bool `json:"exposed,omitempty"`
+
 	// +optional
 	// Env defines additional environment variables to be injected into the agent container.
 	// These are take precedence over operator-managed environment variables.

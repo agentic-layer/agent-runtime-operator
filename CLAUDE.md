@@ -73,6 +73,13 @@ make docker-push
   - Protocol definitions (A2A, OpenAI)
   - Status tracking with conditions
 
+- **AgentGateway CRD** (`api/v1alpha1/agentgateway_types.go`): Defines the AgentGateway custom resource for exposing agents via a unified gateway:
+  - Gateway provider abstraction (KrakenD, Envoy, Nginx)
+  - Routing strategies (path-based, subdomain-based)
+  - IAP (Identity-Aware Proxy) integration for security
+  - TLS configuration and certificate management
+  - Agent reference and selective exposure controls
+
 - **Agent Controller** (`internal/controller/agent_controller.go`): Reconciles Agent resources by:
   - Creating Kubernetes Deployments for agent workloads
   - Managing Services for protocol exposure
@@ -99,7 +106,7 @@ make docker-push
     └── utils/           # Test utilities
 ```
 
-### Agent Resource Example
+### Resource Examples
 
 **Using Agent Templates (recommended for framework-agnostic agents):**
 ```yaml
@@ -148,6 +155,18 @@ spec:
   envFrom:
     - secretRef:
         name: api-key-secret
+```
+
+#### AgentGateway Resource
+```yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  name: main-gateway
+spec:
+  agentGatewayClassName: "krakend"
+  replicas: 2
+  timeout: "60s"
 ```
 
 ## Testing

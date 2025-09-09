@@ -251,6 +251,10 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
+              exposed:
+                description: Exposed indicates whether this agent should be exposed
+                  via the AgentGateway
+                type: boolean
               framework:
                 description: Framework defines the supported agent frameworks
                 enum:
