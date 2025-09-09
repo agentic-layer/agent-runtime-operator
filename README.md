@@ -128,6 +128,7 @@ spec:
   image: ghcr.io/agentic-layer/weather-agent:0.3.0
   protocols:
     - type: A2A  # Agent-to-Agent protocol
+  exposed: true  # Whether the agent should be exposed via the gateway
   replicas: 1  # Number of agent replicas (optional, default: 1)
   env:
     - name: PORT
@@ -167,6 +168,21 @@ spec:
   envFrom:
     - secretRef:
         name: api-key-secret
+```
+
+To expose agents through a unified gateway, you define an `AgentGateway` resource:
+
+```yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: agent-gateway
+spec:
+  agentGatewayClass: krakend  # Specifies the controller class to use for this gateway instance.
+  replicas: 1  # Number of gateway replicas
 ```
 
 
