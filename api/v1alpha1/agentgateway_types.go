@@ -36,10 +36,6 @@ type GatewayProvider string
 const (
 	// KrakenDProvider uses KrakenD as the gateway implementation
 	KrakenDProvider GatewayProvider = "krakend"
-	// EnvoyProvider uses Envoy as the gateway implementation
-	EnvoyProvider GatewayProvider = "envoy"
-	// NginxProvider uses Nginx as the gateway implementation
-	NginxProvider GatewayProvider = "nginx"
 )
 
 // AgentReference defines a reference to an Agent resource that should be exposed
@@ -58,6 +54,11 @@ type AgentReference struct {
 	// TargetProtocol specifies which protocol of the agent to target
 	// If empty, defaults to the first protocol defined in the Agent spec
 	TargetProtocol string `json:"targetProtocol,omitempty"`
+
+	// AllowedMethods defines the HTTP methods that should be routed to this agent
+	// If empty, defaults to protocol-appropriate methods (e.g., GET for most, POST for OpenAI)
+	// +kubebuilder:validation:items:Enum=GET;POST;PUT;DELETE;PATCH;HEAD;OPTIONS
+	AllowedMethods []string `json:"allowedMethods,omitempty"`
 
 	// Enabled allows selective enabling/disabling of agent exposure
 	// +kubebuilder:default=true
@@ -112,7 +113,7 @@ type TLSConfig struct {
 // GatewayConfig defines provider-specific gateway configuration
 type GatewayConfig struct {
 	// Provider specifies the gateway technology to use
-	// +kubebuilder:validation:Enum=krakend;envoy;nginx
+	// +kubebuilder:validation:Enum=krakend
 	// +kubebuilder:default=krakend
 	Provider GatewayProvider `json:"provider,omitempty"`
 
