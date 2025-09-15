@@ -15,19 +15,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.domain
-      name: Domain
-      type: string
-    - jsonPath: .spec.routingStrategy
-      name: Strategy
-      type: string
     - jsonPath: .spec.gateway.provider
       name: Provider
       type: string
-    - description: Number of exposed agents
-      jsonPath: .status.exposedAgents[*]
-      name: Agents
-      type: integer
     - jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
@@ -59,180 +49,28 @@ spec:
           spec:
             description: AgentGatewaySpec defines the desired state of AgentGateway
             properties:
-              agents:
-                description: Agents defines the list of Agent resources to expose
-                  through this gateway
-                items:
-                  description: AgentReference defines a reference to an Agent resource
-                    that should be exposed
-                  properties:
-                    allowedMethods:
-                      description: |-
-                        AllowedMethods defines the HTTP methods that should be routed to this agent
-                        If empty, defaults to protocol-appropriate methods (e.g., GET for most, POST for OpenAI)
-                      items:
-                        enum:
-                        - GET
-                        - POST
-                        - PUT
-                        - DELETE
-                        - PATCH
-                        - HEAD
-                        - OPTIONS
-                        type: string
-                      type: array
-                    enabled:
-                      default: true
-                      description: Enabled allows selective enabling/disabling of
-                        agent exposure
-                      type: boolean
-                    name:
-                      description: Name of the Agent resource
-                      type: string
-                    namespace:
-                      description: Namespace of the Agent resource (defaults to same
-                        namespace as AgentGateway)
-                      type: string
-                    routePrefix:
-                      description: |-
-                        RoutePrefix defines the path prefix or subdomain for this agent
-                        For path-based routing: "/weather" -> routes /weather/* to this agent
-                        For subdomain-based routing: "weather" -> routes weather.domain.com to this agent
-                      type: string
-                    targetProtocol:
-                      description: |-
-                        TargetProtocol specifies which protocol of the agent to target
-                        If empty, defaults to the first protocol defined in the Agent spec
-                      type: string
-                  required:
-                  - name
-                  - routePrefix
-                  type: object
-                type: array
               annotations:
                 additionalProperties:
                   type: string
                 description: Annotations to be added to the gateway resources
-                type: object
-              domain:
-                description: Domain is the base domain for the gateway (e.g., "agents.example.com")
-                pattern: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$
-                type: string
-              gateway:
-                description: Gateway defines the gateway provider and configuration
-                properties:
-                  config:
-                    additionalProperties:
-                      type: string
-                    description: Config contains provider-specific configuration as
-                      key-value pairs
-                    type: object
-                  image:
-                    description: Image specifies the container image for the gateway
-                    type: string
-                  provider:
-                    default: krakend
-                    description: Provider specifies the gateway technology to use
-                    enum:
-                    - krakend
-                    type: string
-                  replicas:
-                    default: 2
-                    description: Replicas is the number of gateway replicas
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  resources:
-                    description: Resources defines compute resources for the gateway
-                    properties:
-                      limits:
-                        additionalProperties:
-                          type: string
-                        description: Limits defines maximum allowed resources
-                        type: object
-                      requests:
-                        additionalProperties:
-                          type: string
-                        description: Requests defines minimum required resources
-                        type: object
-                    type: object
-                type: object
-              iap:
-                description: IAP defines Identity-Aware Proxy configuration
-                properties:
-                  allowedDomains:
-                    description: AllowedDomains defines the list of email domains
-                      allowed through IAP
-                    items:
-                      type: string
-                    type: array
-                  allowedUsers:
-                    description: AllowedUsers defines the list of users allowed through
-                      IAP
-                    items:
-                      type: string
-                    type: array
-                  clientId:
-                    description: ClientID is the OAuth 2.0 client ID for IAP
-                    type: string
-                  clientSecretRef:
-                    description: |-
-                      ClientSecret is the OAuth 2.0 client secret for IAP
-                      Should reference a Kubernetes Secret
-                    properties:
-                      key:
-                        description: Key within the secret
-                        type: string
-                      name:
-                        description: Name of the secret
-                        type: string
-                      namespace:
-                        description: Namespace of the secret (defaults to same namespace
-                          as AgentGateway)
-                        type: string
-                    required:
-                    - key
-                    - name
-                    type: object
-                  enabled:
-                    default: false
-                    description: Enabled determines if IAP should be configured
-                    type: boolean
                 type: object
               labels:
                 additionalProperties:
                   type: string
                 description: Labels to be added to the gateway resources
                 type: object
-              routingStrategy:
-                default: path
-                description: RoutingStrategy defines how traffic should be routed
-                  to agents
+              provider:
+                default: krakend
+                description: Provider specifies the gateway technology to use
                 enum:
-                - path
-                - subdomain
+                - krakend
                 type: string
-              tls:
-                description: TLS defines TLS configuration for the gateway
-                properties:
-                  enabled:
-                    default: true
-                    description: Enabled determines if TLS should be configured
-                    type: boolean
-                  hosts:
-                    description: Hosts defines the list of hostnames covered by the
-                      TLS certificate
-                    items:
-                      type: string
-                    type: array
-                  secretName:
-                    description: SecretName is the name of the Kubernetes Secret containing
-                      TLS certificate and key
-                    type: string
-                type: object
-            required:
-            - agents
-            - domain
+              replicas:
+                default: 2
+                description: Replicas is the number of gateway replicas
+                format: int32
+                minimum: 1
+                type: integer
             type: object
           status:
             description: AgentGatewayStatus defines the observed state of AgentGateway
@@ -299,12 +137,6 @@ spec:
                 description: ConfigHash represents the hash of the current gateway
                   configuration
                 type: string
-              exposedAgents:
-                description: ExposedAgents lists the agents currently exposed through
-                  this gateway
-                items:
-                  type: string
-                type: array
               gatewayEndpoint:
                 description: GatewayEndpoint is the external endpoint where the gateway
                   can be reached
