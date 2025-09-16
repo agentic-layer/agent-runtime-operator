@@ -35,9 +35,15 @@ jobs:
       - name: 'Generate Version Tag'
         id: 'generate_version'
         run: |
-          GIT_BRANCH="${{ github.ref_name }}"
-          GIT_SHA="${{ github.sha }}"
-          VERSION="${GIT_BRANCH}-${GIT_SHA:0:7}-$(date +%s)"
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            GIT_BRANCH="${{ github.ref_name }}"
+            GIT_SHA="${{ github.sha }}"
+            VERSION="${GIT_BRANCH}-${GIT_SHA:0:7}-$(date +%s)"
+          else
+            VERSION=$(git describe --tags --always | sed 's/^v//')
+          fi
+          
+          echo "Generated version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: 'Docker Build'
