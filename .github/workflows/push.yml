@@ -46,10 +46,27 @@ jobs:
           echo "Generated version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: 'Docker Build'
+      - name: 'Docker Build & Push'
+        env:
+          VERSION: ${{ steps.generate_version.outputs.version }}
         run: |
-          VERSION=${{ steps.generate_version.outputs.version }} make docker-build
+          make docker-buildx
 
-      - name: 'Docker Push'
+      - name: 'Build Installer'
+        if: github.ref_name != 'main'
+        env:
+          VERSION: ${{ steps.generate_version.outputs.version }}
         run: |
-          VERSION=${{ steps.generate_version.outputs.version }} make docker-push
+          make build-installer
+
+      - name: 'Create Release'
+        if: github.ref_name != 'main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+        run: |
+          gh release create "$tag" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${tag#v}" \
+              --generate-notes \
+              dist/install.yaml
