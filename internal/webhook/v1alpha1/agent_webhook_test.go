@@ -138,8 +138,8 @@ var _ = Describe("Agent Webhook", func() {
 			err := defaulter.Default(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("verifying that protocol name is generated")
-			Expect(agent.Spec.Protocols[0].Name).To(Equal("A2A-8080"))
+			By("verifying that protocol name is generated with lowercase")
+			Expect(agent.Spec.Protocols[0].Name).To(Equal("a2a-8080"))
 		})
 
 		It("Should not override existing protocol name", func() {
@@ -263,13 +263,50 @@ var _ = Describe("Agent Webhook", func() {
 			Expect(agent.Spec.Protocols).To(HaveLen(3))
 
 			Expect(agent.Spec.Protocols[0].Port).To(Equal(int32(8000))) // google-adk default
-			Expect(agent.Spec.Protocols[0].Name).To(Equal("A2A-0"))     // name generated before port was set
+			Expect(agent.Spec.Protocols[0].Name).To(Equal("a2a-8000"))  // generated name with lowercase
 
 			Expect(agent.Spec.Protocols[1].Port).To(Equal(int32(9000)))   // preserved port
-			Expect(agent.Spec.Protocols[1].Name).To(Equal("OpenAI-9000")) // generated name
+			Expect(agent.Spec.Protocols[1].Name).To(Equal("openai-9000")) // generated name with lowercase
 
 			Expect(agent.Spec.Protocols[2].Port).To(Equal(int32(8500))) // preserved port
 			Expect(agent.Spec.Protocols[2].Name).To(Equal("custom"))    // preserved name
+		})
+	})
+
+	Context("When sanitizing protocol names", func() {
+		It("Should convert uppercase to lowercase", func() {
+			result := sanitizeForPortName("OPENAI")
+			Expect(result).To(Equal("openai"))
+		})
+
+		It("Should handle mixed case with special characters", func() {
+			result := sanitizeForPortName("OpenAI_API")
+			Expect(result).To(Equal("openai-api"))
+		})
+
+		It("Should remove leading and trailing hyphens", func() {
+			result := sanitizeForPortName("_test_")
+			Expect(result).To(Equal("test"))
+		})
+
+		It("Should handle empty string", func() {
+			result := sanitizeForPortName("")
+			Expect(result).To(Equal("port"))
+		})
+
+		It("Should handle string with only special characters", func() {
+			result := sanitizeForPortName("!@#$%")
+			Expect(result).To(Equal("port"))
+		})
+
+		It("Should preserve valid lowercase with hyphens", func() {
+			result := sanitizeForPortName("a2a-protocol")
+			Expect(result).To(Equal("a2a-protocol"))
+		})
+
+		It("Should handle numbers correctly", func() {
+			result := sanitizeForPortName("HTTP2")
+			Expect(result).To(Equal("http2"))
 		})
 	})
 })

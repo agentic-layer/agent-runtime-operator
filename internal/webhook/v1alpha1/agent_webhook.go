@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,7 +95,7 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 			agent.Spec.Protocols[i].Port = d.frameworkDefaultPort(agent.Spec.Framework)
 		}
 		if protocol.Name == "" {
-			agent.Spec.Protocols[i].Name = fmt.Sprintf("%s-%d", protocol.Type, protocol.Port)
+			agent.Spec.Protocols[i].Name = fmt.Sprintf("%s-%d", sanitizeForPortName(protocol.Type), agent.Spec.Protocols[i].Port)
 		}
 	}
 
@@ -120,4 +121,34 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 	default:
 		return d.DefaultPort // Default port for unknown frameworks
 	}
+}
+
+// sanitizeForPortName converts a string to be valid for Kubernetes port names.
+// Port names must contain only lowercase letters, numbers, and hyphens,
+// and must start and end with an alphanumeric character.
+func sanitizeForPortName(name string) string {
+	// Convert to lowercase
+	result := strings.ToLower(name)
+
+	// Replace any character that's not a lowercase letter, digit, or hyphen with a hyphen
+	var sanitized strings.Builder
+	for _, r := range result {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			sanitized.WriteRune(r)
+		} else {
+			sanitized.WriteRune('-')
+		}
+	}
+
+	result = sanitized.String()
+
+	// Remove leading and trailing hyphens and ensure it starts/ends with alphanumeric
+	result = strings.Trim(result, "-")
+
+	// Ensure we have a valid result
+	if result == "" {
+		result = "port"
+	}
+
+	return result
 }
