@@ -30,6 +30,10 @@ import (
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
+const (
+	googleAdkFramework = "google-adk"
+)
+
 // nolint:unused
 // log is for logging in this package.
 var agentlog = logf.Log.WithName("agent-resource")
@@ -89,6 +93,9 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 		if protocol.Port == 0 {
 			agent.Spec.Protocols[i].Port = d.frameworkDefaultPort(agent.Spec.Framework)
 		}
+		if protocol.Name == "" {
+			agent.Spec.Protocols[i].Name = fmt.Sprintf("%s-%d", protocol.Type, protocol.Port)
+		}
 	}
 
 	// Filter out protected environment variables and create an event if found.
@@ -108,7 +115,7 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 
 func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 	switch framework {
-	case "google-adk":
+	case googleAdkFramework:
 		return d.DefaultPortGoogleAdk
 	default:
 		return d.DefaultPort // Default port for unknown frameworks

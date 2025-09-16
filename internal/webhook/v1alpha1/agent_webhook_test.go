@@ -17,45 +17,259 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	// TODO (user): Add any additional imports if needed
 )
 
 var _ = Describe("Agent Webhook", func() {
 	var (
-		obj       *runtimev1alpha1.Agent
-		oldObj    *runtimev1alpha1.Agent
-		defaulter AgentCustomDefaulter
+		agent     *runtimev1alpha1.Agent
+		defaulter *AgentCustomDefaulter
+		ctx       context.Context
+		recorder  *record.FakeRecorder
 	)
 
 	BeforeEach(func() {
-		obj = &runtimev1alpha1.Agent{}
-		oldObj = &runtimev1alpha1.Agent{}
-		defaulter = AgentCustomDefaulter{}
-		Expect(defaulter).NotTo(BeNil(), "Expected defaulter to be initialized")
-		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
-		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
-		// TODO (user): Add any setup logic common to all tests
+		ctx = context.Background()
+		recorder = record.NewFakeRecorder(10)
+		defaulter = &AgentCustomDefaulter{
+			DefaultReplicas:      1,
+			DefaultPort:          8080,
+			DefaultPortGoogleAdk: 8000,
+			Recorder:             recorder,
+		}
+		agent = &runtimev1alpha1.Agent{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-agent",
+				Namespace: "default",
+			},
+		}
 	})
 
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
+	Context("When applying defaults", func() {
+		It("Should set default replicas when not specified", func() {
+			By("having no replicas set initially")
+			Expect(agent.Spec.Replicas).To(BeNil())
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that default replicas are set")
+			Expect(agent.Spec.Replicas).NotTo(BeNil())
+			Expect(*agent.Spec.Replicas).To(Equal(int32(1)))
+		})
+
+		It("Should not override existing replicas", func() {
+			By("setting a custom replica count")
+			replicas := int32(3)
+			agent.Spec.Replicas = &replicas
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that existing replicas are preserved")
+			Expect(*agent.Spec.Replicas).To(Equal(int32(3)))
+		})
+
+		It("Should set default port for google-adk framework", func() {
+			By("setting up a google-adk agent with protocol but no port")
+			agent.Spec.Framework = googleAdkFramework
+			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
+				{Type: "A2A"},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that google-adk default port is set")
+			Expect(agent.Spec.Protocols).To(HaveLen(1))
+			Expect(agent.Spec.Protocols[0].Port).To(Equal(int32(8000)))
+		})
+
+		It("Should set default port for other frameworks", func() {
+			By("setting up an agent with unknown framework and protocol but no port")
+			agent.Spec.Framework = "flokk"
+			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
+				{Type: "OpenAI"},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that default port is set")
+			Expect(agent.Spec.Protocols).To(HaveLen(1))
+			Expect(agent.Spec.Protocols[0].Port).To(Equal(int32(8080)))
+		})
+
+		It("Should not override existing port", func() {
+			By("setting up an agent with custom port")
+			agent.Spec.Framework = googleAdkFramework
+			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
+				{Type: "A2A", Port: 9000},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that existing port is preserved")
+			Expect(agent.Spec.Protocols[0].Port).To(Equal(int32(9000)))
+		})
+
+		It("Should set default protocol name when not specified", func() {
+			By("setting up a protocol without name")
+			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
+				{Type: "A2A", Port: 8080},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that protocol name is generated")
+			Expect(agent.Spec.Protocols[0].Name).To(Equal("A2A-8080"))
+		})
+
+		It("Should not override existing protocol name", func() {
+			By("setting up a protocol with custom name")
+			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
+				{Type: "A2A", Port: 8080, Name: "custom-name"},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that existing name is preserved")
+			Expect(agent.Spec.Protocols[0].Name).To(Equal("custom-name"))
+		})
+
+		It("Should filter out protected environment variable AGENT_NAME", func() {
+			By("setting up environment variables including protected one")
+			agent.Spec.Env = []corev1.EnvVar{
+				{Name: "CUSTOM_VAR", Value: "custom_value"},
+				{Name: "AGENT_NAME", Value: "user_defined_name"},
+				{Name: "ANOTHER_VAR", Value: "another_value"},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that AGENT_NAME is removed")
+			Expect(agent.Spec.Env).To(HaveLen(2))
+			for _, env := range agent.Spec.Env {
+				Expect(env.Name).NotTo(Equal("AGENT_NAME"))
+			}
+			Expect(agent.Spec.Env[0].Name).To(Equal("CUSTOM_VAR"))
+			Expect(agent.Spec.Env[1].Name).To(Equal("ANOTHER_VAR"))
+
+			By("verifying that an event was recorded")
+			Eventually(recorder.Events).Should(Receive(ContainSubstring("The user-defined 'AGENT_NAME' environment variable was removed as it is system-managed.")))
+		})
+
+		It("Should not modify environment variables when no protected variables present", func() {
+			By("setting up environment variables without protected ones")
+			agent.Spec.Env = []corev1.EnvVar{
+				{Name: "CUSTOM_VAR", Value: "custom_value"},
+				{Name: "ANOTHER_VAR", Value: "another_value"},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that all environment variables are preserved")
+			Expect(agent.Spec.Env).To(HaveLen(2))
+			Expect(agent.Spec.Env[0].Name).To(Equal("CUSTOM_VAR"))
+			Expect(agent.Spec.Env[1].Name).To(Equal("ANOTHER_VAR"))
+		})
 	})
 
-	Context("When creating Agent under Defaulting Webhook", func() {
-		// TODO (user): Add logic for defaulting webhooks
-		// Example:
-		// It("Should apply defaults when a required field is empty", func() {
-		//     By("simulating a scenario where defaults should be applied")
-		//     obj.SomeFieldWithDefault = ""
-		//     By("calling the Default method to apply defaults")
-		//     defaulter.Default(ctx, obj)
-		//     By("checking that the default values are set")
-		//     Expect(obj.SomeFieldWithDefault).To(Equal("default_value"))
-		// })
+	Context("When handling invalid objects", func() {
+		It("Should return error for non-Agent objects", func() {
+			By("passing a non-Agent object")
+			invalidObj := &corev1.Pod{}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, invalidObj)
+
+			By("verifying that an error is returned")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("expected an Agent object but got"))
+		})
+
+		It("Should handle nil runtime.Object gracefully", func() {
+			By("passing a nil object")
+			var nilObj runtime.Object
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, nilObj)
+
+			By("verifying that an error is returned")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("expected an Agent object but got"))
+		})
 	})
 
+	Context("When handling complex scenarios", func() {
+		It("Should apply all defaults for completely empty agent", func() {
+			By("having a completely empty agent spec")
+			emptyAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "empty-agent",
+					Namespace: "default",
+				},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, emptyAgent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that default replicas are set")
+			Expect(emptyAgent.Spec.Replicas).NotTo(BeNil())
+			Expect(*emptyAgent.Spec.Replicas).To(Equal(int32(1)))
+
+			By("verifying that protocols list is empty but handled gracefully")
+			Expect(emptyAgent.Spec.Protocols).To(BeEmpty())
+		})
+
+		It("Should handle multiple protocols with mixed configurations", func() {
+			By("setting up multiple protocols with different configurations")
+			agent.Spec.Framework = googleAdkFramework
+			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
+				{Type: "A2A"},                             // No port, no name
+				{Type: "OpenAI", Port: 9000},              // Port set, no name
+				{Type: "A2A", Name: "custom", Port: 8500}, // Both set
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying defaults are applied correctly")
+			Expect(agent.Spec.Protocols).To(HaveLen(3))
+
+			Expect(agent.Spec.Protocols[0].Port).To(Equal(int32(8000))) // google-adk default
+			Expect(agent.Spec.Protocols[0].Name).To(Equal("A2A-0"))     // name generated before port was set
+
+			Expect(agent.Spec.Protocols[1].Port).To(Equal(int32(9000)))   // preserved port
+			Expect(agent.Spec.Protocols[1].Name).To(Equal("OpenAI-9000")) // generated name
+
+			Expect(agent.Spec.Protocols[2].Port).To(Equal(int32(8500))) // preserved port
+			Expect(agent.Spec.Protocols[2].Name).To(Equal("custom"))    // preserved name
+		})
+	})
 })
