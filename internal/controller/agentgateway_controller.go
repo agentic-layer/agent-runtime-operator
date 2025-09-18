@@ -18,6 +18,11 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +41,20 @@ import (
 type AgentGatewayReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+}
+
+// KrakendBackend represents a backend configuration in KrakenD
+type KrakendBackend struct {
+	Host       []string `json:"host"`
+	URLPattern string   `json:"url_pattern"`
+}
+
+// KrakendEndpoint represents an endpoint configuration in KrakenD
+type KrakendEndpoint struct {
+	Endpoint       string           `json:"endpoint"`
+	OutputEncoding string           `json:"output_encoding"`
+	Method         string           `json:"method"`
+	Backend        []KrakendBackend `json:"backend"`
 }
 
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agentgateways,verbs=get;list;watch;create;update;patch;delete
@@ -75,7 +94,7 @@ func (r *AgentGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Deployment does not exist, create it
 		log.Info("Creating new Deployment", "name", deploymentName, "namespace", agentGateway.Namespace)
 
-		deployment, err = r.createDeploymentForAgentGateway(&agentGateway, deploymentName)
+		deployment, err = r.createDeploymentForKrakendAgentGateway(&agentGateway, deploymentName)
 		if err != nil {
 			log.Error(err, "Failed to create deployment for Agent")
 			return ctrl.Result{}, err
@@ -205,7 +224,7 @@ func (r *AgentGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // createDeploymentForAgent creates a deployment for the given Agent
-func (r *AgentGatewayReconciler) createDeploymentForAgentGateway(agentGateway *runtimev1alpha1.AgentGateway, deploymentName string) (*appsv1.Deployment, error) {
+func (r *AgentGatewayReconciler) createDeploymentForKrakendAgentGateway(agentGateway *runtimev1alpha1.AgentGateway, deploymentName string) (*appsv1.Deployment, error) {
 	replicas := agentGateway.Spec.Replicas
 	if replicas == nil {
 		replicas = new(int32)
@@ -294,6 +313,142 @@ func (r *AgentGatewayReconciler) createDeploymentForAgentGateway(agentGateway *r
 	}
 
 	return deployment, nil
+}
+
+// createConfigMapForKrakendGateway creates a ConfigMap with KrakenD configuration
+func (r *AgentGatewayReconciler) createConfigMapForKrakendGateway(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway) (*corev1.ConfigMap, error) {
+
+	configPath := filepath.Join("internal", "controller", "krakend.json")
+	krakendConfigBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the base KrakenD configuration
+	var krakendConfigMap map[string]interface{}
+	if err := json.Unmarshal(krakendConfigBytes, &krakendConfigMap); err != nil {
+		return nil, fmt.Errorf("failed to parse KrakenD config: %w", err)
+	}
+
+	// Get all exposed agents
+	exposedAgents, err := r.getExposedAgents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get exposed agents: %w", err)
+	}
+
+	// Generate endpoints for all exposed agents
+	endpoints := make([]KrakendEndpoint, 0, len(exposedAgents))
+	for _, agent := range exposedAgents {
+		endpoint, err := r.generateEndpointForAgent(ctx, agent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate endpoint for agent %s: %w", agent.Name, err)
+		}
+		endpoints = append(endpoints, endpoint)
+	}
+
+	// Add the generated endpoints to the KrakenD config
+	krakendConfigMap["endpoints"] = endpoints
+
+	// Marshal the updated configuration back to JSON
+	updatedConfigBytes, err := json.MarshalIndent(krakendConfigMap, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal updated KrakenD config: %w", err)
+	}
+	krakendConfig := string(updatedConfigBytes)
+
+	labels := map[string]string{
+		"app":      agentGateway.Name,
+		"provider": string(agentGateway.Spec.Provider),
+	}
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "krakend-config",
+			Namespace: agentGateway.Namespace,
+			Labels:    labels,
+		},
+		Data: map[string]string{
+			"krakend.json": krakendConfig,
+		},
+	}
+
+	// Set AgentGateway as the owner of the ConfigMap
+	if err := ctrl.SetControllerReference(agentGateway, configMap, r.Scheme); err != nil {
+		return nil, err
+	}
+
+	return configMap, nil
+}
+
+// getExposedAgents queries all Agent resources across all namespaces with Exposed: true
+func (r *AgentGatewayReconciler) getExposedAgents(ctx context.Context) ([]*runtimev1alpha1.Agent, error) {
+	var agentList runtimev1alpha1.AgentList
+	if err := r.List(ctx, &agentList); err != nil {
+		return nil, fmt.Errorf("failed to list agents: %w", err)
+	}
+
+	var exposedAgents []*runtimev1alpha1.Agent
+	for i := range agentList.Items {
+		agent := &agentList.Items[i]
+		if agent.Spec.Exposed {
+			exposedAgents = append(exposedAgents, agent)
+		}
+	}
+
+	return exposedAgents, nil
+}
+
+// getAgentServiceURL finds the service owned by the agent and generates the Kubernetes service URL
+func (r *AgentGatewayReconciler) getAgentServiceURL(ctx context.Context, agent *runtimev1alpha1.Agent) (string, error) {
+	var serviceList corev1.ServiceList
+	if err := r.List(ctx, &serviceList, client.InNamespace(agent.Namespace)); err != nil {
+		return "", fmt.Errorf("failed to list services in namespace %s: %w", agent.Namespace, err)
+	}
+
+	var foundService *corev1.Service
+	for i := range serviceList.Items {
+		service := &serviceList.Items[i]
+		for _, ownerRef := range service.OwnerReferences {
+			if ownerRef.Kind == "Agent" && ownerRef.Name == agent.Name && ownerRef.UID == agent.UID {
+				foundService = service
+				break
+			}
+		}
+		if foundService != nil {
+			break
+		}
+	}
+
+	if foundService == nil {
+		return "", fmt.Errorf("no service found owned by agent %s in namespace %s", agent.Name, agent.Namespace)
+	}
+
+	if len(foundService.Spec.Ports) == 0 {
+		return "", fmt.Errorf("service %s owned by agent %s has no ports defined", foundService.Name, agent.Name)
+	}
+
+	port := foundService.Spec.Ports[0].Port
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", foundService.Name, foundService.Namespace, port), nil
+}
+
+// generateEndpointForAgent creates the endpoint JSON configuration for a single agent
+func (r *AgentGatewayReconciler) generateEndpointForAgent(ctx context.Context, agent *runtimev1alpha1.Agent) (KrakendEndpoint, error) {
+	serviceURL, err := r.getAgentServiceURL(ctx, agent)
+	if err != nil {
+		return KrakendEndpoint{}, fmt.Errorf("failed to get service URL for agent %s: %w", agent.Name, err)
+	}
+
+	return KrakendEndpoint{
+		Endpoint:       fmt.Sprintf("/%s/{anyPath}/", agent.Name),
+		OutputEncoding: "no-op",
+		Method:         "POST",
+		Backend: []KrakendBackend{
+			{
+				Host:       []string{serviceURL},
+				URLPattern: "/{anyPath}/",
+			},
+		},
+	}, nil
 }
 
 // // discoverAgents finds and validates all Agent resources referenced by the AgentGateway

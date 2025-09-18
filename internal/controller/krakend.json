@@ -1,0 +1,21 @@
+{
+    "$schema": "https://www.krakend.io/schema/v2.10/krakend.json",
+    "version": 3,
+    "port": 8080,
+    "extra_config": {
+        "telemetry/logging": {
+            "level": "DEBUG",
+            "syslog": true,
+            "stdout": true
+        },
+        "router": {
+            "disable_access_log": false,
+            "hide_version_header": false
+        }
+    },
+    "timeout": "60000ms",
+    "cache_ttl": "300s",
+    "output_encoding": "json",
+    "name": "agent-gateway-krakend",
+    "endpoints": []
+}

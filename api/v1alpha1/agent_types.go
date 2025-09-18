@@ -56,6 +56,8 @@ type AgentSpec struct {
 	// Protocols defines the protocols supported by the agent
 	Protocols []AgentProtocol `json:"protocols,omitempty"`
 
+	Exposed bool `json:"exposed,omitempty"`
+
 	// +optional
 	// Env defines environment variables to be injected into the agent container
 	// Note: The 'AGENT_NAME' variable is system-managed and will automatically be removed if set.
