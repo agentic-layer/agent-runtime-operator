@@ -107,18 +107,40 @@ func (r *AgentGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.Info("Reconciling AgentGateway", "name", agentGateway.Name, "namespace", agentGateway.Namespace)
 
+	configMap := &corev1.ConfigMap{}
+	configMapName := "krakend-config"
+	err := r.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, configMap)
+
+	if err != nil && errors.IsNotFound(err) {
+		configMap, err := r.createConfigMapForKrakendGateway(ctx, &agentGateway, configMapName)
+		if err != nil {
+			log.Error(err, "Failed to create ConfigMap for krakend config")
+			return ctrl.Result{}, err
+		}
+
+		if err := r.Create(ctx, configMap); err != nil {
+			log.Error(err, "Failed to create new krakend ConfigMap", "name", configMapName)
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Successfully created krakend ConfigMap", "name", configMapName, "namespace", agentGateway.Namespace)
+	} else if err != nil {
+		log.Error(err, "Failed to get ConfigMap")
+		return ctrl.Result{}, err
+	}
+
 	// Check if deployment already exists
 	deployment := &appsv1.Deployment{}
 	deploymentName := agentGateway.Name
-	err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, deployment)
+	err = r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, deployment)
 
 	if err != nil && errors.IsNotFound(err) {
 		// Deployment does not exist, create it
 		log.Info("Creating new Deployment", "name", deploymentName, "namespace", agentGateway.Namespace)
 
-		deployment, err = r.createDeploymentForKrakendAgentGateway(ctx, &agentGateway, deploymentName)
+		deployment, err = r.createDeploymentForAgentGateway(ctx, &agentGateway, deploymentName, configMapName)
 		if err != nil {
-			log.Error(err, "Failed to create deployment for Agent")
+			log.Error(err, "Failed to create deployment for Agent Gateway")
 			return ctrl.Result{}, err
 		}
 
@@ -270,7 +292,7 @@ func (r *AgentGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // createDeploymentForAgent creates a deployment for the given Agent
-func (r *AgentGatewayReconciler) createDeploymentForKrakendAgentGateway(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, deploymentName string) (*appsv1.Deployment, error) {
+func (r *AgentGatewayReconciler) createDeploymentForAgentGateway(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, deploymentName string, krakendConfigMapName string) (*appsv1.Deployment, error) {
 	replicas := agentGateway.Spec.Replicas
 	if replicas == nil {
 		replicas = new(int32)
@@ -294,18 +316,13 @@ func (r *AgentGatewayReconciler) createDeploymentForKrakendAgentGateway(ctx cont
 		Protocol:      corev1.ProtocolTCP,
 	}
 
-	configMap, err := r.createConfigMapForKrakendGateway(ctx, agentGateway)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the krakend config volume
 	configVolume := corev1.Volume{
 		Name: "krakend-config-volume",
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: configMap.Name,
+					Name: krakendConfigMapName,
 				},
 			},
 		},
@@ -408,7 +425,7 @@ func (r *AgentGatewayReconciler) createServiceForAgentGateway(agentGateway *runt
 }
 
 // createConfigMapForKrakendGateway creates a ConfigMap with KrakenD configuration
-func (r *AgentGatewayReconciler) createConfigMapForKrakendGateway(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway) (*corev1.ConfigMap, error) {
+func (r *AgentGatewayReconciler) createConfigMapForKrakendGateway(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, configMapName string) (*corev1.ConfigMap, error) {
 
 	// Parse the base KrakenD configuration from embedded template
 	var krakendConfigMap map[string]interface{}
@@ -449,7 +466,7 @@ func (r *AgentGatewayReconciler) createConfigMapForKrakendGateway(ctx context.Co
 
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "krakend-config",
+			Name:      configMapName,
 			Namespace: agentGateway.Namespace,
 			Labels:    labels,
 		},

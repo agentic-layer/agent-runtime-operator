@@ -68,12 +68,13 @@ var _ = Describe("Agent Gateway Controller", func() {
 
 		It("should create ConfigMap with embedded KrakenD configuration", func() {
 			By("Creating ConfigMap")
-			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway)
+			configMapName := agentGateway.Name + "-config"
+			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway, configMapName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(configMap).NotTo(BeNil())
 
 			By("Verifying ConfigMap structure")
-			Expect(configMap.Name).To(Equal("krakend-config"))
+			Expect(configMap.Name).To(Equal(configMapName))
 			Expect(configMap.Namespace).To(Equal("default"))
 			Expect(configMap.Data).To(HaveKey("krakend.json"))
 
@@ -167,7 +168,9 @@ var _ = Describe("Agent Gateway Controller", func() {
 
 		It("should create ConfigMap with endpoints for exposed agents", func() {
 			By("Creating ConfigMap with dynamic endpoints")
-			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway)
+			configMapName := agentGateway.Name + "-config"
+
+			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway, configMapName)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Parsing KrakenD configuration")
@@ -241,7 +244,8 @@ var _ = Describe("Agent Gateway Controller", func() {
 
 		It("should create ConfigMap with endpoints for all exposed agents", func() {
 			By("Creating ConfigMap with multiple agents")
-			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway)
+			configMapName := agentGateway.Name + "-config"
+			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway, configMapName)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Parsing KrakenD configuration")
@@ -299,7 +303,8 @@ var _ = Describe("Agent Gateway Controller", func() {
 
 		It("should handle no exposed agents gracefully", func() {
 			By("Creating ConfigMap with no exposed agents")
-			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway)
+			configMapName := agentGateway.Name + "-config"
+			configMap, err := reconciler.createConfigMapForKrakendGateway(ctx, agentGateway, configMapName)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Verifying empty endpoints array")
