@@ -30,43 +30,42 @@ Before working with this project, ensure you have the following tools installed 
 
 Follow these steps to get the operator up and running on a local Kubernetes cluster.
 
+### Prerequisites
+```shell
+# Create a local Kubernetes cluster using kind
+kind create cluster
+```
 
-1.  **Clone the repository:**
+```bash
+# Install cert-manager for webhook support (update the version to the latest stable if needed)
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+# Wait for cert-manager to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
+```
 
-    ```bash
-    git clone https://github.com/agentic-layer/agent-runtime-operator
-    cd agent-runtime-operator
-    ```
+### Installation
+```bash
+# Install the Agent Runtime Operator (update the version to the latest stable if needed)
+kubectl apply -f https://github.com/agentic-layer/agent-runtime-operator/releases/download/v0.2.3/install.yaml
+# Wait for the operator to be ready
+kubectl wait --for=condition=Available --timeout=60s -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager
+```
 
-2.  **Set up the local cluster and install dependencies:**
-    This command creates a local `kind` cluster and installs `cert-manager`, which is required for the operator's webhooks.
+## Development
 
-    ```bash
-    kind create cluster
-    kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
-    ```
+Follow the prerequisites above to set up your local environment.
+Then follow these steps to build and deploy the operator locally:
 
-    Wait for `cert-manager` to be ready before proceeding:
-
-    ```bash
-    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
-    ```
-
-3.  **Build and deploy the operator:**
-    These commands will install the CRDs, build the operator's container image, load it into your `kind` cluster, and deploy it.
-
-    ```bash
-    make install
-    make docker-build
-    make kind-load
-    make deploy
-    ```
-4.  **Verify the deployment:**
-    After a successful start, you should see the controller manager pod running in the `agent-runtime-operator-system` namespace.
-
-    ```bash
-    kubectl get pods -n agent-runtime-operator-system
-    ```
+```shell
+# Install CRDs into the cluster
+make install
+# Build docker image
+make docker-build
+# Load image into kind cluster (not needed if using local registry)
+make kind-load
+# Deploy the operator to the cluster
+make deploy
+```
 
 ## Configuration
 
