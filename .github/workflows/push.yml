@@ -53,6 +53,9 @@ jobs:
         run: |
           make docker-buildx
 
+      - name: 'Setup Flux CLI'
+        uses: fluxcd/flux2/action@main
+
       - name: 'Flux Build & Push'
         env:
           VERSION: ${{ steps.generate_version.outputs.version }}
