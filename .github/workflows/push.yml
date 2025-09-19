@@ -52,6 +52,19 @@ jobs:
         run: |
           make docker-buildx
 
+      - name: 'Flux Build & Push'
+        env:
+          VERSION: ${{ steps.generate_version.outputs.version }}
+        run: |
+          make flux-push
+
+      - name: 'Flux Tag Latest'
+        if: github.ref_name == 'main'
+        env:
+          VERSION: ${{ steps.generate_version.outputs.version }}
+        run: |
+          make flux-tag-latest
+
       - name: 'Build Installer'
         if: github.ref_name != 'main'
         env:

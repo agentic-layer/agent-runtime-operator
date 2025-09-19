@@ -31,6 +31,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # agentic-layer.ai/agent-runtime-operator-bundle:$VERSION and agentic-layer.ai/agent-runtime-operator-catalog:$VERSION.
 IMAGE_TAG_BASE ?= eu.gcr.io/agentic-layer/agent-runtime-operator
 
+MANIFESTS_IMG ?= oci://ghcr.io/agentic-layer/manifests/agent-runtime-operator:$(VERSION)
+
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
@@ -195,6 +197,18 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
+
+.PHONY: flux-push
+flux-push:
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	flux push artifact $(MANIFESTS_IMG) \
+    	--path="./config/default" \
+    	--source="$(shell git config --get remote.origin.url)" \
+    	--revision="$(VERSION)"
+
+.PHONY: flux-tag-latest
+flux-tag-latest:
+	flux tag artifact $(MANIFESTS_IMG) --tag latest
 
 ##@ Deployment
 
@@ -363,13 +377,3 @@ catalog-push: ## Push a catalog image.
 .PHONY: kind
 kind-load:
 	$(KIND) load docker-image $(IMG)
-
-HELMIFY ?= $(LOCALBIN)/helmify
-
-.PHONY: helmify
-helmify: $(HELMIFY) ## Download helmify locally if necessary.
-$(HELMIFY): $(LOCALBIN)
-	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
-
-helm: manifests kustomize helmify
-	$(KUSTOMIZE) build config/default | $(HELMIFY)
