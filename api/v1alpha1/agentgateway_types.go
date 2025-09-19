@@ -47,18 +47,6 @@ type AgentGatewaySpec struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
-// GatewayConditionType defines the type of condition for the gateway
-type GatewayConditionType string
-
-const (
-	// GatewayReady indicates the gateway is ready to serve traffic
-	GatewayReady GatewayConditionType = "Ready"
-	// GatewayConfigured indicates the gateway configuration has been applied
-	GatewayConfigured GatewayConditionType = "Configured"
-	// GatewaySecured indicates IAP and TLS have been properly configured
-	GatewaySecured GatewayConditionType = "Secured"
-)
-
 // AgentGatewayStatus defines the observed state of AgentGateway
 type AgentGatewayStatus struct {
 	// Conditions represent the latest available observations of the gateway's state
