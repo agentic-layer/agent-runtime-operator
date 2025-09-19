@@ -29,16 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
+	"github.com/agentic-layer/agent-runtime-operator/internal/constants"
 )
-
-// DefaultKrakendPort is the default port for KrakenD gateway
-const DefaultKrakendPort = 8080
 
 // KrakendBackend represents a backend configuration in KrakenD
 type KrakendBackend struct {
@@ -91,13 +88,6 @@ func (p *Provider) CreateAgentGatewayResources(ctx context.Context, agentGateway
 	deploymentName := agentGateway.Name
 	if err := p.ensureDeployment(ctx, agentGateway, deploymentName, configMapName); err != nil {
 		log.Error(err, "Failed to ensure Deployment for KrakenD")
-		return err
-	}
-
-	// Create Service
-	serviceName := agentGateway.Name
-	if err := p.ensureService(ctx, agentGateway, serviceName); err != nil {
-		log.Error(err, "Failed to ensure Service for KrakenD")
 		return err
 	}
 
@@ -188,31 +178,6 @@ func (p *Provider) ensureDeployment(ctx context.Context, agentGateway *runtimev1
 	return nil
 }
 
-// ensureService creates or updates the KrakenD service
-func (p *Provider) ensureService(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, serviceName string) error {
-	log := logf.FromContext(ctx)
-
-	service := &corev1.Service{}
-	err := p.client.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: agentGateway.Namespace}, service)
-
-	if err != nil && errors.IsNotFound(err) {
-		service, err := p.createServiceForKrakend(agentGateway, serviceName)
-		if err != nil {
-			return fmt.Errorf("failed to create Service: %w", err)
-		}
-
-		if err := p.client.Create(ctx, service); err != nil {
-			return fmt.Errorf("failed to create new Service %s: %w", serviceName, err)
-		}
-
-		log.Info("Successfully created Service", "name", serviceName, "namespace", agentGateway.Namespace)
-	} else if err != nil {
-		return fmt.Errorf("failed to get Service: %w", err)
-	}
-
-	return nil
-}
-
 // createConfigMapForKrakend creates a ConfigMap with KrakenD configuration
 func (p *Provider) createConfigMapForKrakend(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, configMapName string, exposedAgents []*runtimev1alpha1.Agent) (*corev1.ConfigMap, error) {
 	// Generate endpoints for all exposed agents
@@ -237,7 +202,7 @@ func (p *Provider) createConfigMapForKrakend(ctx context.Context, agentGateway *
 	}
 
 	templateData := KrakendConfigData{
-		Port:      DefaultKrakendPort,
+		Port:      constants.DefaultGatewayPort,
 		Timeout:   timeout,
 		CacheTTL:  cacheTTL,
 		Endpoints: endpoints,
@@ -300,7 +265,7 @@ func (p *Provider) createDeploymentForKrakend(agentGateway *runtimev1alpha1.Agen
 	// Create container port
 	containerPort := corev1.ContainerPort{
 		Name:          "http",
-		ContainerPort: DefaultKrakendPort,
+		ContainerPort: constants.DefaultGatewayPort,
 		Protocol:      corev1.ProtocolTCP,
 	}
 
@@ -369,47 +334,6 @@ func (p *Provider) createDeploymentForKrakend(agentGateway *runtimev1alpha1.Agen
 	}
 
 	return deployment, nil
-}
-
-// createServiceForKrakend creates a service for KrakenD
-func (p *Provider) createServiceForKrakend(agentGateway *runtimev1alpha1.AgentGateway, serviceName string) (*corev1.Service, error) {
-	labels := map[string]string{
-		"app":      agentGateway.Name,
-		"provider": string(agentGateway.Spec.Provider),
-	}
-
-	// Service selector should match deployment selector (stable labels only)
-	selectorLabels := map[string]string{
-		"app": agentGateway.Name,
-	}
-
-	// Create service port for the gateway (port 10000 named http)
-	servicePort := corev1.ServicePort{
-		Name:       "http",
-		Port:       10000,
-		TargetPort: intstr.FromInt32(DefaultKrakendPort), // Target the container port 8080
-		Protocol:   corev1.ProtocolTCP,
-	}
-
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: agentGateway.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.ServiceSpec{
-			Selector: selectorLabels,
-			Ports:    []corev1.ServicePort{servicePort},
-			Type:     corev1.ServiceTypeClusterIP,
-		},
-	}
-
-	// Set AgentGateway as the owner of the Service
-	if err := ctrl.SetControllerReference(agentGateway, service, p.scheme); err != nil {
-		return nil, err
-	}
-
-	return service, nil
 }
 
 // generateEndpointForAgent creates the endpoint JSON configuration for a single agent

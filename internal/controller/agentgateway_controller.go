@@ -23,13 +23,16 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	"github.com/agentic-layer/agent-runtime-operator/internal/agentgateway"
+	"github.com/agentic-layer/agent-runtime-operator/internal/constants"
 )
 
 // AgentGatewayReconciler reconciles an AgentGateway object
@@ -103,6 +106,12 @@ func (r *AgentGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create all resources using the provider
 	if err := provider.CreateAgentGatewayResources(ctx, &agentGateway, exposedAgents); err != nil {
 		log.Error(err, "Failed to create agent gateway resources")
+		return ctrl.Result{}, err
+	}
+
+	// Create Service (provider-independent)
+	if err := r.ensureService(ctx, &agentGateway); err != nil {
+		log.Error(err, "Failed to ensure Service for AgentGateway")
 		return ctrl.Result{}, err
 	}
 
@@ -200,4 +209,132 @@ func (r *AgentGatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Named("agentgateway").
 		Complete(r)
+}
+
+// ensureService creates or updates the AgentGateway service
+func (r *AgentGatewayReconciler) ensureService(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway) error {
+	log := logf.FromContext(ctx)
+
+	serviceName := agentGateway.Name
+
+	// First, generate the desired Service configuration
+	desiredService, err := r.createServiceForAgentGateway(agentGateway, serviceName)
+	if err != nil {
+		return fmt.Errorf("failed to generate desired Service: %w", err)
+	}
+
+	// Try to get existing Service
+	existingService := &corev1.Service{}
+	err = r.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: agentGateway.Namespace}, existingService)
+
+	if err != nil && errors.IsNotFound(err) {
+		// Service doesn't exist, create it
+		if err := r.Create(ctx, desiredService); err != nil {
+			return fmt.Errorf("failed to create new Service %s: %w", serviceName, err)
+		}
+		log.Info("Successfully created Service", "name", serviceName, "namespace", agentGateway.Namespace)
+	} else if err != nil {
+		return fmt.Errorf("failed to get Service: %w", err)
+	}
+	// Once created, the Service is immutable.
+
+	return nil
+}
+
+// createServiceForAgentGateway creates a service for the AgentGateway
+func (r *AgentGatewayReconciler) createServiceForAgentGateway(agentGateway *runtimev1alpha1.AgentGateway, serviceName string) (*corev1.Service, error) {
+	labels := map[string]string{
+		"app":      agentGateway.Name,
+		"provider": string(agentGateway.Spec.Provider),
+	}
+
+	// Service selector should match deployment selector (stable labels only)
+	selectorLabels := map[string]string{
+		"app": agentGateway.Name,
+	}
+
+	// Create service port for the gateway (port 10000 named http)
+	servicePort := corev1.ServicePort{
+		Name:       "http",
+		Port:       10000,
+		TargetPort: intstr.FromInt32(constants.DefaultGatewayPort), // Target the agent gateway container port
+		Protocol:   corev1.ProtocolTCP,
+	}
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: agentGateway.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: selectorLabels,
+			Ports:    []corev1.ServicePort{servicePort},
+			Type:     corev1.ServiceTypeClusterIP,
+		},
+	}
+
+	// Set AgentGateway as the owner of the Service
+	if err := ctrl.SetControllerReference(agentGateway, service, r.Scheme); err != nil {
+		return nil, err
+	}
+
+	return service, nil
+}
+
+// serviceNeedsUpdate compares existing and desired Services to determine if an update is needed
+func (r *AgentGatewayReconciler) serviceNeedsUpdate(existing, desired *corev1.Service) bool {
+	// Compare labels
+	if len(existing.Labels) != len(desired.Labels) {
+		return true
+	}
+
+	for key, desiredValue := range desired.Labels {
+		if existingValue, exists := existing.Labels[key]; !exists || existingValue != desiredValue {
+			return true
+		}
+	}
+
+	// Compare selector
+	if len(existing.Spec.Selector) != len(desired.Spec.Selector) {
+		return true
+	}
+
+	for key, desiredValue := range desired.Spec.Selector {
+		if existingValue, exists := existing.Spec.Selector[key]; !exists || existingValue != desiredValue {
+			return true
+		}
+	}
+
+	// Compare ports
+	if len(existing.Spec.Ports) != len(desired.Spec.Ports) {
+		return true
+	}
+
+	// Create maps for easier comparison
+	existingPortsMap := make(map[string]corev1.ServicePort)
+	for _, port := range existing.Spec.Ports {
+		existingPortsMap[port.Name] = port
+	}
+
+	for _, desiredPort := range desired.Spec.Ports {
+		existingPort, exists := existingPortsMap[desiredPort.Name]
+		if !exists {
+			return true
+		}
+
+		// Compare key port fields
+		if existingPort.Port != desiredPort.Port ||
+			existingPort.TargetPort != desiredPort.TargetPort ||
+			existingPort.Protocol != desiredPort.Protocol {
+			return true
+		}
+	}
+
+	// Compare service type
+	if existing.Spec.Type != desired.Spec.Type {
+		return true
+	}
+
+	return false
 }
