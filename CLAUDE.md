@@ -96,6 +96,15 @@ make docker-push
 
 - **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent resources
 
+- **Gateway Providers** (`internal/agentgateway/`): Pluggable provider implementations for different gateway technologies:
+  - **KrakenD Provider** (`internal/agentgateway/krakend/provider.go`): Implements the AgentGateway provider interface for KrakenD
+    - Generates KrakenD JSON configuration with endpoints for exposed agents
+    - Creates ConfigMaps containing the gateway configuration
+    - Manages Kubernetes Deployments running KrakenD containers
+    - Creates Services for traffic routing to gateway instances
+    - Automatically discovers agent services and configures backend routing
+    - Supports path-based routing with configurable endpoints
+
 ### Project Structure
 
 ```
@@ -109,6 +118,8 @@ make docker-push
 │   └── samples/          # Example Agent resources
 ├── internal/
 │   ├── controller/       # Reconciliation logic
+│   ├── agentgateway/     # Gateway provider implementations
+│   │   └── krakend/     # KrakenD provider
 │   └── webhook/          # Admission webhook handlers
 └── test/
     ├── e2e/             # End-to-end tests
