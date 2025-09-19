@@ -202,7 +202,7 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 flux-push: manifests generate kustomize ## Push the manifests to a oci repository for FluxCD to consume.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	flux push artifact $(MANIFESTS_IMG) \
-    	--path="./config/default" \
+    	--path="./config" \
     	--source="$(shell git config --get remote.origin.url)" \
     	--revision="$(VERSION)"
 
