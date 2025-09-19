@@ -246,6 +246,8 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
+              exposed:
+                type: boolean
               framework:
                 description: Framework defines the supported agent frameworks
                 enum:

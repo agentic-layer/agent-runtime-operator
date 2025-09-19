@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/runtime.agentic-layer.ai_agents.yaml
+- bases/runtime.agentic-layer.ai_agentgateways.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

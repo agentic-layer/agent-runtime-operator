@@ -73,12 +73,37 @@ make docker-push
   - Protocol definitions (A2A, OpenAI)
   - Status tracking with conditions
 
+- **AgentGateway CRD** (`api/v1alpha1/agentgateway_types.go`): Defines the AgentGateway custom resource for exposing agents via a unified gateway:
+  - Gateway provider abstraction (KrakenD, Envoy, Nginx)
+  - Routing strategies (path-based, subdomain-based)
+  - IAP (Identity-Aware Proxy) integration for security
+  - TLS configuration and certificate management
+  - Agent reference and selective exposure controls
+
 - **Agent Controller** (`internal/controller/agent_controller.go`): Reconciles Agent resources by:
   - Creating Kubernetes Deployments for agent workloads
   - Managing Services for protocol exposure
   - Handling framework-specific configurations
 
+- **AgentGateway Controller** (`internal/controller/agentgateway_controller.go`): Reconciles AgentGateway resources by:
+  - Discovering and validating referenced Agent resources
+  - Generating gateway configuration (KrakenD JSON)
+  - Creating/updating ConfigMaps with gateway configuration
+  - Managing Kubernetes Deployments for gateway instances
+  - Creating Services and Ingress resources for traffic routing
+  - Handling IAP and TLS security configurations
+  - Tracking status conditions (Ready, Configured, Secured)
+
 - **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent resources
+
+- **Gateway Providers** (`internal/agentgateway/`): Pluggable provider implementations for different gateway technologies:
+  - **KrakenD Provider** (`internal/agentgateway/krakend/provider.go`): Implements the AgentGateway provider interface for KrakenD
+    - Generates KrakenD JSON configuration with endpoints for exposed agents
+    - Creates ConfigMaps containing the gateway configuration
+    - Manages Kubernetes Deployments running KrakenD containers
+    - Creates Services for traffic routing to gateway instances
+    - Automatically discovers agent services and configures backend routing
+    - Supports path-based routing with configurable endpoints
 
 ### Project Structure
 
@@ -93,14 +118,17 @@ make docker-push
 │   └── samples/          # Example Agent resources
 ├── internal/
 │   ├── controller/       # Reconciliation logic
+│   ├── agentgateway/     # Gateway provider implementations
+│   │   └── krakend/     # KrakenD provider
 │   └── webhook/          # Admission webhook handlers
 └── test/
     ├── e2e/             # End-to-end tests
     └── utils/           # Test utilities
 ```
 
-### Agent Resource Example
+### Resource Examples
 
+#### Agent Resource
 ```yaml
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent
@@ -118,6 +146,33 @@ spec:
   envFrom:
     - secretRef:
         name: api-key-secret
+```
+
+#### AgentGateway Resource
+```yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  name: main-gateway
+spec:
+  domain: "agents.example.com"
+  routingStrategy: path
+  agents:
+    - name: weather-agent
+      routePrefix: "/weather"
+      targetProtocol: "A2A"
+      enabled: true
+  gateway:
+    provider: krakend
+    replicas: 2
+  iap:
+    enabled: true
+    clientId: "your-oauth-client-id.apps.googleusercontent.com"
+    allowedDomains: ["example.com"]
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    hosts: ["agents.example.com"]
 ```
 
 ## Testing

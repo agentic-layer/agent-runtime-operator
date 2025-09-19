@@ -1,0 +1,31 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: agent-gateway
+spec:
+  # Gateway provider (default: krakend)
+  provider: krakend
+
+  # Number of gateway replicas (default: 2)
+  replicas: 2
+
+  # Request timeout (default: 60000ms)
+  timeout: "30000ms"
+
+  # Cache TTL for responses (default: 300s)
+  cacheTTL: "600s"
+
+---
+# Minimal AgentGateway configuration
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: minimal-gateway
+spec:
+  # Uses defaults: provider=krakend, replicas=2, timeout=60000ms, cacheTTL=300s
