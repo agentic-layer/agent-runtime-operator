@@ -18,3 +18,6 @@ package constants
 
 // DefaultGatewayPort is the default port for agent gateway containers
 const DefaultGatewayPort = 8080
+
+// AgentGatewayKind is the kind name for AgentGateway resources
+const AgentGatewayKind = "AgentGateway"

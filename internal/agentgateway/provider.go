@@ -35,13 +35,13 @@ type AgentGatewayProvider interface {
 }
 
 // NewAgentGatewayProvider creates a new provider instance based on the provider type
-func NewAgentGatewayProvider(providerType runtimev1alpha1.GatewayProvider, client client.Client, scheme *runtime.Scheme) (AgentGatewayProvider, error) {
+func NewAgentGatewayProvider(providerType runtimev1alpha1.GatewayProvider, k8sClient client.Client, scheme *runtime.Scheme) (AgentGatewayProvider, error) {
 	switch providerType {
 	case runtimev1alpha1.KrakenDProvider:
-		return krakend.NewProvider(client, scheme), nil
+		return krakend.NewProvider(k8sClient, scheme), nil
 	case "":
 		// Default to KrakenD if no provider specified
-		return krakend.NewProvider(client, scheme), nil
+		return krakend.NewProvider(k8sClient, scheme), nil
 	default:
 		return nil, fmt.Errorf("unsupported gateway provider: %s", providerType)
 	}

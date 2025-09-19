@@ -66,9 +66,9 @@ type Provider struct {
 }
 
 // NewProvider creates a new KrakenD provider instance
-func NewProvider(client client.Client, scheme *runtime.Scheme) *Provider {
+func NewProvider(k8sClient client.Client, scheme *runtime.Scheme) *Provider {
 	return &Provider{
-		client: client,
+		client: k8sClient,
 		scheme: scheme,
 	}
 }
@@ -426,11 +426,7 @@ func (p *Provider) deploymentNeedsUpdate(existing, desired *appsv1.Deployment) b
 	existingConfigMapName := p.getConfigMapNameFromVolumes(existing.Spec.Template.Spec.Volumes)
 	desiredConfigMapName := p.getConfigMapNameFromVolumes(desired.Spec.Template.Spec.Volumes)
 
-	if existingConfigMapName != desiredConfigMapName {
-		return true
-	}
-
-	return false
+	return existingConfigMapName != desiredConfigMapName
 }
 
 // getConfigMapNameFromVolumes extracts the ConfigMap name from the volumes

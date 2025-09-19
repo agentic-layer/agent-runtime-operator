@@ -135,7 +135,7 @@ func (r *AgentGatewayReconciler) deleteOwnedResources(ctx context.Context, agent
 	}
 	for _, configMap := range configMapList.Items {
 		for _, ownerRef := range configMap.OwnerReferences {
-			if ownerRef.Kind == "AgentGateway" && ownerRef.Name == agentGateway.Name && ownerRef.UID == agentGateway.UID {
+			if ownerRef.Kind == constants.AgentGatewayKind && ownerRef.Name == agentGateway.Name && ownerRef.UID == agentGateway.UID {
 				log.Info("Deleting ConfigMap", "name", configMap.Name)
 				if err := r.Delete(ctx, &configMap); err != nil && !errors.IsNotFound(err) {
 					return fmt.Errorf("failed to delete ConfigMap %s: %w", configMap.Name, err)
@@ -152,7 +152,7 @@ func (r *AgentGatewayReconciler) deleteOwnedResources(ctx context.Context, agent
 	}
 	for _, deployment := range deploymentList.Items {
 		for _, ownerRef := range deployment.OwnerReferences {
-			if ownerRef.Kind == "AgentGateway" && ownerRef.Name == agentGateway.Name && ownerRef.UID == agentGateway.UID {
+			if ownerRef.Kind == constants.AgentGatewayKind && ownerRef.Name == agentGateway.Name && ownerRef.UID == agentGateway.UID {
 				log.Info("Deleting Deployment", "name", deployment.Name)
 				if err := r.Delete(ctx, &deployment); err != nil && !errors.IsNotFound(err) {
 					return fmt.Errorf("failed to delete Deployment %s: %w", deployment.Name, err)
@@ -169,7 +169,7 @@ func (r *AgentGatewayReconciler) deleteOwnedResources(ctx context.Context, agent
 	}
 	for _, service := range serviceList.Items {
 		for _, ownerRef := range service.OwnerReferences {
-			if ownerRef.Kind == "AgentGateway" && ownerRef.Name == agentGateway.Name && ownerRef.UID == agentGateway.UID {
+			if ownerRef.Kind == constants.AgentGatewayKind && ownerRef.Name == agentGateway.Name && ownerRef.UID == agentGateway.UID {
 				log.Info("Deleting Service", "name", service.Name)
 				if err := r.Delete(ctx, &service); err != nil && !errors.IsNotFound(err) {
 					return fmt.Errorf("failed to delete Service %s: %w", service.Name, err)
@@ -280,61 +280,4 @@ func (r *AgentGatewayReconciler) createServiceForAgentGateway(agentGateway *runt
 	}
 
 	return service, nil
-}
-
-// serviceNeedsUpdate compares existing and desired Services to determine if an update is needed
-func (r *AgentGatewayReconciler) serviceNeedsUpdate(existing, desired *corev1.Service) bool {
-	// Compare labels
-	if len(existing.Labels) != len(desired.Labels) {
-		return true
-	}
-
-	for key, desiredValue := range desired.Labels {
-		if existingValue, exists := existing.Labels[key]; !exists || existingValue != desiredValue {
-			return true
-		}
-	}
-
-	// Compare selector
-	if len(existing.Spec.Selector) != len(desired.Spec.Selector) {
-		return true
-	}
-
-	for key, desiredValue := range desired.Spec.Selector {
-		if existingValue, exists := existing.Spec.Selector[key]; !exists || existingValue != desiredValue {
-			return true
-		}
-	}
-
-	// Compare ports
-	if len(existing.Spec.Ports) != len(desired.Spec.Ports) {
-		return true
-	}
-
-	// Create maps for easier comparison
-	existingPortsMap := make(map[string]corev1.ServicePort)
-	for _, port := range existing.Spec.Ports {
-		existingPortsMap[port.Name] = port
-	}
-
-	for _, desiredPort := range desired.Spec.Ports {
-		existingPort, exists := existingPortsMap[desiredPort.Name]
-		if !exists {
-			return true
-		}
-
-		// Compare key port fields
-		if existingPort.Port != desiredPort.Port ||
-			existingPort.TargetPort != desiredPort.TargetPort ||
-			existingPort.Protocol != desiredPort.Protocol {
-			return true
-		}
-	}
-
-	// Compare service type
-	if existing.Spec.Type != desired.Spec.Type {
-		return true
-	}
-
-	return false
 }

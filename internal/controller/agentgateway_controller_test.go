@@ -114,11 +114,11 @@ var _ = Describe("Agent Gateway Controller", func() {
 			Expect(k8sClient.Create(ctx, agentGateway)).To(Succeed())
 
 			// Create exposed agent with service
-			exposedAgent = createTestAgent(ctx, "exposed-agent", "default", true, 8080)
+			exposedAgent = createTestAgent(ctx, "exposed-agent", true, 8080)
 			exposedService = createTestServiceForAgent(ctx, exposedAgent, 8080)
 
 			// Create hidden agent (not exposed) with service
-			hiddenAgent = createTestAgent(ctx, "hidden-agent", "default", false, 8080)
+			hiddenAgent = createTestAgent(ctx, "hidden-agent", false, 8080)
 			hiddenService = createTestServiceForAgent(ctx, hiddenAgent, 8080)
 
 		})
@@ -216,13 +216,13 @@ var _ = Describe("Agent Gateway Controller", func() {
 			Expect(k8sClient.Create(ctx, agentGateway)).To(Succeed())
 
 			// Create multiple exposed agents
-			agent1 = createTestAgent(ctx, "weather-agent", "default", true, 8080)
+			agent1 = createTestAgent(ctx, "weather-agent", true, 8080)
 			service1 = createTestServiceForAgent(ctx, agent1, 8080)
 
-			agent2 = createTestAgent(ctx, "news-agent", "default", true, 9000)
+			agent2 = createTestAgent(ctx, "news-agent", true, 9000)
 			service2 = createTestServiceForAgent(ctx, agent2, 9000)
 
-			agent3 = createTestAgent(ctx, "calendar-agent", "default", true, 8000)
+			agent3 = createTestAgent(ctx, "calendar-agent", true, 8000)
 			service3 = createTestServiceForAgent(ctx, agent3, 8000)
 
 		})
@@ -427,7 +427,7 @@ var _ = Describe("Agent Gateway Controller", func() {
 			Expect(k8sClient.Create(ctx, agentGateway)).To(Succeed())
 
 			// Create first agent
-			agent1 = createTestAgent(ctx, "update-agent-1", "default", true, 8080)
+			agent1 = createTestAgent(ctx, "update-agent-1", true, 8080)
 			service1 = createTestServiceForAgent(ctx, agent1, 8080)
 		})
 
@@ -476,7 +476,7 @@ var _ = Describe("Agent Gateway Controller", func() {
 			initialResourceVersion := configMap.ResourceVersion
 
 			By("Adding a second agent and updating the configuration")
-			agent2 = createTestAgent(ctx, "update-agent-2", "default", true, 9000)
+			agent2 = createTestAgent(ctx, "update-agent-2", true, 9000)
 			service2 = createTestServiceForAgent(ctx, agent2, 9000)
 
 			// Call provider again with both agents
@@ -609,7 +609,7 @@ var _ = Describe("Agent Gateway Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agentGateway)).To(Succeed())
 
-			agent1 = createTestAgent(ctx, "deploy-update-agent", "default", true, 8080)
+			agent1 = createTestAgent(ctx, "deploy-update-agent", true, 8080)
 			service1 = createTestServiceForAgent(ctx, agent1, 8080)
 		})
 
@@ -697,7 +697,8 @@ var _ = Describe("Agent Gateway Controller", func() {
 // Helper functions for testing
 
 // createTestAgent creates a test Agent resource
-func createTestAgent(ctx context.Context, name, namespace string, exposed bool, port int32) *runtimev1alpha1.Agent {
+func createTestAgent(ctx context.Context, name string, exposed bool, port int32) *runtimev1alpha1.Agent {
+	namespace := "default"
 	agent := &runtimev1alpha1.Agent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
