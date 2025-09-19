@@ -146,6 +146,10 @@ spec:
                   updated
                 format: date-time
                 type: string
+              observedProvider:
+                description: ObservedProvider tracks the currently deployed provider
+                  type
+                type: string
             type: object
         type: object
     served: true

@@ -64,6 +64,9 @@ type AgentGatewayStatus struct {
 	// Conditions represent the latest available observations of the gateway's state
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
+	// ObservedProvider tracks the currently deployed provider type
+	ObservedProvider GatewayProvider `json:"observedProvider,omitempty"`
+
 	// GatewayEndpoint is the external endpoint where the gateway can be reached
 	GatewayEndpoint string `json:"gatewayEndpoint,omitempty"`
 
