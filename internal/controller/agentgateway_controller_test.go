@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -322,7 +323,7 @@ var _ = Describe("Agent Gateway Controller", func() {
 
 			endpoints, ok := config["endpoints"].([]interface{})
 			Expect(ok).To(BeTrue())
-			Expect(endpoints).To(HaveLen(0))
+			Expect(endpoints).To(BeEmpty())
 		})
 
 		It("should return error when agent service not found", func() {
@@ -402,6 +403,190 @@ var _ = Describe("Agent Gateway Controller", func() {
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(10000)))
 		})
 	})
+
+	Context("ConfigMap update behavior", func() {
+		const gatewayName = "test-update-gateway"
+		ctx := context.Background()
+
+		var agentGateway *runtimev1alpha1.AgentGateway
+		var agent1, agent2 *runtimev1alpha1.Agent
+		var service1, service2 *corev1.Service
+
+		BeforeEach(func() {
+			agentGateway = &runtimev1alpha1.AgentGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      gatewayName,
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentGatewaySpec{
+					Provider: "krakend",
+					Timeout:  stringPtr("30000ms"),
+					CacheTTL: stringPtr("120s"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, agentGateway)).To(Succeed())
+
+			// Create first agent
+			agent1 = createTestAgent(ctx, "update-agent-1", "default", true, 8080)
+			service1 = createTestServiceForAgent(ctx, agent1, 8080)
+		})
+
+		AfterEach(func() {
+			cleanupTestResource(ctx, agentGateway)
+			cleanupTestResource(ctx, agent1)
+			cleanupTestResource(ctx, service1)
+			if agent2 != nil {
+				cleanupTestResource(ctx, agent2)
+			}
+			if service2 != nil {
+				cleanupTestResource(ctx, service2)
+			}
+		})
+
+		It("should create initial ConfigMap with correct configuration", func() {
+			By("Creating initial resources with one agent")
+			provider, err := agentgateway.NewAgentGatewayProvider(runtimev1alpha1.KrakenDProvider, k8sClient, k8sClient.Scheme())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying initial ConfigMap was created")
+			configMapName := agentGateway.Name + "-krakend-config"
+			configMap := &corev1.ConfigMap{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, configMap)
+			}).Should(Succeed())
+
+			By("Verifying initial configuration content")
+			var config map[string]interface{}
+			Expect(json.Unmarshal([]byte(configMap.Data["krakend.json"]), &config)).To(Succeed())
+
+			// Verify timeout and cacheTTL
+			Expect(config["timeout"]).To(Equal("30000ms"))
+			Expect(config["cache_ttl"]).To(Equal("120s"))
+
+			// Verify single endpoint
+			endpoints := config["endpoints"].([]interface{})
+			Expect(endpoints).To(HaveLen(1))
+			endpoint := endpoints[0].(map[string]interface{})
+			Expect(endpoint["endpoint"]).To(Equal("/update-agent-1/{anyPath}/"))
+
+			// Store initial resource version for comparison
+			initialResourceVersion := configMap.ResourceVersion
+
+			By("Adding a second agent and updating the configuration")
+			agent2 = createTestAgent(ctx, "update-agent-2", "default", true, 9000)
+			service2 = createTestServiceForAgent(ctx, agent2, 9000)
+
+			// Call provider again with both agents
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1, agent2})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying ConfigMap was updated with new agent")
+			updatedConfigMap := &corev1.ConfigMap{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, updatedConfigMap)
+				if err != nil {
+					return false
+				}
+				// Check if resource version changed (indicating an update)
+				return updatedConfigMap.ResourceVersion != initialResourceVersion
+			}).Should(BeTrue())
+
+			By("Verifying updated configuration contains both endpoints")
+			var updatedConfig map[string]interface{}
+			Expect(json.Unmarshal([]byte(updatedConfigMap.Data["krakend.json"]), &updatedConfig)).To(Succeed())
+
+			updatedEndpoints := updatedConfig["endpoints"].([]interface{})
+			Expect(updatedEndpoints).To(HaveLen(2))
+
+			// Check that both agents are present
+			endpointPaths := make([]string, 0, 2)
+			for _, ep := range updatedEndpoints {
+				endpoint := ep.(map[string]interface{})
+				endpointPaths = append(endpointPaths, endpoint["endpoint"].(string))
+			}
+			Expect(endpointPaths).To(ContainElement("/update-agent-1/{anyPath}/"))
+			Expect(endpointPaths).To(ContainElement("/update-agent-2/{anyPath}/"))
+		})
+
+		It("should update ConfigMap when AgentGateway spec changes", func() {
+			By("Creating initial resources")
+			provider, err := agentgateway.NewAgentGatewayProvider(runtimev1alpha1.KrakenDProvider, k8sClient, k8sClient.Scheme())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Getting initial ConfigMap")
+			configMapName := agentGateway.Name + "-krakend-config"
+			configMap := &corev1.ConfigMap{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, configMap)
+			}).Should(Succeed())
+
+			initialResourceVersion := configMap.ResourceVersion
+
+			By("Updating AgentGateway timeout and cacheTTL")
+			// Update the AgentGateway spec
+			updatedAgentGateway := agentGateway.DeepCopy()
+			updatedAgentGateway.Spec.Timeout = stringPtr("45000ms")
+			updatedAgentGateway.Spec.CacheTTL = stringPtr("600s")
+
+			// Call provider with updated AgentGateway
+			err = provider.CreateAgentGatewayResources(ctx, updatedAgentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying ConfigMap was updated with new timeout and cacheTTL")
+			updatedConfigMap := &corev1.ConfigMap{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, updatedConfigMap)
+				if err != nil {
+					return false
+				}
+				// Check if resource version changed
+				return updatedConfigMap.ResourceVersion != initialResourceVersion
+			}).Should(BeTrue())
+
+			By("Verifying new configuration values")
+			var updatedConfig map[string]interface{}
+			Expect(json.Unmarshal([]byte(updatedConfigMap.Data["krakend.json"]), &updatedConfig)).To(Succeed())
+
+			Expect(updatedConfig["timeout"]).To(Equal("45000ms"))
+			Expect(updatedConfig["cache_ttl"]).To(Equal("600s"))
+		})
+
+		It("should not update ConfigMap when configuration hasn't changed", func() {
+			By("Creating initial resources")
+			provider, err := agentgateway.NewAgentGatewayProvider(runtimev1alpha1.KrakenDProvider, k8sClient, k8sClient.Scheme())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Getting initial ConfigMap")
+			configMapName := agentGateway.Name + "-krakend-config"
+			configMap := &corev1.ConfigMap{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, configMap)
+			}).Should(Succeed())
+
+			initialResourceVersion := configMap.ResourceVersion
+
+			By("Calling provider again with same configuration")
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying ConfigMap was NOT updated (resource version unchanged)")
+			unchangedConfigMap := &corev1.ConfigMap{}
+			Consistently(func() string {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, unchangedConfigMap)
+				Expect(err).NotTo(HaveOccurred())
+				return unchangedConfigMap.ResourceVersion
+			}, "2s", "200ms").Should(Equal(initialResourceVersion))
+		})
+	})
 })
 
 // Helper functions for testing
@@ -479,4 +664,9 @@ func assertKrakendConfigStructure(configData string) {
 	Expect(config).To(HaveKey("name"))
 	Expect(config["name"]).To(Equal("agent-gateway-krakend"))
 	Expect(config).To(HaveKey("endpoints"))
+}
+
+// stringPtr returns a pointer to a string (helper for optional fields)
+func stringPtr(s string) *string {
+	return &s
 }

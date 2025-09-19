@@ -108,22 +108,38 @@ func (p *Provider) CreateAgentGatewayResources(ctx context.Context, agentGateway
 func (p *Provider) ensureConfigMap(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, configMapName string, exposedAgents []*runtimev1alpha1.Agent) error {
 	log := logf.FromContext(ctx)
 
-	configMap := &corev1.ConfigMap{}
-	err := p.client.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, configMap)
+	// First, generate the desired ConfigMap configuration
+	desiredConfigMap, err := p.createConfigMapForKrakend(ctx, agentGateway, configMapName, exposedAgents)
+	if err != nil {
+		return fmt.Errorf("failed to generate desired ConfigMap: %w", err)
+	}
+
+	// Try to get existing ConfigMap
+	existingConfigMap := &corev1.ConfigMap{}
+	err = p.client.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agentGateway.Namespace}, existingConfigMap)
 
 	if err != nil && errors.IsNotFound(err) {
-		configMap, err := p.createConfigMapForKrakend(ctx, agentGateway, configMapName, exposedAgents)
-		if err != nil {
-			return fmt.Errorf("failed to create ConfigMap: %w", err)
-		}
-
-		if err := p.client.Create(ctx, configMap); err != nil {
+		// ConfigMap doesn't exist, create it
+		if err := p.client.Create(ctx, desiredConfigMap); err != nil {
 			return fmt.Errorf("failed to create new ConfigMap %s: %w", configMapName, err)
 		}
-
 		log.Info("Successfully created ConfigMap", "name", configMapName, "namespace", agentGateway.Namespace)
 	} else if err != nil {
 		return fmt.Errorf("failed to get ConfigMap: %w", err)
+	} else {
+		// ConfigMap exists, check if update is needed
+		if p.configMapNeedsUpdate(existingConfigMap, desiredConfigMap) {
+			// Update the existing ConfigMap's data and labels
+			existingConfigMap.Data = desiredConfigMap.Data
+			existingConfigMap.Labels = desiredConfigMap.Labels
+
+			if err := p.client.Update(ctx, existingConfigMap); err != nil {
+				return fmt.Errorf("failed to update ConfigMap %s: %w", configMapName, err)
+			}
+			log.Info("Successfully updated ConfigMap", "name", configMapName, "namespace", agentGateway.Namespace)
+		} else {
+			log.V(1).Info("ConfigMap is up to date, no update needed", "name", configMapName, "namespace", agentGateway.Namespace)
+		}
 	}
 
 	return nil
@@ -396,6 +412,33 @@ func (p *Provider) generateEndpointForAgent(ctx context.Context, agent *runtimev
 			},
 		},
 	}, nil
+}
+
+// configMapNeedsUpdate compares existing and desired ConfigMaps to determine if an update is needed
+func (p *Provider) configMapNeedsUpdate(existing, desired *corev1.ConfigMap) bool {
+	// Compare data content
+	if len(existing.Data) != len(desired.Data) {
+		return true
+	}
+
+	for key, desiredValue := range desired.Data {
+		if existingValue, exists := existing.Data[key]; !exists || existingValue != desiredValue {
+			return true
+		}
+	}
+
+	// Compare labels (optional but good practice for consistency)
+	if len(existing.Labels) != len(desired.Labels) {
+		return true
+	}
+
+	for key, desiredValue := range desired.Labels {
+		if existingValue, exists := existing.Labels[key]; !exists || existingValue != desiredValue {
+			return true
+		}
+	}
+
+	return false
 }
 
 // getAgentServiceURL finds the service owned by the agent and generates the Kubernetes service URL
