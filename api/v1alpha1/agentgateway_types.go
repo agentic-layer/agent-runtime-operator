@@ -39,12 +39,6 @@ type AgentGatewaySpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=2
 	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Annotations to be added to the gateway resources
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// Labels to be added to the gateway resources
-	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // AgentGatewayStatus defines the observed state of AgentGateway

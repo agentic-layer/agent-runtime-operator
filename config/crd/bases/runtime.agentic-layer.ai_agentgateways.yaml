@@ -49,16 +49,6 @@ spec:
           spec:
             description: AgentGatewaySpec defines the desired state of AgentGateway
             properties:
-              annotations:
-                additionalProperties:
-                  type: string
-                description: Annotations to be added to the gateway resources
-                type: object
-              labels:
-                additionalProperties:
-                  type: string
-                description: Labels to be added to the gateway resources
-                type: object
               provider:
                 default: krakend
                 description: Provider specifies the gateway technology to use
