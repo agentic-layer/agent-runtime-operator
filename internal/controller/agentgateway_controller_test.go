@@ -587,6 +587,111 @@ var _ = Describe("Agent Gateway Controller", func() {
 			}, "2s", "200ms").Should(Equal(initialResourceVersion))
 		})
 	})
+
+	Context("Deployment update behavior", func() {
+		const gatewayName = "test-deployment-update-gateway"
+		ctx := context.Background()
+
+		var agentGateway *runtimev1alpha1.AgentGateway
+		var agent1 *runtimev1alpha1.Agent
+		var service1 *corev1.Service
+
+		BeforeEach(func() {
+			agentGateway = &runtimev1alpha1.AgentGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      gatewayName,
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentGatewaySpec{
+					Provider: "krakend",
+					Replicas: int32Ptr(2),
+				},
+			}
+			Expect(k8sClient.Create(ctx, agentGateway)).To(Succeed())
+
+			agent1 = createTestAgent(ctx, "deploy-update-agent", "default", true, 8080)
+			service1 = createTestServiceForAgent(ctx, agent1, 8080)
+		})
+
+		AfterEach(func() {
+			cleanupTestResource(ctx, agentGateway)
+			cleanupTestResource(ctx, agent1)
+			cleanupTestResource(ctx, service1)
+		})
+
+		It("should create initial Deployment with correct replica count", func() {
+			By("Creating initial resources")
+			provider, err := agentgateway.NewAgentGatewayProvider(runtimev1alpha1.KrakenDProvider, k8sClient, k8sClient.Scheme())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying initial Deployment was created")
+			deploymentName := agentGateway.Name
+			deployment := &appsv1.Deployment{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, deployment)
+			}).Should(Succeed())
+
+			By("Verifying initial configuration")
+			Expect(deployment.Spec.Replicas).NotTo(BeNil())
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(2)))
+			Expect(deployment.Labels["provider"]).To(Equal("krakend"))
+
+			initialGeneration := deployment.Generation
+
+			By("Updating AgentGateway replica count")
+			updatedAgentGateway := agentGateway.DeepCopy()
+			updatedAgentGateway.Spec.Replicas = int32Ptr(4)
+
+			err = provider.CreateAgentGatewayResources(ctx, updatedAgentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying Deployment was updated with new replica count")
+			updatedDeployment := &appsv1.Deployment{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, updatedDeployment)
+				if err != nil {
+					return false
+				}
+				// Check if generation changed (indicating an update) and replica count is updated
+				return updatedDeployment.Generation > initialGeneration &&
+					updatedDeployment.Spec.Replicas != nil &&
+					*updatedDeployment.Spec.Replicas == 4
+			}).Should(BeTrue())
+		})
+
+		It("should not update Deployment when configuration hasn't changed", func() {
+			By("Creating initial resources")
+			provider, err := agentgateway.NewAgentGatewayProvider(runtimev1alpha1.KrakenDProvider, k8sClient, k8sClient.Scheme())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Getting initial Deployment")
+			deploymentName := agentGateway.Name
+			deployment := &appsv1.Deployment{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, deployment)
+			}).Should(Succeed())
+
+			initialGeneration := deployment.Generation
+
+			By("Calling provider again with same configuration")
+			err = provider.CreateAgentGatewayResources(ctx, agentGateway, []*runtimev1alpha1.Agent{agent1})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying Deployment was NOT updated (generation unchanged)")
+			unchangedDeployment := &appsv1.Deployment{}
+			Consistently(func() int64 {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, unchangedDeployment)
+				Expect(err).NotTo(HaveOccurred())
+				return unchangedDeployment.Generation
+			}, "2s", "200ms").Should(Equal(initialGeneration))
+		})
+	})
 })
 
 // Helper functions for testing
@@ -669,4 +774,9 @@ func assertKrakendConfigStructure(configData string) {
 // stringPtr returns a pointer to a string (helper for optional fields)
 func stringPtr(s string) *string {
 	return &s
+}
+
+// int32Ptr returns a pointer to an int32 (helper for optional fields)
+func int32Ptr(i int32) *int32 {
+	return &i
 }

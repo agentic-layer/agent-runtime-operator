@@ -19,6 +19,7 @@ package krakend
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -224,6 +225,366 @@ var _ = Describe("KrakenD Provider", func() {
 
 			result := provider.configMapNeedsUpdate(existing, desired)
 			Expect(result).To(BeFalse())
+		})
+	})
+
+	Describe("deploymentNeedsUpdate", func() {
+		It("should return false for identical Deployments", func() {
+			replicas := int32(2)
+			existing := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "default",
+					Labels: map[string]string{
+						"app":      "test",
+						"provider": "krakend",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app":      "test",
+								"provider": "krakend",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								{
+									Name: "config-volume",
+									VolumeSource: corev1.VolumeSource{
+										ConfigMap: &corev1.ConfigMapVolumeSource{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "test-config",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			desired := existing.DeepCopy()
+
+			result := provider.deploymentNeedsUpdate(existing, desired)
+			Expect(result).To(BeFalse())
+		})
+
+		It("should return true when replica count differs", func() {
+			replicas1 := int32(1)
+			replicas2 := int32(3)
+
+			existing := &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas1,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+			}
+
+			desired := &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas2,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+			}
+
+			result := provider.deploymentNeedsUpdate(existing, desired)
+			Expect(result).To(BeTrue())
+		})
+
+		It("should return true when deployment labels differ", func() {
+			replicas := int32(1)
+			existing := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":      "test",
+						"provider": "krakend",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+			}
+
+			desired := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":      "test",
+						"provider": "envoy",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+			}
+
+			result := provider.deploymentNeedsUpdate(existing, desired)
+			Expect(result).To(BeTrue())
+		})
+
+		It("should return true when template labels differ", func() {
+			replicas := int32(1)
+			existing := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app":      "test",
+								"provider": "krakend",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+			}
+
+			desired := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app":      "test",
+								"provider": "envoy",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+			}
+
+			result := provider.deploymentNeedsUpdate(existing, desired)
+			Expect(result).To(BeTrue())
+		})
+
+		It("should return true when ConfigMap volume reference differs", func() {
+			replicas := int32(1)
+			existing := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								{
+									Name: "config-volume",
+									VolumeSource: corev1.VolumeSource{
+										ConfigMap: &corev1.ConfigMapVolumeSource{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "old-config",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			desired := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								{
+									Name: "config-volume",
+									VolumeSource: corev1.VolumeSource{
+										ConfigMap: &corev1.ConfigMapVolumeSource{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "new-config",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			result := provider.deploymentNeedsUpdate(existing, desired)
+			Expect(result).To(BeTrue())
+		})
+
+		It("should handle nil replicas correctly", func() {
+			existing := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: nil, // Should default to 1
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+			}
+
+			desired := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: nil, // Should default to 1
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app": "test",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{},
+						},
+					},
+				},
+			}
+
+			result := provider.deploymentNeedsUpdate(existing, desired)
+			Expect(result).To(BeFalse())
+		})
+	})
+
+	Describe("getConfigMapNameFromVolumes", func() {
+		It("should return ConfigMap name when found", func() {
+			volumes := []corev1.Volume{
+				{
+					Name: "regular-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "config-volume",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "test-config",
+							},
+						},
+					},
+				},
+			}
+
+			result := provider.getConfigMapNameFromVolumes(volumes)
+			Expect(result).To(Equal("test-config"))
+		})
+
+		It("should return empty string when no ConfigMap volume found", func() {
+			volumes := []corev1.Volume{
+				{
+					Name: "regular-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			}
+
+			result := provider.getConfigMapNameFromVolumes(volumes)
+			Expect(result).To(Equal(""))
+		})
+
+		It("should return empty string for empty volumes", func() {
+			volumes := []corev1.Volume{}
+
+			result := provider.getConfigMapNameFromVolumes(volumes)
+			Expect(result).To(Equal(""))
 		})
 	})
 })

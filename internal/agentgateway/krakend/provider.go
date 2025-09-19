@@ -149,22 +149,40 @@ func (p *Provider) ensureConfigMap(ctx context.Context, agentGateway *runtimev1a
 func (p *Provider) ensureDeployment(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, deploymentName string, configMapName string) error {
 	log := logf.FromContext(ctx)
 
-	deployment := &appsv1.Deployment{}
-	err := p.client.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, deployment)
+	// First, generate the desired Deployment configuration
+	desiredDeployment, err := p.createDeploymentForKrakend(agentGateway, deploymentName, configMapName)
+	if err != nil {
+		return fmt.Errorf("failed to generate desired Deployment: %w", err)
+	}
+
+	// Try to get existing Deployment
+	existingDeployment := &appsv1.Deployment{}
+	err = p.client.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: agentGateway.Namespace}, existingDeployment)
 
 	if err != nil && errors.IsNotFound(err) {
-		deployment, err := p.createDeploymentForKrakend(agentGateway, deploymentName, configMapName)
-		if err != nil {
-			return fmt.Errorf("failed to create Deployment: %w", err)
-		}
-
-		if err := p.client.Create(ctx, deployment); err != nil {
+		// Deployment doesn't exist, create it
+		if err := p.client.Create(ctx, desiredDeployment); err != nil {
 			return fmt.Errorf("failed to create new Deployment %s: %w", deploymentName, err)
 		}
-
 		log.Info("Successfully created Deployment", "name", deploymentName, "namespace", agentGateway.Namespace)
 	} else if err != nil {
 		return fmt.Errorf("failed to get Deployment: %w", err)
+	} else {
+		// Deployment exists, check if update is needed
+		if p.deploymentNeedsUpdate(existingDeployment, desiredDeployment) {
+			// Update the existing Deployment's spec and labels
+			existingDeployment.Labels = desiredDeployment.Labels
+			existingDeployment.Spec.Replicas = desiredDeployment.Spec.Replicas
+			existingDeployment.Spec.Template.Labels = desiredDeployment.Spec.Template.Labels
+			existingDeployment.Spec.Template.Spec.Volumes = desiredDeployment.Spec.Template.Spec.Volumes
+
+			if err := p.client.Update(ctx, existingDeployment); err != nil {
+				return fmt.Errorf("failed to update Deployment %s: %w", deploymentName, err)
+			}
+			log.Info("Successfully updated Deployment", "name", deploymentName, "namespace", agentGateway.Namespace)
+		} else {
+			log.V(1).Info("Deployment is up to date, no update needed", "name", deploymentName, "namespace", agentGateway.Namespace)
+		}
 	}
 
 	return nil
@@ -439,6 +457,66 @@ func (p *Provider) configMapNeedsUpdate(existing, desired *corev1.ConfigMap) boo
 	}
 
 	return false
+}
+
+// deploymentNeedsUpdate compares existing and desired Deployments to determine if an update is needed
+func (p *Provider) deploymentNeedsUpdate(existing, desired *appsv1.Deployment) bool {
+	// Compare replica count
+	existingReplicas := int32(1) // Default replica count
+	if existing.Spec.Replicas != nil {
+		existingReplicas = *existing.Spec.Replicas
+	}
+
+	desiredReplicas := int32(1) // Default replica count
+	if desired.Spec.Replicas != nil {
+		desiredReplicas = *desired.Spec.Replicas
+	}
+
+	if existingReplicas != desiredReplicas {
+		return true
+	}
+
+	// Compare labels
+	if len(existing.Labels) != len(desired.Labels) {
+		return true
+	}
+
+	for key, desiredValue := range desired.Labels {
+		if existingValue, exists := existing.Labels[key]; !exists || existingValue != desiredValue {
+			return true
+		}
+	}
+
+	// Compare template labels (pod labels)
+	if len(existing.Spec.Template.Labels) != len(desired.Spec.Template.Labels) {
+		return true
+	}
+
+	for key, desiredValue := range desired.Spec.Template.Labels {
+		if existingValue, exists := existing.Spec.Template.Labels[key]; !exists || existingValue != desiredValue {
+			return true
+		}
+	}
+
+	// Compare ConfigMap volume reference (in case the ConfigMap name changes)
+	existingConfigMapName := p.getConfigMapNameFromVolumes(existing.Spec.Template.Spec.Volumes)
+	desiredConfigMapName := p.getConfigMapNameFromVolumes(desired.Spec.Template.Spec.Volumes)
+
+	if existingConfigMapName != desiredConfigMapName {
+		return true
+	}
+
+	return false
+}
+
+// getConfigMapNameFromVolumes extracts the ConfigMap name from the volumes
+func (p *Provider) getConfigMapNameFromVolumes(volumes []corev1.Volume) string {
+	for _, volume := range volumes {
+		if volume.ConfigMap != nil {
+			return volume.ConfigMap.Name
+		}
+	}
+	return ""
 }
 
 // getAgentServiceURL finds the service owned by the agent and generates the Kubernetes service URL
