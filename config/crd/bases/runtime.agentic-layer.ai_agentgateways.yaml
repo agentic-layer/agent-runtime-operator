@@ -49,6 +49,11 @@ spec:
           spec:
             description: AgentGatewaySpec defines the desired state of AgentGateway
             properties:
+              cacheTTL:
+                default: 300s
+                description: CacheTTL specifies the cache time-to-live for gateway
+                  responses
+                type: string
               provider:
                 default: krakend
                 description: Provider specifies the gateway technology to use
@@ -61,6 +66,10 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              timeout:
+                default: 60000ms
+                description: Timeout specifies the gateway timeout for requests
+                type: string
             type: object
           status:
             description: AgentGatewayStatus defines the observed state of AgentGateway

@@ -17,9 +17,10 @@ limitations under the License.
 package krakend
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"text/template"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +37,9 @@ import (
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
+// DefaultKrakendPort is the default port for KrakenD gateway
+const DefaultKrakendPort = 8080
+
 // KrakendBackend represents a backend configuration in KrakenD
 type KrakendBackend struct {
 	Host       []string `json:"host"`
@@ -50,28 +54,13 @@ type KrakendEndpoint struct {
 	Backend        []KrakendBackend `json:"backend"`
 }
 
-// defaultKrakendConfig is the base KrakenD configuration template
-const defaultKrakendConfig = `{
-    "$schema": "https://www.krakend.io/schema/v2.10/krakend.json",
-    "version": 3,
-    "port": 8080,
-    "extra_config": {
-        "telemetry/logging": {
-            "level": "DEBUG",
-            "syslog": true,
-            "stdout": true
-        },
-        "router": {
-            "disable_access_log": false,
-            "hide_version_header": false
-        }
-    },
-    "timeout": "60000ms",
-    "cache_ttl": "300s",
-    "output_encoding": "json",
-    "name": "agent-gateway-krakend",
-    "endpoints": []
-}`
+// KrakendConfigData holds the data for template execution
+type KrakendConfigData struct {
+	Port      int32
+	Timeout   string
+	CacheTTL  string
+	Endpoints []KrakendEndpoint
+}
 
 // Provider implements the AgentGatewayProvider interface for KrakenD
 type Provider struct {
@@ -192,12 +181,6 @@ func (p *Provider) ensureService(ctx context.Context, agentGateway *runtimev1alp
 
 // createConfigMapForKrakend creates a ConfigMap with KrakenD configuration
 func (p *Provider) createConfigMapForKrakend(ctx context.Context, agentGateway *runtimev1alpha1.AgentGateway, configMapName string, exposedAgents []*runtimev1alpha1.Agent) (*corev1.ConfigMap, error) {
-	// Parse the base KrakenD configuration from embedded template
-	var krakendConfigMap map[string]interface{}
-	if err := json.Unmarshal([]byte(defaultKrakendConfig), &krakendConfigMap); err != nil {
-		return nil, fmt.Errorf("failed to parse KrakenD config: %w", err)
-	}
-
 	// Generate endpoints for all exposed agents
 	endpoints := make([]KrakendEndpoint, 0, len(exposedAgents))
 	for _, agent := range exposedAgents {
@@ -208,15 +191,35 @@ func (p *Provider) createConfigMapForKrakend(ctx context.Context, agentGateway *
 		endpoints = append(endpoints, endpoint)
 	}
 
-	// Add the generated endpoints to the KrakenD config
-	krakendConfigMap["endpoints"] = endpoints
-
-	// Marshal the updated configuration back to JSON
-	updatedConfigBytes, err := json.MarshalIndent(krakendConfigMap, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal updated KrakenD config: %w", err)
+	// Prepare template data with default values
+	timeout := "60000ms"
+	if agentGateway.Spec.Timeout != nil {
+		timeout = *agentGateway.Spec.Timeout
 	}
-	krakendConfig := string(updatedConfigBytes)
+
+	cacheTTL := "300s"
+	if agentGateway.Spec.CacheTTL != nil {
+		cacheTTL = *agentGateway.Spec.CacheTTL
+	}
+
+	templateData := KrakendConfigData{
+		Port:      DefaultKrakendPort,
+		Timeout:   timeout,
+		CacheTTL:  cacheTTL,
+		Endpoints: endpoints,
+	}
+
+	// Parse and execute the template
+	tmpl, err := template.New("krakend").Parse(krakendConfigTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse KrakenD template: %w", err)
+	}
+
+	var configBuffer bytes.Buffer
+	if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+		return nil, fmt.Errorf("failed to execute KrakenD template: %w", err)
+	}
+	krakendConfig := configBuffer.String()
 
 	labels := map[string]string{
 		"app":      agentGateway.Name,
@@ -263,7 +266,7 @@ func (p *Provider) createDeploymentForKrakend(agentGateway *runtimev1alpha1.Agen
 	// Create container port
 	containerPort := corev1.ContainerPort{
 		Name:          "http",
-		ContainerPort: 8080,
+		ContainerPort: DefaultKrakendPort,
 		Protocol:      corev1.ProtocolTCP,
 	}
 
@@ -350,7 +353,7 @@ func (p *Provider) createServiceForKrakend(agentGateway *runtimev1alpha1.AgentGa
 	servicePort := corev1.ServicePort{
 		Name:       "http",
 		Port:       10000,
-		TargetPort: intstr.FromInt32(8080), // Target the container port 8080
+		TargetPort: intstr.FromInt32(DefaultKrakendPort), // Target the container port 8080
 		Protocol:   corev1.ProtocolTCP,
 	}
 

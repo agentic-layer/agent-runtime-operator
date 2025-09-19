@@ -39,6 +39,14 @@ type AgentGatewaySpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=2
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Timeout specifies the gateway timeout for requests
+	// +kubebuilder:default="60000ms"
+	Timeout *string `json:"timeout,omitempty"`
+
+	// CacheTTL specifies the cache time-to-live for gateway responses
+	// +kubebuilder:default="300s"
+	CacheTTL *string `json:"cacheTTL,omitempty"`
 }
 
 // AgentGatewayStatus defines the observed state of AgentGateway
