@@ -91,7 +91,7 @@ metadata:
   name: weather-agent
 spec:
   framework: google-adk  # Supported: google-adk, flokk, autogen
-  image: eu.gcr.io/agentic-layer/weather-agent:0.1.2
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
   protocols:
     - type: A2A  # Agent-to-Agent protocol
   replicas: 1  # Number of agent replicas (optional, default: 1)

@@ -62,7 +62,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 					Spec: runtimev1alpha1.AgentSpec{
 						Framework: "google-adk",
-						Image:     "eu.gcr.io/agentic-layer/weather-agent:0.1.2",
+						Image:     "ghcr.io/agentic-layer/weather-agent:0.3.0",
 						Protocols: []runtimev1alpha1.AgentProtocol{
 							{
 								Type: "A2A",
@@ -104,7 +104,7 @@ var _ = Describe("Agent Controller", func() {
 			err = k8sClient.Get(ctx, deploymentKey, deployment)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.1.2"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("ghcr.io/agentic-layer/weather-agent:0.3.0"))
 
 			By("Checking that service was created")
 			service := &corev1.Service{}
@@ -138,7 +138,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Framework: "google-adk",
-					Image:     "eu.gcr.io/agentic-layer/weather-agent:0.1.0",
+					Image:     "ghcr.io/agentic-layer/weather-agent:0.3.0",
 					Replicas:  func() *int32 { i := int32(1); return &i }(),
 					Protocols: []runtimev1alpha1.AgentProtocol{
 						{
@@ -176,7 +176,7 @@ var _ = Describe("Agent Controller", func() {
 			agent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, typeNamespacedName, agent)).To(Succeed())
 
-			agent.Spec.Image = "eu.gcr.io/agentic-layer/weather-agent:0.2.0"
+			agent.Spec.Image = "ghcr.io/agentic-layer/weather-agent:0.3.0"
 			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
 
 			By("Reconciling the updated resource")
@@ -196,7 +196,7 @@ var _ = Describe("Agent Controller", func() {
 			// Find agent container using our improved method (addresses PR feedback)
 			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
 			Expect(agentContainer).NotTo(BeNil())
-			Expect(agentContainer.Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.2.0"))
+			Expect(agentContainer.Image).To(Equal("ghcr.io/agentic-layer/weather-agent:0.3.0"))
 		})
 
 		It("should detect environment variable changes and update deployment", func() {
@@ -348,7 +348,7 @@ var _ = Describe("Agent Controller", func() {
 			agent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, typeNamespacedName, agent)).To(Succeed())
 
-			agent.Spec.Image = "eu.gcr.io/agentic-layer/weather-agent:0.3.0"
+			agent.Spec.Image = "ghcr.io/agentic-layer/weather-agent:0.3.0"
 			agent.Spec.Replicas = func() *int32 { i := int32(5); return &i }()
 			agent.Spec.Framework = "flokk"
 			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
@@ -374,7 +374,7 @@ var _ = Describe("Agent Controller", func() {
 			deployment := &appsv1.Deployment{}
 			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
-			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.3.0"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("ghcr.io/agentic-layer/weather-agent:0.3.0"))
 			Expect(*deployment.Spec.Replicas).To(Equal(int32(5)))
 			Expect(deployment.Labels["framework"]).To(Equal("flokk"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Ports).To(HaveLen(1))
@@ -405,7 +405,7 @@ var _ = Describe("Agent Controller", func() {
 			By("Updating the Agent image")
 			agent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, typeNamespacedName, agent)).To(Succeed())
-			agent.Spec.Image = "eu.gcr.io/agentic-layer/weather-agent:0.4.0"
+			agent.Spec.Image = "ghcr.io/agentic-layer/weather-agent:0.4.0"
 			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
 
 			By("Reconciling the updated resource")
@@ -422,7 +422,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
 			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
 			Expect(agentContainer).NotTo(BeNil())
-			Expect(agentContainer.Image).To(Equal("eu.gcr.io/agentic-layer/weather-agent:0.4.0"))
+			Expect(agentContainer.Image).To(Equal("ghcr.io/agentic-layer/weather-agent:0.4.0"))
 			Expect(agentContainer.Resources.Limits[corev1.ResourceCPU]).To(Equal(resourceQuantity("100m")))
 			Expect(agentContainer.Resources.Limits[corev1.ResourceMemory]).To(Equal(resourceQuantity("128Mi")))
 		})

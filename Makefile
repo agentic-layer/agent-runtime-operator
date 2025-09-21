@@ -29,7 +29,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # agentic-layer.ai/agent-runtime-operator-bundle:$VERSION and agentic-layer.ai/agent-runtime-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= eu.gcr.io/agentic-layer/agent-runtime-operator
+IMAGE_TAG_BASE ?= ghcr.io/agentic-layer/agent-runtime-operator
 
 MANIFESTS_IMG ?= oci://ghcr.io/agentic-layer/manifests/agent-runtime-operator:$(VERSION)
 
