@@ -39,10 +39,17 @@ spec:
           spec:
             description: AgentSpec defines the desired state of Agent.
             properties:
+              description:
+                description: |-
+                  Description provides a description of the agent.
+                  This is passed as AGENT_DESCRIPTION environment variable to the agent.
+                type: string
               env:
                 description: |-
-                  Env defines environment variables to be injected into the agent container
-                  Note: The 'AGENT_NAME' variable is system-managed and will automatically be removed if set.
+                  Env defines additional environment variables to be injected into the agent container.
+                  Note: Template-specific variables (AGENT_NAME, AGENT_DESCRIPTION, AGENT_INSTRUCTION,
+                  AGENT_MODEL, SUB_AGENTS, AGENT_TOOLS) are automatically managed by the operator and
+                  will be removed if manually set here.
                 items:
                   description: EnvVar represents an environment variable present in
                     a Container.
@@ -254,8 +261,20 @@ spec:
                 - autogen
                 type: string
               image:
-                description: Image is the Docker image and tag to use for the microservice
-                  deployment
+                description: |-
+                  Image is the Docker image and tag to use for the microservice deployment.
+                  When not specified, the operator will use a framework-specific template image.
+                type: string
+              instruction:
+                description: |-
+                  Instruction defines the system instruction/prompt for the agent when using template images.
+                  This is passed as AGENT_INSTRUCTION environment variable to the agent.
+                type: string
+              model:
+                description: |-
+                  Model specifies the language model to use for the agent.
+                  This is passed as AGENT_MODEL environment variable to the agent.
+                  Defaults to "gemini/gemini-2.0-flash" if not specified.
                 type: string
               protocols:
                 description: Protocols defines the protocols supported by the agent
@@ -293,6 +312,44 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              subAgents:
+                description: |-
+                  SubAgents defines configuration for connecting to remote agents.
+                  This is converted to JSON and passed as SUB_AGENTS environment variable to the agent.
+                items:
+                  description: SubAgent defines configuration for connecting to a
+                    remote agent
+                  properties:
+                    name:
+                      description: Name is the unique identifier for this sub-agent
+                      type: string
+                    url:
+                      description: Url is the endpoint Url for the remote agent configuration
+                      type: string
+                  required:
+                  - name
+                  - url
+                  type: object
+                type: array
+              tools:
+                description: |-
+                  Tools defines configuration for integrating MCP (Model Context Protocol) tools.
+                  This is converted to JSON and passed as AGENT_TOOLS environment variable to the agent.
+                items:
+                  description: AgentTool defines configuration for integrating an
+                    MCP (Model Context Protocol) tool
+                  properties:
+                    name:
+                      description: Name is the unique identifier for this tool
+                      type: string
+                    url:
+                      description: Url is the endpoint Url for the MCP tool server
+                      type: string
+                  required:
+                  - name
+                  - url
+                  type: object
+                type: array
             type: object
           status:
             description: AgentStatus defines the observed state of Agent.

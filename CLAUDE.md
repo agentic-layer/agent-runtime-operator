@@ -101,6 +101,36 @@ make docker-push
 
 ### Agent Resource Example
 
+**Using Agent Templates (recommended for framework-agnostic agents):**
+```yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: weather-agent-template
+spec:
+  framework: google-adk
+  description: "A helpful weather information agent"
+  instruction: "You are a weather agent that provides current weather information and forecasts."
+  model: "gemini/gemini-2.0-flash"
+  subAgents:
+    - name: forecast_agent
+      url: "https://example.com/forecast-agent.json"
+    - name: location_agent
+      url: "https://example.com/location-agent.json"
+  tools:
+    - name: weather_api
+      url: "https://weather.mcpservers.org/mcp"
+    - name: web_fetch
+      url: "https://remote.mcpservers.org/fetch/mcp"
+  protocols:
+    - type: A2A
+  replicas: 1
+  envFrom:
+    - secretRef:
+        name: api-key-secret
+```
+
+**Using Custom Docker Images:**
 ```yaml
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent

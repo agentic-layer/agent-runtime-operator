@@ -40,6 +40,24 @@ type AgentProtocol struct {
 	Path string `json:"path,omitempty"`
 }
 
+// SubAgent defines configuration for connecting to a remote agent
+type SubAgent struct {
+	// Name is the unique identifier for this sub-agent
+	Name string `json:"name"`
+
+	// Url is the endpoint Url for the remote agent configuration
+	Url string `json:"url"`
+}
+
+// AgentTool defines configuration for integrating an MCP (Model Context Protocol) tool
+type AgentTool struct {
+	// Name is the unique identifier for this tool
+	Name string `json:"name"`
+
+	// Url is the endpoint Url for the MCP tool server
+	Url string `json:"url"`
+}
+
 // AgentSpec defines the desired state of Agent.
 type AgentSpec struct {
 	// Framework defines the supported agent frameworks
@@ -50,15 +68,45 @@ type AgentSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Image is the Docker image and tag to use for the microservice deployment
+	// +optional
+	// Image is the Docker image and tag to use for the microservice deployment.
+	// When not specified, the operator will use a framework-specific template image.
 	Image string `json:"image,omitempty"`
+
+	// +optional
+	// Description provides a description of the agent.
+	// This is passed as AGENT_DESCRIPTION environment variable to the agent.
+	Description string `json:"description,omitempty"`
+
+	// +optional
+	// Instruction defines the system instruction/prompt for the agent when using template images.
+	// This is passed as AGENT_INSTRUCTION environment variable to the agent.
+	Instruction string `json:"instruction,omitempty"`
+
+	// +optional
+	// Model specifies the language model to use for the agent.
+	// This is passed as AGENT_MODEL environment variable to the agent.
+	// Defaults to "gemini/gemini-2.0-flash" if not specified.
+	Model string `json:"model,omitempty"`
+
+	// +optional
+	// SubAgents defines configuration for connecting to remote agents.
+	// This is converted to JSON and passed as SUB_AGENTS environment variable to the agent.
+	SubAgents []SubAgent `json:"subAgents,omitempty"`
+
+	// +optional
+	// Tools defines configuration for integrating MCP (Model Context Protocol) tools.
+	// This is converted to JSON and passed as AGENT_TOOLS environment variable to the agent.
+	Tools []AgentTool `json:"tools,omitempty"`
 
 	// Protocols defines the protocols supported by the agent
 	Protocols []AgentProtocol `json:"protocols,omitempty"`
 
 	// +optional
-	// Env defines environment variables to be injected into the agent container
-	// Note: The 'AGENT_NAME' variable is system-managed and will automatically be removed if set.
+	// Env defines additional environment variables to be injected into the agent container.
+	// Note: Template-specific variables (AGENT_NAME, AGENT_DESCRIPTION, AGENT_INSTRUCTION,
+	// AGENT_MODEL, SUB_AGENTS, AGENT_TOOLS) are automatically managed by the operator and
+	// will be removed if manually set here.
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// +optional
