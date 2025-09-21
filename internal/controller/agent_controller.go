@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -193,6 +194,113 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
+// buildTemplateEnvironmentVars creates environment variables from Agent spec fields.
+// These are always set regardless of whether using template or custom images.
+func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent) ([]corev1.EnvVar, error) {
+	var templateEnvVars []corev1.EnvVar
+
+	// Always set AGENT_NAME
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_NAME",
+		Value: agent.Name,
+	})
+
+	// AGENT_DESCRIPTION - always set, even if empty
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_DESCRIPTION",
+		Value: agent.Spec.Description,
+	})
+
+	// AGENT_INSTRUCTION - always set, even if empty
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_INSTRUCTION",
+		Value: agent.Spec.Instruction,
+	})
+
+	// AGENT_MODEL - always set, even if empty
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_MODEL",
+		Value: agent.Spec.Model,
+	})
+
+	// SUB_AGENTS - always set, with empty array if no subagents
+	var subAgentsJSON []byte
+	var err error
+	if len(agent.Spec.SubAgents) > 0 {
+		subAgentsMap := make(map[string]map[string]string)
+		for _, subAgent := range agent.Spec.SubAgents {
+			subAgentsMap[subAgent.Name] = map[string]string{
+				"url": subAgent.Url,
+			}
+		}
+		subAgentsJSON, err = json.Marshal(subAgentsMap)
+	} else {
+		subAgentsJSON, err = json.Marshal([]interface{}{})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subAgents: %w", err)
+	}
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "SUB_AGENTS",
+		Value: string(subAgentsJSON),
+	})
+
+	// AGENT_TOOLS - always set, with empty array if no tools
+	var toolsJSON []byte
+	if len(agent.Spec.Tools) > 0 {
+		toolsMap := make(map[string]map[string]string)
+		for _, tool := range agent.Spec.Tools {
+			toolsMap[tool.Name] = map[string]string{
+				"url": tool.Url,
+			}
+		}
+		toolsJSON, err = json.Marshal(toolsMap)
+	} else {
+		toolsJSON, err = json.Marshal([]interface{}{})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tools: %w", err)
+	}
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_TOOLS",
+		Value: string(toolsJSON),
+	})
+
+	return templateEnvVars, nil
+}
+
+// mergeEnvironmentVariables merges template and user environment variables,
+// with user variables taking precedence over template variables
+func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars []corev1.EnvVar) []corev1.EnvVar {
+	// Create a map for efficient lookups of user environment variables
+	userEnvMap := make(map[string]corev1.EnvVar)
+	for _, env := range userEnvVars {
+		userEnvMap[env.Name] = env
+	}
+
+	// Pre-allocate result slice for efficiency
+	result := make([]corev1.EnvVar, 0, len(templateEnvVars)+len(userEnvVars))
+
+	// Add template environment variables, but skip if user has overridden them
+	for _, templateEnv := range templateEnvVars {
+		if userEnv, exists := userEnvMap[templateEnv.Name]; exists {
+			// User has overridden this variable, use user's version
+			result = append(result, userEnv)
+			delete(userEnvMap, templateEnv.Name) // Remove so we don't add it again
+		} else {
+			// No user override, use template variable
+			result = append(result, templateEnv)
+		}
+	}
+
+	// Add any remaining user environment variables that weren't overrides
+	for _, userEnv := range userEnvMap {
+		result = append(result, userEnv)
+	}
+
+	return result
+}
+
 // createDeploymentForAgent creates a deployment for the given Agent
 func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent, deploymentName string) (*appsv1.Deployment, error) {
 	replicas := agent.Spec.Replicas
@@ -223,6 +331,18 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 		})
 	}
 
+	// Use the image from spec (webhook ensures it's always set)
+	agentImage := agent.Spec.Image
+
+	// Build template-specific environment variables
+	templateEnvVars, err := r.buildTemplateEnvironmentVars(agent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build template environment variables: %w", err)
+	}
+
+	// Combine template and user environment variables (user vars override template vars)
+	allEnvVars := r.mergeEnvironmentVariables(templateEnvVars, agent.Spec.Env)
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
@@ -241,13 +361,10 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "agent",
-							Image: agent.Spec.Image,
-							Ports: containerPorts,
-							Env: append(agent.Spec.Env, corev1.EnvVar{
-								Name:  "AGENT_NAME",
-								Value: agent.Name,
-							}),
+							Name:    "agent",
+							Image:   agentImage,
+							Ports:   containerPorts,
+							Env:     allEnvVars,
 							EnvFrom: agent.Spec.EnvFrom,
 						},
 					},

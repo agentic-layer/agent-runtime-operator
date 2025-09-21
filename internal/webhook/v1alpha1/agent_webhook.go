@@ -21,18 +21,21 @@ import (
 	"fmt"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
 const (
-	googleAdkFramework = "google-adk"
+	googleAdkFramework           = "google-adk"
+	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.1.0"
+	defaultTemplateImageFallback = "invalid"
 )
 
 // nolint:unused
@@ -48,10 +51,13 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 			DefaultPortGoogleAdk: 8000,
 			Recorder:             mgr.GetEventRecorderFor("agent-defaulter-webhook"),
 		}).
+		WithValidator(&AgentCustomValidator{}).
 		Complete()
 }
 
 // +kubebuilder:webhook:path=/mutate-runtime-agentic-layer-ai-v1alpha1-agent,mutating=true,failurePolicy=fail,sideEffects=None,groups=runtime.agentic-layer.ai,resources=agents,verbs=create;update,versions=v1alpha1,name=magent-v1alpha1.kb.io,admissionReviewVersions=v1
+
+// +kubebuilder:webhook:path=/validate-runtime-agentic-layer-ai-v1alpha1-agent,mutating=false,failurePolicy=fail,sideEffects=None,groups=runtime.agentic-layer.ai,resources=agents,verbs=create;update,versions=v1alpha1,name=vagent-v1alpha1.kb.io,admissionReviewVersions=v1
 
 // AgentCustomDefaulter struct is responsible for setting default values on the custom resource of the
 // Kind Agent when those are created or updated.
@@ -89,6 +95,18 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 		*agent.Spec.Replicas = d.DefaultReplicas
 	}
 
+	// Set default image if not specified (template image)
+	if agent.Spec.Image == "" {
+		switch agent.Spec.Framework {
+		case googleAdkFramework:
+			agent.Spec.Image = defaultTemplateImageAdk
+		default:
+			// Validation will catch unsupported frameworks without images
+			// This shouldn't be reached due to validation, but set template as fallback
+			agent.Spec.Image = defaultTemplateImageFallback
+		}
+	}
+
 	// Set default ports for protocols if not specified
 	for i, protocol := range agent.Spec.Protocols {
 		if protocol.Port == 0 {
@@ -98,20 +116,6 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 			agent.Spec.Protocols[i].Name = fmt.Sprintf("%s-%d", sanitizeForPortName(protocol.Type), agent.Spec.Protocols[i].Port)
 		}
 	}
-
-	// Filter out protected environment variables and create an event if found.
-	protectedVar := "AGENT_NAME"
-	var filteredEnvs []corev1.EnvVar
-
-	for _, env := range agent.Spec.Env {
-		if env.Name != protectedVar {
-			filteredEnvs = append(filteredEnvs, env)
-		} else {
-			agentlog.Info("removing protected environment variable from spec", "variable", protectedVar, "agent", agent.GetName())
-			d.Recorder.Eventf(agent, "Warning", "SpecModified", "The user-defined '%s' environment variable was removed as it is system-managed.", protectedVar)
-		}
-	}
-	agent.Spec.Env = filteredEnvs
 }
 
 func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
@@ -121,6 +125,61 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 	default:
 		return d.DefaultPort // Default port for unknown frameworks
 	}
+}
+
+// AgentCustomValidator struct is responsible for validating the custom resource of the
+// Kind Agent when those are created or updated.
+//
+// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
+// as it is used only for temporary operations and does not need to be deeply copied.
+type AgentCustomValidator struct{}
+
+var _ webhook.CustomValidator = &AgentCustomValidator{}
+
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
+func (v *AgentCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	agent, ok := obj.(*runtimev1alpha1.Agent)
+	if !ok {
+		return nil, fmt.Errorf("expected an Agent object but got %T", obj)
+	}
+	agentlog.Info("Validating Agent on create", "name", agent.GetName())
+	return v.validateAgent(agent)
+}
+
+// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
+func (v *AgentCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	agent, ok := newObj.(*runtimev1alpha1.Agent)
+	if !ok {
+		return nil, fmt.Errorf("expected an Agent object but got %T", newObj)
+	}
+	agentlog.Info("Validating Agent on update", "name", agent.GetName())
+	return v.validateAgent(agent)
+}
+
+// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
+func (v *AgentCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	// No validation needed on delete
+	return nil, nil
+}
+
+// validateAgent performs validation logic for Agent resources.
+func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admission.Warnings, error) {
+	var allErrs field.ErrorList
+
+	// Validate framework and image combination
+	if agent.Spec.Image == "" && agent.Spec.Framework != googleAdkFramework {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "framework"),
+			agent.Spec.Framework,
+			fmt.Sprintf("framework %q requires a custom image. Template agents are only supported for %q framework", agent.Spec.Framework, googleAdkFramework),
+		))
+	}
+
+	if len(allErrs) > 0 {
+		return nil, allErrs.ToAggregate()
+	}
+
+	return nil, nil
 }
 
 // sanitizeForPortName converts a string to be valid for Kubernetes port names.

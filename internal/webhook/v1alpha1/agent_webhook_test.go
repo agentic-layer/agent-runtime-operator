@@ -29,10 +29,15 @@ import (
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
+const (
+	flokkFramework = "flokk"
+)
+
 var _ = Describe("Agent Webhook", func() {
 	var (
 		agent     *runtimev1alpha1.Agent
 		defaulter *AgentCustomDefaulter
+		validator *AgentCustomValidator
 		ctx       context.Context
 		recorder  *record.FakeRecorder
 	)
@@ -46,6 +51,7 @@ var _ = Describe("Agent Webhook", func() {
 			DefaultPortGoogleAdk: 8000,
 			Recorder:             recorder,
 		}
+		validator = &AgentCustomValidator{}
 		agent = &runtimev1alpha1.Agent{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-agent",
@@ -99,7 +105,7 @@ var _ = Describe("Agent Webhook", func() {
 
 		It("Should set default port for other frameworks", func() {
 			By("setting up an agent with unknown framework and protocol but no port")
-			agent.Spec.Framework = "flokk"
+			agent.Spec.Framework = flokkFramework
 			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
 				{Type: "OpenAI"},
 			}
@@ -156,8 +162,8 @@ var _ = Describe("Agent Webhook", func() {
 			Expect(agent.Spec.Protocols[0].Name).To(Equal("custom-name"))
 		})
 
-		It("Should filter out protected environment variable AGENT_NAME", func() {
-			By("setting up environment variables including protected one")
+		It("Should allow user environment variables to override operator vars", func() {
+			By("setting up environment variables including AGENT_NAME")
 			agent.Spec.Env = []corev1.EnvVar{
 				{Name: "CUSTOM_VAR", Value: "custom_value"},
 				{Name: "AGENT_NAME", Value: "user_defined_name"},
@@ -168,16 +174,16 @@ var _ = Describe("Agent Webhook", func() {
 			err := defaulter.Default(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("verifying that AGENT_NAME is removed")
-			Expect(agent.Spec.Env).To(HaveLen(2))
-			for _, env := range agent.Spec.Env {
-				Expect(env.Name).NotTo(Equal("AGENT_NAME"))
-			}
+			By("verifying that all user environment variables are preserved")
+			Expect(agent.Spec.Env).To(HaveLen(3))
 			Expect(agent.Spec.Env[0].Name).To(Equal("CUSTOM_VAR"))
-			Expect(agent.Spec.Env[1].Name).To(Equal("ANOTHER_VAR"))
+			Expect(agent.Spec.Env[1].Name).To(Equal("AGENT_NAME"))
+			Expect(agent.Spec.Env[1].Value).To(Equal("user_defined_name"))
+			Expect(agent.Spec.Env[2].Name).To(Equal("ANOTHER_VAR"))
 
-			By("verifying that an event was recorded")
-			Eventually(recorder.Events).Should(Receive(ContainSubstring("The user-defined 'AGENT_NAME' environment variable was removed as it is system-managed.")))
+			By("verifying that no filtering events were recorded")
+			// Since we no longer filter environment variables, no events should be recorded
+			Consistently(recorder.Events).ShouldNot(Receive())
 		})
 
 		It("Should not modify environment variables when no protected variables present", func() {
@@ -270,6 +276,205 @@ var _ = Describe("Agent Webhook", func() {
 
 			Expect(agent.Spec.Protocols[2].Port).To(Equal(int32(8500))) // preserved port
 			Expect(agent.Spec.Protocols[2].Name).To(Equal("custom"))    // preserved name
+		})
+	})
+
+	Context("When setting default images", func() {
+		It("Should set template image for google-adk framework when no image specified", func() {
+			By("setting up a google-adk agent without image")
+			agent.Spec.Framework = googleAdkFramework
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that template image is set")
+			Expect(agent.Spec.Image).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"))
+		})
+
+		It("Should set fallback image for unknown framework when no image specified", func() {
+			By("setting up an unknown framework agent without image")
+			agent.Spec.Framework = "unknown-framework"
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that fallback image is set")
+			Expect(agent.Spec.Image).To(Equal("invalid"))
+		})
+
+		It("Should not override existing image", func() {
+			By("setting up an agent with custom image")
+			agent.Spec.Framework = googleAdkFramework
+			agent.Spec.Image = "ghcr.io/custom/my-agent:latest"
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that custom image is preserved")
+			Expect(agent.Spec.Image).To(Equal("ghcr.io/custom/my-agent:latest"))
+		})
+	})
+
+	Context("When validating agents", func() {
+		It("Should pass validation for google-adk framework without image (template agent)", func() {
+			By("setting up a google-adk agent without image")
+			agent.Spec.Framework = googleAdkFramework
+			agent.Spec.Description = "Test template agent"
+			agent.Spec.Instruction = "Test instruction"
+
+			By("calling the ValidateCreate method")
+			warnings, err := validator.ValidateCreate(ctx, agent)
+
+			By("verifying that validation passes")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(warnings).To(BeEmpty())
+		})
+
+		It("Should pass validation for any framework with custom image", func() {
+			By("setting up a flokk agent with custom image")
+			agent.Spec.Framework = flokkFramework
+			agent.Spec.Image = "ghcr.io/example/flokk-agent:latest"
+
+			By("calling the ValidateCreate method")
+			warnings, err := validator.ValidateCreate(ctx, agent)
+
+			By("verifying that validation passes")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(warnings).To(BeEmpty())
+		})
+
+		It("Should fail validation for non-google-adk framework without image", func() {
+			By("setting up a flokk agent without image")
+			agent.Spec.Framework = flokkFramework
+			// No image specified
+
+			By("calling the ValidateCreate method")
+			warnings, err := validator.ValidateCreate(ctx, agent)
+
+			By("verifying that validation fails")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("framework \"flokk\" requires a custom image"))
+			Expect(err.Error()).To(ContainSubstring("Template agents are only supported for \"google-adk\" framework"))
+			Expect(warnings).To(BeEmpty())
+		})
+
+		It("Should fail validation for autogen framework without image", func() {
+			By("setting up an autogen agent without image")
+			agent.Spec.Framework = "autogen"
+			// No image specified
+
+			By("calling the ValidateCreate method")
+			warnings, err := validator.ValidateCreate(ctx, agent)
+
+			By("verifying that validation fails")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("framework \"autogen\" requires a custom image"))
+			Expect(warnings).To(BeEmpty())
+		})
+
+		It("Should handle ValidateUpdate correctly", func() {
+			By("setting up old and new agent objects")
+			oldAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: googleAdkFramework,
+					Image:     "ghcr.io/old/image:v1",
+				},
+			}
+			newAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "flokk",
+					// No image - should fail
+				},
+			}
+
+			By("calling the ValidateUpdate method")
+			warnings, err := validator.ValidateUpdate(ctx, oldAgent, newAgent)
+
+			By("verifying that validation fails")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("framework \"flokk\" requires a custom image"))
+			Expect(warnings).To(BeEmpty())
+		})
+
+		It("Should not validate on delete", func() {
+			By("calling the ValidateDelete method")
+			warnings, err := validator.ValidateDelete(ctx, agent)
+
+			By("verifying that no validation is performed")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(warnings).To(BeEmpty())
+		})
+
+		It("Should return error for non-Agent objects in validation", func() {
+			By("passing a non-Agent object")
+			invalidObj := &corev1.Pod{}
+
+			By("calling the ValidateCreate method")
+			warnings, err := validator.ValidateCreate(ctx, invalidObj)
+
+			By("verifying that an error is returned")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("expected an Agent object but got"))
+			Expect(warnings).To(BeEmpty())
+		})
+	})
+
+	Context("When handling template agent fields", func() {
+		It("Should preserve all template fields", func() {
+			By("setting up an agent with template fields")
+			agent.Spec.Framework = googleAdkFramework
+			agent.Spec.Description = "A test news agent"
+			agent.Spec.Instruction = "You are a news agent that summarizes articles"
+			agent.Spec.Model = "gpt-4"
+			agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+				{Name: "summarizer", Url: "https://example.com/summarizer.json"},
+			}
+			agent.Spec.Tools = []runtimev1alpha1.AgentTool{
+				{Name: "news_fetcher", Url: "https://news.mcpservers.org/mcp"},
+			}
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that all template fields are preserved")
+			Expect(agent.Spec.Description).To(Equal("A test news agent"))
+			Expect(agent.Spec.Instruction).To(Equal("You are a news agent that summarizes articles"))
+			Expect(agent.Spec.Model).To(Equal("gpt-4"))
+			Expect(agent.Spec.SubAgents).To(HaveLen(1))
+			Expect(agent.Spec.SubAgents[0].Name).To(Equal("summarizer"))
+			Expect(agent.Spec.SubAgents[0].Url).To(Equal("https://example.com/summarizer.json"))
+			Expect(agent.Spec.Tools).To(HaveLen(1))
+			Expect(agent.Spec.Tools[0].Name).To(Equal("news_fetcher"))
+			Expect(agent.Spec.Tools[0].Url).To(Equal("https://news.mcpservers.org/mcp"))
+
+			By("verifying that template image is still set")
+			Expect(agent.Spec.Image).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"))
+		})
+
+		It("Should work with empty template fields", func() {
+			By("setting up an agent without template fields")
+			agent.Spec.Framework = googleAdkFramework
+			// All template fields empty
+
+			By("calling the Default method")
+			err := defaulter.Default(ctx, agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying that empty fields remain empty")
+			Expect(agent.Spec.Description).To(BeEmpty())
+			Expect(agent.Spec.Instruction).To(BeEmpty())
+			Expect(agent.Spec.Model).To(BeEmpty())
+			Expect(agent.Spec.SubAgents).To(BeEmpty())
+			Expect(agent.Spec.Tools).To(BeEmpty())
+
+			By("verifying that template image is still set")
+			Expect(agent.Spec.Image).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"))
 		})
 	})
 
