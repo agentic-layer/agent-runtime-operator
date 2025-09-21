@@ -57,7 +57,7 @@ spec:
           args:
             - --leader-elect
             - --health-probe-bind-address=:8081
-          image: controller:latest
+          image: ghcr.io/agentic-layer/agent-runtime-operator:latest
           name: manager
           ports: [ ]
           securityContext:
