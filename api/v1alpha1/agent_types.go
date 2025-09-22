@@ -110,9 +110,7 @@ type AgentSpec struct {
 
 	// +optional
 	// Env defines additional environment variables to be injected into the agent container.
-	// Note: Template-specific variables (AGENT_NAME, AGENT_DESCRIPTION, AGENT_INSTRUCTION,
-	// AGENT_MODEL, SUB_AGENTS, AGENT_TOOLS) are automatically managed by the operator and
-	// will be removed if manually set here.
+	// These are take precedence over operator-managed environment variables.
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// +optional
