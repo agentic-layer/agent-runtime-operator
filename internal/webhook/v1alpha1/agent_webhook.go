@@ -58,8 +58,6 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 
 // +kubebuilder:webhook:path=/mutate-runtime-agentic-layer-ai-v1alpha1-agent,mutating=true,failurePolicy=fail,sideEffects=None,groups=runtime.agentic-layer.ai,resources=agents,verbs=create;update,versions=v1alpha1,name=magent-v1alpha1.kb.io,admissionReviewVersions=v1
 
-// +kubebuilder:webhook:path=/validate-runtime-agentic-layer-ai-v1alpha1-agent,mutating=false,failurePolicy=fail,sideEffects=None,groups=runtime.agentic-layer.ai,resources=agents,verbs=create;update,versions=v1alpha1,name=vagent-v1alpha1.kb.io,admissionReviewVersions=v1
-
 // AgentCustomDefaulter struct is responsible for setting default values on the custom resource of the
 // Kind Agent when those are created or updated.
 //
@@ -128,17 +126,21 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 	}
 }
 
-// AgentCustomValidator struct is responsible for validating the custom resource of the
-// Kind Agent when those are created or updated.
+// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
+// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
+// +kubebuilder:webhook:path=/validate-runtime-agentic-layer-ai-v1alpha1-agent,mutating=false,failurePolicy=fail,sideEffects=None,groups=runtime.agentic-layer.ai,resources=agents,verbs=create;update,versions=v1alpha1,name=vagent-v1alpha1.kb.io,admissionReviewVersions=v1
+
+// AgentCustomValidator struct is responsible for validating the Agent resource
+// when it is created, updated, or deleted.
 //
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as it is used only for temporary operations and does not need to be deeply copied.
+// as this struct is used only for temporary operations and does not need to be deeply copied.
 type AgentCustomValidator struct{}
 
 var _ webhook.CustomValidator = &AgentCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
-func (v *AgentCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *AgentCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
 	agent, ok := obj.(*runtimev1alpha1.Agent)
 	if !ok {
 		return nil, fmt.Errorf("expected an Agent object but got %T", obj)
@@ -148,7 +150,7 @@ func (v *AgentCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
-func (v *AgentCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (v *AgentCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
 	agent, ok := newObj.(*runtimev1alpha1.Agent)
 	if !ok {
 		return nil, fmt.Errorf("expected an Agent object but got %T", newObj)
@@ -158,7 +160,7 @@ func (v *AgentCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
-func (v *AgentCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *AgentCustomValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
 	// No validation needed on delete
 	return nil, nil
 }
