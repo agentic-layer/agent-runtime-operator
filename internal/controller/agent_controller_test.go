@@ -798,11 +798,11 @@ var _ = Describe("Agent Controller", func() {
 			// JSON fields with empty arrays should have empty JSON arrays
 			subAgentsVar := findEnvVar(agentContainer.Env, "SUB_AGENTS")
 			Expect(subAgentsVar).NotTo(BeNil())
-			Expect(subAgentsVar.Value).To(Equal("[]"))
+			Expect(subAgentsVar.Value).To(Equal("{}"))
 
 			toolsVar := findEnvVar(agentContainer.Env, "AGENT_TOOLS")
 			Expect(toolsVar).NotTo(BeNil())
-			Expect(toolsVar.Value).To(Equal("[]"))
+			Expect(toolsVar.Value).To(Equal("{}"))
 		})
 
 		It("should update deployment when template fields change", func() {
@@ -935,7 +935,205 @@ var _ = Describe("Agent Controller", func() {
 
 			subAgentsVar := findEnvVar(agentContainer.Env, "SUB_AGENTS")
 			Expect(subAgentsVar).NotTo(BeNil())
-			Expect(subAgentsVar.Value).To(Equal("[]"))
+			Expect(subAgentsVar.Value).To(Equal("{}"))
+		})
+	})
+
+	Context("Unit tests for controller functions", func() {
+		var reconciler *AgentReconciler
+
+		BeforeEach(func() {
+			reconciler = &AgentReconciler{}
+		})
+
+		Describe("buildTemplateEnvironmentVars", func() {
+			It("should handle empty agent fields gracefully", func() {
+				agent := &runtimev1alpha1.Agent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-agent",
+					},
+					Spec: runtimev1alpha1.AgentSpec{},
+				}
+
+				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(envVars).To(HaveLen(6))
+
+				// Verify all required template variables are present with correct values
+				agentNameVar := findEnvVar(envVars, "AGENT_NAME")
+				Expect(agentNameVar).NotTo(BeNil())
+				Expect(agentNameVar.Value).To(Equal("test-agent"))
+
+				agentDescVar := findEnvVar(envVars, "AGENT_DESCRIPTION")
+				Expect(agentDescVar).NotTo(BeNil())
+				Expect(agentDescVar.Value).To(Equal(""))
+
+				agentInstVar := findEnvVar(envVars, "AGENT_INSTRUCTION")
+				Expect(agentInstVar).NotTo(BeNil())
+				Expect(agentInstVar.Value).To(Equal(""))
+
+				agentModelVar := findEnvVar(envVars, "AGENT_MODEL")
+				Expect(agentModelVar).NotTo(BeNil())
+				Expect(agentModelVar.Value).To(Equal(""))
+
+				subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
+				Expect(subAgentsVar).NotTo(BeNil())
+				Expect(subAgentsVar.Value).To(Equal("{}"))
+
+				toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
+				Expect(toolsVar).NotTo(BeNil())
+				Expect(toolsVar.Value).To(Equal("{}"))
+			})
+
+			It("should populate all template fields correctly", func() {
+				agent := &runtimev1alpha1.Agent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "full-agent",
+					},
+					Spec: runtimev1alpha1.AgentSpec{
+						Description: "Test agent description",
+						Instruction: "You are a helpful assistant",
+						Model:       "gpt-4",
+						SubAgents: []runtimev1alpha1.SubAgent{
+							{Name: "sub1", Url: "https://example.com/sub1.json"},
+							{Name: "sub2", Url: "https://example.com/sub2.json"},
+						},
+						Tools: []runtimev1alpha1.AgentTool{
+							{Name: "tool1", Url: "https://example.com/tool1"},
+							{Name: "tool2", Url: "https://example.com/tool2"},
+						},
+					},
+				}
+
+				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(envVars).To(HaveLen(6))
+
+				agentDescVar := findEnvVar(envVars, "AGENT_DESCRIPTION")
+				Expect(agentDescVar.Value).To(Equal("Test agent description"))
+
+				agentInstVar := findEnvVar(envVars, "AGENT_INSTRUCTION")
+				Expect(agentInstVar.Value).To(Equal("You are a helpful assistant"))
+
+				agentModelVar := findEnvVar(envVars, "AGENT_MODEL")
+				Expect(agentModelVar.Value).To(Equal("gpt-4"))
+
+				subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
+				Expect(subAgentsVar.Value).To(ContainSubstring("sub1"))
+				Expect(subAgentsVar.Value).To(ContainSubstring("https://example.com/sub1.json"))
+				Expect(subAgentsVar.Value).To(ContainSubstring("sub2"))
+
+				toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
+				Expect(toolsVar.Value).To(ContainSubstring("tool1"))
+				Expect(toolsVar.Value).To(ContainSubstring("https://example.com/tool1"))
+				Expect(toolsVar.Value).To(ContainSubstring("tool2"))
+			})
+
+			It("should handle JSON marshaling of complex structures", func() {
+				agent := &runtimev1alpha1.Agent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "json-test-agent",
+					},
+					Spec: runtimev1alpha1.AgentSpec{
+						SubAgents: []runtimev1alpha1.SubAgent{
+							{Name: "test-sub", Url: "https://example.com/sub.json"},
+						},
+						Tools: []runtimev1alpha1.AgentTool{
+							{Name: "test-tool", Url: "https://example.com/tool"},
+						},
+					},
+				}
+
+				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify JSON structure is valid
+				subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
+				Expect(subAgentsVar.Value).To(MatchJSON(`{"test-sub":{"url":"https://example.com/sub.json"}}`))
+
+				toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
+				Expect(toolsVar.Value).To(MatchJSON(`{"test-tool":{"url":"https://example.com/tool"}}`))
+			})
+		})
+
+		Describe("mergeEnvironmentVariables", func() {
+			It("should merge template and user variables with user precedence", func() {
+				templateVars := []corev1.EnvVar{
+					{Name: "AGENT_NAME", Value: "test-agent"},
+					{Name: "AGENT_MODEL", Value: "default-model"},
+					{Name: "TEMPLATE_ONLY", Value: "template-value"},
+				}
+
+				userVars := []corev1.EnvVar{
+					{Name: "AGENT_MODEL", Value: "user-model"}, // Override
+					{Name: "USER_ONLY", Value: "user-value"},   // New variable
+				}
+
+				result := reconciler.mergeEnvironmentVariables(templateVars, userVars)
+
+				// Should have all unique variables
+				Expect(result).To(HaveLen(4))
+
+				// User variable should override template variable
+				agentModelVar := findEnvVar(result, "AGENT_MODEL")
+				Expect(agentModelVar).NotTo(BeNil())
+				Expect(agentModelVar.Value).To(Equal("user-model"))
+
+				// Template-only variable should remain
+				templateOnlyVar := findEnvVar(result, "TEMPLATE_ONLY")
+				Expect(templateOnlyVar).NotTo(BeNil())
+				Expect(templateOnlyVar.Value).To(Equal("template-value"))
+
+				// User-only variable should be present
+				userOnlyVar := findEnvVar(result, "USER_ONLY")
+				Expect(userOnlyVar).NotTo(BeNil())
+				Expect(userOnlyVar.Value).To(Equal("user-value"))
+
+				// Non-overridden template variable should remain
+				agentNameVar := findEnvVar(result, "AGENT_NAME")
+				Expect(agentNameVar).NotTo(BeNil())
+				Expect(agentNameVar.Value).To(Equal("test-agent"))
+			})
+
+			It("should handle empty input slices", func() {
+				// Empty template vars
+				result := reconciler.mergeEnvironmentVariables([]corev1.EnvVar{}, []corev1.EnvVar{
+					{Name: "USER_VAR", Value: "value"},
+				})
+				Expect(result).To(HaveLen(1))
+				Expect(result[0].Name).To(Equal("USER_VAR"))
+
+				// Empty user vars
+				result = reconciler.mergeEnvironmentVariables([]corev1.EnvVar{
+					{Name: "TEMPLATE_VAR", Value: "value"},
+				}, []corev1.EnvVar{})
+				Expect(result).To(HaveLen(1))
+				Expect(result[0].Name).To(Equal("TEMPLATE_VAR"))
+
+				// Both empty
+				result = reconciler.mergeEnvironmentVariables([]corev1.EnvVar{}, []corev1.EnvVar{})
+				Expect(result).To(BeEmpty())
+			})
+
+			It("should preserve environment variable ordering", func() {
+				templateVars := []corev1.EnvVar{
+					{Name: "A", Value: "template-a"},
+					{Name: "B", Value: "template-b"},
+					{Name: "C", Value: "template-c"},
+				}
+
+				userVars := []corev1.EnvVar{
+					{Name: "B", Value: "user-b"}, // Override middle variable
+				}
+
+				result := reconciler.mergeEnvironmentVariables(templateVars, userVars)
+
+				// Should maintain template variable order for non-overridden vars
+				Expect(result[0].Name).To(Equal("A"))
+				Expect(result[1].Name).To(Equal("B"))
+				Expect(result[1].Value).To(Equal("user-b")) // But with user value
+				Expect(result[2].Name).To(Equal("C"))
+			})
 		})
 	})
 })

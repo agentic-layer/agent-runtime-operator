@@ -514,4 +514,155 @@ var _ = Describe("Agent Webhook", func() {
 			Expect(result).To(Equal("http2"))
 		})
 	})
+
+	Context("URL validation", func() {
+		var validator *AgentCustomValidator
+
+		BeforeEach(func() {
+			validator = &AgentCustomValidator{}
+			// Set valid framework and image to avoid framework validation errors
+			agent.Spec.Framework = "flokk"
+			agent.Spec.Image = "ghcr.io/custom/agent:1.0.0"
+		})
+
+		Describe("SubAgent URL validation", func() {
+			It("should accept valid HTTP and HTTPS URLs", func() {
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "external", Url: "https://example.com/agent.json"},
+					{Name: "internal", Url: "http://agent-service:8080/config"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should accept empty URLs", func() {
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "test", Url: ""}, // Empty URL should be allowed
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should reject invalid URLs", func() {
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "test", Url: "not-a-valid-url"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("must use HTTP or HTTPS scheme"))
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should reject URLs without host", func() {
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "test", Url: "https://"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("must have a valid host"))
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should reject other schemes", func() {
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "test1", Url: "ftp://example.com/agent.json"},
+					{Name: "test2", Url: "file:///path/to/agent.json"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("must use HTTP or HTTPS scheme"))
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should provide clear error messages with field paths", func() {
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "valid", Url: "https://example.com/valid"},
+					{Name: "invalid", Url: "ftp://example.com/invalid"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("spec.subAgents[1].url"))
+				Expect(err.Error()).To(ContainSubstring("SubAgent[1].Url"))
+				Expect(warnings).To(BeEmpty())
+			})
+		})
+
+		Describe("Tool URL validation", func() {
+			It("should accept valid HTTP and HTTPS URLs", func() {
+				agent.Spec.Tools = []runtimev1alpha1.AgentTool{
+					{Name: "external-search", Url: "https://api.example.com/search"},
+					{Name: "internal-calc", Url: "http://calculator-service:8080/api"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should accept empty URLs", func() {
+				agent.Spec.Tools = []runtimev1alpha1.AgentTool{
+					{Name: "test", Url: ""}, // Empty URL should be allowed
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should provide clear error messages with field paths", func() {
+				agent.Spec.Tools = []runtimev1alpha1.AgentTool{
+					{Name: "valid", Url: "https://example.com/valid"},
+					{Name: "invalid", Url: "ftp://example.com/invalid"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("spec.tools[1].url"))
+				Expect(err.Error()).To(ContainSubstring("Tool[1].Url"))
+				Expect(warnings).To(BeEmpty())
+			})
+		})
+
+		Describe("Combined validation", func() {
+			It("should handle multiple URL validation errors", func() {
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "sub1", Url: "ftp://invalid-sub.com"},
+				}
+				agent.Spec.Tools = []runtimev1alpha1.AgentTool{
+					{Name: "tool1", Url: "file://invalid-tool.local"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("SubAgent[0].Url"))
+				Expect(err.Error()).To(ContainSubstring("Tool[0].Url"))
+				Expect(warnings).To(BeEmpty())
+			})
+
+			It("should work with valid URLs and valid framework combination", func() {
+				agent.Spec.Framework = googleAdkFramework
+				agent.Spec.Image = "" // Should trigger template image assignment
+				agent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+					{Name: "external", Url: "https://example.com/sub"},
+					{Name: "internal", Url: "http://sub-agent:8080/config"},
+				}
+				agent.Spec.Tools = []runtimev1alpha1.AgentTool{
+					{Name: "external-tool", Url: "https://example.com/tool"},
+					{Name: "internal-tool", Url: "http://tool-service:9090/api"},
+				}
+
+				warnings, err := validator.validateAgent(agent)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(warnings).To(BeEmpty())
+			})
+		})
+	})
 })

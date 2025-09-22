@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -175,11 +176,56 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 		))
 	}
 
+	// Validate SubAgent URLs
+	for i, subAgent := range agent.Spec.SubAgents {
+		if err := v.validateURL(subAgent.Url, fmt.Sprintf("SubAgent[%d].Url", i)); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec", "subAgents").Index(i).Child("url"),
+				subAgent.Url,
+				err.Error(),
+			))
+		}
+	}
+
+	// Validate Tool URLs
+	for i, tool := range agent.Spec.Tools {
+		if err := v.validateURL(tool.Url, fmt.Sprintf("Tool[%d].Url", i)); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec", "tools").Index(i).Child("url"),
+				tool.Url,
+				err.Error(),
+			))
+		}
+	}
+
 	if len(allErrs) > 0 {
 		return nil, allErrs.ToAggregate()
 	}
 
 	return nil, nil
+}
+
+// validateURL validates that a URL is properly formatted and uses HTTP or HTTPS scheme.
+// Both schemes are allowed to support external HTTPS URLs and internal cluster HTTP URLs.
+func (v *AgentCustomValidator) validateURL(urlStr, fieldName string) error {
+	if urlStr == "" {
+		return nil // Empty URLs are allowed (optional fields)
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("%s must be a valid URL: %v", fieldName, err)
+	}
+
+	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
+		return fmt.Errorf("%s must use HTTP or HTTPS scheme, got %q", fieldName, parsedURL.Scheme)
+	}
+
+	if parsedURL.Host == "" {
+		return fmt.Errorf("%s must have a valid host", fieldName)
+	}
+
+	return nil
 }
 
 // sanitizeForPortName converts a string to be valid for Kubernetes port names.

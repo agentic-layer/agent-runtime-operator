@@ -45,7 +45,10 @@ type SubAgent struct {
 	// Name is the unique identifier for this sub-agent
 	Name string `json:"name"`
 
-	// Url is the endpoint Url for the remote agent configuration
+	// Url is the HTTP/HTTPS endpoint URL for the remote agent configuration.
+	// Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
+	// +kubebuilder:validation:Pattern=`^https?://[a-zA-Z0-9.-]+(/.*)?$`
+	// +kubebuilder:validation:Format=uri
 	Url string `json:"url"`
 }
 
@@ -54,7 +57,10 @@ type AgentTool struct {
 	// Name is the unique identifier for this tool
 	Name string `json:"name"`
 
-	// Url is the endpoint Url for the MCP tool server
+	// Url is the HTTP/HTTPS endpoint URL for the MCP tool server.
+	// Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
+	// +kubebuilder:validation:Pattern=`^https?://[a-zA-Z0-9.-]+(/.*)?$`
+	// +kubebuilder:validation:Format=uri
 	Url string `json:"url"`
 }
 

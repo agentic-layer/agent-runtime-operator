@@ -194,8 +194,28 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
-// buildTemplateEnvironmentVars creates environment variables from Agent spec fields.
-// These are always set regardless of whether using template or custom images.
+// buildTemplateEnvironmentVars creates template environment variables from Agent spec fields.
+// These template variables are always set regardless of whether using template or custom images,
+// providing a consistent interface for agent configuration.
+//
+// Template variables created:
+//   - AGENT_NAME: Always set to the agent's name
+//   - AGENT_DESCRIPTION: Set to spec.Description (empty string if not specified)
+//   - AGENT_INSTRUCTION: Set to spec.Instruction (empty string if not specified)
+//   - AGENT_MODEL: Set to spec.Model (empty string if not specified)
+//   - SUB_AGENTS: JSON-encoded map of sub-agent configurations (empty object if none)
+//   - AGENT_TOOLS: JSON-encoded map of MCP tool configurations (empty object if none)
+//
+// JSON Structure:
+//   - SubAgents: {"agentName": {"url": "https://..."}}
+//   - Tools: {"toolName": {"url": "https://..."}}
+//
+// Parameters:
+//   - agent: The Agent resource to generate template variables for
+//
+// Returns:
+//   - []corev1.EnvVar: Slice of environment variables for template configuration
+//   - error: JSON marshaling error if SubAgents or Tools contain invalid data
 func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent) ([]corev1.EnvVar, error) {
 	var templateEnvVars []corev1.EnvVar
 
@@ -223,7 +243,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 		Value: agent.Spec.Model,
 	})
 
-	// SUB_AGENTS - always set, with empty array if no subagents
+	// SUB_AGENTS - always set, with empty object if no subagents
 	var subAgentsJSON []byte
 	var err error
 	if len(agent.Spec.SubAgents) > 0 {
@@ -235,7 +255,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 		}
 		subAgentsJSON, err = json.Marshal(subAgentsMap)
 	} else {
-		subAgentsJSON, err = json.Marshal([]interface{}{})
+		subAgentsJSON, err = json.Marshal(map[string]interface{}{})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal subAgents: %w", err)
@@ -245,7 +265,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 		Value: string(subAgentsJSON),
 	})
 
-	// AGENT_TOOLS - always set, with empty array if no tools
+	// AGENT_TOOLS - always set, with empty object if no tools
 	var toolsJSON []byte
 	if len(agent.Spec.Tools) > 0 {
 		toolsMap := make(map[string]map[string]string)
@@ -256,7 +276,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 		}
 		toolsJSON, err = json.Marshal(toolsMap)
 	} else {
-		toolsJSON, err = json.Marshal([]interface{}{})
+		toolsJSON, err = json.Marshal(map[string]interface{}{})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal tools: %w", err)
@@ -269,8 +289,29 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 	return templateEnvVars, nil
 }
 
-// mergeEnvironmentVariables merges template and user environment variables,
-// with user variables taking precedence over template variables
+// mergeEnvironmentVariables merges template and user environment variables with proper precedence.
+// User-defined environment variables override template variables with the same name, ensuring
+// that users can customize agent behavior while maintaining template functionality.
+//
+// Merge Logic:
+//  1. Start with all template variables
+//  2. For each template variable, check if user has provided an override
+//  3. If user override exists, use the user value instead of template value
+//  4. Add any additional user variables that don't override template variables
+//  5. Maintain original ordering where possible
+//
+// Example:
+//
+//	Template: [AGENT_NAME=test, AGENT_MODEL=default, TEMPLATE_VAR=value]
+//	User:     [AGENT_MODEL=custom, USER_VAR=user]
+//	Result:   [AGENT_NAME=test, AGENT_MODEL=custom, TEMPLATE_VAR=value, USER_VAR=user]
+//
+// Parameters:
+//   - templateEnvVars: Environment variables generated from Agent template fields
+//   - userEnvVars: Environment variables defined by user in Agent.Spec.Env
+//
+// Returns:
+//   - []corev1.EnvVar: Merged environment variables with user precedence
 func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars []corev1.EnvVar) []corev1.EnvVar {
 	// Create a map for efficient lookups of user environment variables
 	userEnvMap := make(map[string]corev1.EnvVar)
