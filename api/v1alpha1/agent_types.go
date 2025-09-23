@@ -66,10 +66,12 @@ type AgentTool struct {
 
 // AgentSpec defines the desired state of Agent.
 type AgentSpec struct {
+	// +optional
 	// Framework defines the supported agent frameworks
-	// +kubebuilder:validation:Enum=google-adk;flokk;autogen
+	// +kubebuilder:validation:Enum=google-adk;custom
 	Framework string `json:"framework,omitempty"`
 
+	// +optional
 	// Replicas is the number of replicas for the microservice deployment
 	// +kubebuilder:validation:Minimum=0
 	Replicas *int32 `json:"replicas,omitempty"`

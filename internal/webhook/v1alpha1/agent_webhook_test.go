@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	flokkFramework = "flokk"
+	customFramework = "custom"
 )
 
 var _ = Describe("Agent Webhook", func() {
@@ -114,7 +114,7 @@ var _ = Describe("Agent Webhook", func() {
 
 		It("Should set default port for other frameworks", func() {
 			By("setting up an agent with unknown framework and protocol but no port")
-			obj.Spec.Framework = flokkFramework
+			obj.Spec.Framework = customFramework
 			obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
 				{Type: "OpenAI"},
 			}
@@ -344,9 +344,9 @@ var _ = Describe("Agent Webhook", func() {
 			})
 
 			It("Should pass validation for any framework with custom image", func() {
-				By("setting up a flokk agent with custom image")
-				obj.Spec.Framework = flokkFramework
-				obj.Spec.Image = "ghcr.io/example/flokk-agent:latest"
+				By("setting up a custom agent with custom image")
+				obj.Spec.Framework = customFramework
+				obj.Spec.Image = "ghcr.io/example/custom-agent:latest"
 
 				By("calling the ValidateCreate method")
 				warnings, err := validator.ValidateCreate(ctx, obj)
@@ -357,8 +357,8 @@ var _ = Describe("Agent Webhook", func() {
 			})
 
 			It("Should fail validation for non-google-adk framework without image", func() {
-				By("setting up a flokk agent without image")
-				obj.Spec.Framework = flokkFramework
+				By("setting up a custom agent without image")
+				obj.Spec.Framework = customFramework
 				// No image specified
 
 				By("calling the ValidateCreate method")
@@ -366,22 +366,8 @@ var _ = Describe("Agent Webhook", func() {
 
 				By("verifying that validation fails")
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("framework \"flokk\" requires a custom image"))
+				Expect(err.Error()).To(ContainSubstring("framework \"custom\" requires a custom image"))
 				Expect(err.Error()).To(ContainSubstring("Template agents are only supported for \"google-adk\" framework"))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("Should fail validation for autogen framework without image", func() {
-				By("setting up an autogen agent without image")
-				obj.Spec.Framework = "autogen"
-				// No image specified
-
-				By("calling the ValidateCreate method")
-				warnings, err := validator.ValidateCreate(ctx, obj)
-
-				By("verifying that validation fails")
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("framework \"autogen\" requires a custom image"))
 				Expect(warnings).To(BeEmpty())
 			})
 
@@ -397,7 +383,7 @@ var _ = Describe("Agent Webhook", func() {
 				newAgent := &runtimev1alpha1.Agent{
 					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
 					Spec: runtimev1alpha1.AgentSpec{
-						Framework: "flokk",
+						Framework: "custom",
 						// No image - should fail
 					},
 				}
@@ -407,7 +393,7 @@ var _ = Describe("Agent Webhook", func() {
 
 				By("verifying that validation fails")
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("framework \"flokk\" requires a custom image"))
+				Expect(err.Error()).To(ContainSubstring("framework \"custom\" requires a custom image"))
 				Expect(warnings).To(BeEmpty())
 			})
 
@@ -531,7 +517,7 @@ var _ = Describe("Agent Webhook", func() {
 			BeforeEach(func() {
 				validator = &AgentCustomValidator{}
 				// Set valid framework and image to avoid framework validation errors
-				obj.Spec.Framework = "flokk"
+				obj.Spec.Framework = "custom"
 				obj.Spec.Image = "ghcr.io/custom/agent:1.0.0"
 			})
 

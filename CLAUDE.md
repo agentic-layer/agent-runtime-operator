@@ -68,7 +68,7 @@ make docker-push
 ### Core Components
 
 - **Agent CRD** (`api/v1alpha1/agent_types.go`): Defines the Agent custom resource with:
-  - Framework specification (google-adk, flokk, autogen)
+  - Framework specification (google-adk, custom)
   - Container image and replica configuration
   - Protocol definitions (A2A, OpenAI)
   - Status tracking with conditions

@@ -356,7 +356,7 @@ var _ = Describe("Agent Controller", func() {
 
 			agent.Spec.Image = "ghcr.io/agentic-layer/weather-agent:0.3.0"
 			agent.Spec.Replicas = func() *int32 { i := int32(5); return &i }()
-			agent.Spec.Framework = "flokk"
+			agent.Spec.Framework = "custom"
 			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
 				{
 					Type: "OpenAI",
@@ -382,7 +382,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("ghcr.io/agentic-layer/weather-agent:0.3.0"))
 			Expect(*deployment.Spec.Replicas).To(Equal(int32(5)))
-			Expect(deployment.Labels["framework"]).To(Equal("flokk"))
+			Expect(deployment.Labels["framework"]).To(Equal("custom"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Ports).To(HaveLen(1))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort).To(Equal(int32(8080)))
 
@@ -881,7 +881,7 @@ var _ = Describe("Agent Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "flokk",
+					Framework: "custom",
 					Image:     "ghcr.io/custom/agent:1.0.0",
 					Protocols: []runtimev1alpha1.AgentProtocol{
 						{

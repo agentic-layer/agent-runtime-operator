@@ -124,7 +124,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: weather-agent
 spec:
-  framework: google-adk  # Supported: google-adk, flokk, autogen
+  framework: google-adk  # Supported: google-adk, custom
   image: ghcr.io/agentic-layer/weather-agent:0.3.0
   protocols:
     - type: A2A  # Agent-to-Agent protocol

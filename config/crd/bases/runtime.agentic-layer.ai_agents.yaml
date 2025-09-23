@@ -255,8 +255,7 @@ spec:
                 description: Framework defines the supported agent frameworks
                 enum:
                 - google-adk
-                - flokk
-                - autogen
+                - custom
                 type: string
               image:
                 description: |-
