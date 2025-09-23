@@ -325,7 +325,6 @@ spec:
                         Url is the HTTP/HTTPS endpoint URL for the remote agent configuration.
                         Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
                       format: uri
-                      pattern: ^https?://[a-zA-Z0-9.-]+(/.*)?$
                       type: string
                   required:
                   - name
@@ -348,7 +347,6 @@ spec:
                         Url is the HTTP/HTTPS endpoint URL for the MCP tool server.
                         Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
                       format: uri
-                      pattern: ^https?://[a-zA-Z0-9.-]+(/.*)?$
                       type: string
                   required:
                   - name

@@ -47,7 +47,6 @@ type SubAgent struct {
 
 	// Url is the HTTP/HTTPS endpoint URL for the remote agent configuration.
 	// Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
-	// +kubebuilder:validation:Pattern=`^https?://[a-zA-Z0-9.-]+(/.*)?$`
 	// +kubebuilder:validation:Format=uri
 	Url string `json:"url"`
 }
@@ -59,7 +58,6 @@ type AgentTool struct {
 
 	// Url is the HTTP/HTTPS endpoint URL for the MCP tool server.
 	// Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
-	// +kubebuilder:validation:Pattern=`^https?://[a-zA-Z0-9.-]+(/.*)?$`
 	// +kubebuilder:validation:Format=uri
 	Url string `json:"url"`
 }
