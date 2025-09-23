@@ -51,6 +51,40 @@ kubectl apply -f https://github.com/agentic-layer/agent-runtime-operator/release
 kubectl wait --for=condition=Available --timeout=60s -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager
 ```
 
+### Alternative Installation via OCI Repository (Flux)
+If you want to install the operator using Flux and an OCI repository, you can use the following configuration:
+
+```yaml
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: agent-runtime-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: oci://ghcr.io/agentic-layer/manifests/agent-runtime-operator
+  ref:
+    # This will pull the latest version that is >=0.1.0 and <1.0.0.
+    semver: "^0.1.0"
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: agent-runtime-operator
+  namespace: flux-system
+spec:
+  sourceRef:
+    kind: OCIRepository
+    name: agent-runtime-operator
+  interval: 10m
+  path: ./default
+  prune: true
+  wait: true
+  dependsOn:
+    # Ensure cert-manager is installed first (if you install it with Flux as well)
+    - name: cert-manager
+```
+
 ## Development
 
 Follow the prerequisites above to set up your local environment.
@@ -152,6 +186,13 @@ The E2E tests automatically create an isolated Kind cluster, deploy the operator
 ```bash
 # Run complete E2E test suite
 make test-e2e
+```
+
+When a previous test run failed, the cluster is not deleted and may be in an inconsistent state. 
+To clean up and start fresh, run:
+
+```bash
+make cleanup-test-e2e
 ```
 
 The E2E test suite includes:
