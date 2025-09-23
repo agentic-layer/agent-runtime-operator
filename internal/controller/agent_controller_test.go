@@ -193,7 +193,7 @@ var _ = Describe("Agent Controller", func() {
 			deployment := &appsv1.Deployment{}
 			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
-			// Find agent container using our improved method (addresses PR feedback)
+			// Find agent container using our improved method
 			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
 			Expect(agentContainer).NotTo(BeNil())
 			Expect(agentContainer.Image).To(Equal("ghcr.io/agentic-layer/weather-agent:0.3.0"))
@@ -1138,7 +1138,7 @@ var _ = Describe("Agent Controller", func() {
 	})
 })
 
-// Helper functions for tests (addresses PR feedback)
+// Helper functions for tests
 func findAgentContainerHelper(containers []corev1.Container) *corev1.Container {
 	for i := range containers {
 		if containers[i].Name == "agent" {

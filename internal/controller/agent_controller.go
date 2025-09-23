@@ -471,7 +471,7 @@ func (r *AgentReconciler) createServiceForAgent(agent *runtimev1alpha1.Agent, se
 	return service, nil
 }
 
-// needsDeploymentUpdate compares existing and desired deployment (addresses PR feedback)
+// needsDeploymentUpdate compares existing and desired deployment
 func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deployment) bool {
 	// Check replicas
 	if *existing.Spec.Replicas != *desired.Spec.Replicas {
@@ -500,7 +500,7 @@ func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deploy
 		return true
 	}
 
-	// Check environment variables (addresses PR feedback)
+	// Check environment variables
 	if !equality.EnvVarsEqual(existingContainer.Env, desiredContainer.Env) {
 		return true
 	}
@@ -510,7 +510,7 @@ func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deploy
 		return true
 	}
 
-	// Check container ports by name (addresses PR feedback)
+	// Check container ports by name
 	if !r.containerPortsEqual(existingContainer.Ports, desiredContainer.Ports) {
 		return true
 	}
@@ -518,14 +518,14 @@ func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deploy
 	return false
 }
 
-// needsServiceUpdate compares existing and desired service (addresses PR feedback)
+// needsServiceUpdate compares existing and desired service
 func (r *AgentReconciler) needsServiceUpdate(existing, desired *corev1.Service) bool {
 	// Check labels
 	if !r.mapsEqual(existing.Labels, desired.Labels) {
 		return true
 	}
 
-	// Check ports by name (addresses PR feedback)
+	// Check ports by name
 	if !r.servicePortsEqual(existing.Spec.Ports, desired.Spec.Ports) {
 		return true
 	}
@@ -533,7 +533,7 @@ func (r *AgentReconciler) needsServiceUpdate(existing, desired *corev1.Service) 
 	return false
 }
 
-// updateAgentContainer finds and updates the agent container by name (addresses PR feedback)
+// updateAgentContainer finds and updates the agent container by name
 func (r *AgentReconciler) updateAgentContainer(deployment, desiredDeployment *appsv1.Deployment) error {
 	agentContainer := r.findAgentContainer(deployment.Spec.Template.Spec.Containers)
 	desiredAgentContainer := r.findAgentContainer(desiredDeployment.Spec.Template.Spec.Containers)
@@ -583,7 +583,7 @@ func (r *AgentReconciler) mapsEqual(a, b map[string]string) bool {
 	return true
 }
 
-// containerPortsEqual compares container ports by name (addresses PR feedback)
+// containerPortsEqual compares container ports by name
 func (r *AgentReconciler) containerPortsEqual(existing, desired []corev1.ContainerPort) bool {
 	if len(existing) != len(desired) {
 		return false
@@ -618,7 +618,7 @@ func (r *AgentReconciler) containerPortsEqual(existing, desired []corev1.Contain
 	return true
 }
 
-// servicePortsEqual compares service ports by name (addresses PR feedback)
+// servicePortsEqual compares service ports by name
 func (r *AgentReconciler) servicePortsEqual(existing, desired []corev1.ServicePort) bool {
 	if len(existing) != len(desired) {
 		return false
