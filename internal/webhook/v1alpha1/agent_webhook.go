@@ -19,20 +19,24 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
 const (
-	googleAdkFramework = "google-adk"
+	googleAdkFramework           = "google-adk"
+	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.1.0"
+	defaultTemplateImageFallback = "invalid"
 )
 
 // nolint:unused
@@ -48,6 +52,7 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 			DefaultPortGoogleAdk: 8000,
 			Recorder:             mgr.GetEventRecorderFor("agent-defaulter-webhook"),
 		}).
+		WithValidator(&AgentCustomValidator{}).
 		Complete()
 }
 
@@ -89,6 +94,18 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 		*agent.Spec.Replicas = d.DefaultReplicas
 	}
 
+	// Set default image if not specified (template image)
+	if agent.Spec.Image == "" {
+		switch agent.Spec.Framework {
+		case googleAdkFramework:
+			agent.Spec.Image = defaultTemplateImageAdk
+		default:
+			// Validation will catch unsupported frameworks without images
+			// This shouldn't be reached due to validation, but set template as fallback
+			agent.Spec.Image = defaultTemplateImageFallback
+		}
+	}
+
 	// Set default ports for protocols if not specified
 	for i, protocol := range agent.Spec.Protocols {
 		if protocol.Port == 0 {
@@ -98,20 +115,6 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 			agent.Spec.Protocols[i].Name = fmt.Sprintf("%s-%d", sanitizeForPortName(protocol.Type), agent.Spec.Protocols[i].Port)
 		}
 	}
-
-	// Filter out protected environment variables and create an event if found.
-	protectedVar := "AGENT_NAME"
-	var filteredEnvs []corev1.EnvVar
-
-	for _, env := range agent.Spec.Env {
-		if env.Name != protectedVar {
-			filteredEnvs = append(filteredEnvs, env)
-		} else {
-			agentlog.Info("removing protected environment variable from spec", "variable", protectedVar, "agent", agent.GetName())
-			d.Recorder.Eventf(agent, "Warning", "SpecModified", "The user-defined '%s' environment variable was removed as it is system-managed.", protectedVar)
-		}
-	}
-	agent.Spec.Env = filteredEnvs
 }
 
 func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
@@ -121,6 +124,110 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 	default:
 		return d.DefaultPort // Default port for unknown frameworks
 	}
+}
+
+// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
+// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
+// +kubebuilder:webhook:path=/validate-runtime-agentic-layer-ai-v1alpha1-agent,mutating=false,failurePolicy=fail,sideEffects=None,groups=runtime.agentic-layer.ai,resources=agents,verbs=create;update,versions=v1alpha1,name=vagent-v1alpha1.kb.io,admissionReviewVersions=v1
+
+// AgentCustomValidator struct is responsible for validating the Agent resource
+// when it is created, updated, or deleted.
+//
+// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
+// as this struct is used only for temporary operations and does not need to be deeply copied.
+type AgentCustomValidator struct{}
+
+var _ webhook.CustomValidator = &AgentCustomValidator{}
+
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
+func (v *AgentCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+	agent, ok := obj.(*runtimev1alpha1.Agent)
+	if !ok {
+		return nil, fmt.Errorf("expected an Agent object but got %T", obj)
+	}
+	agentlog.Info("Validating Agent on create", "name", agent.GetName())
+	return v.validateAgent(agent)
+}
+
+// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
+func (v *AgentCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
+	agent, ok := newObj.(*runtimev1alpha1.Agent)
+	if !ok {
+		return nil, fmt.Errorf("expected an Agent object but got %T", newObj)
+	}
+	agentlog.Info("Validating Agent on update", "name", agent.GetName())
+	return v.validateAgent(agent)
+}
+
+// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
+func (v *AgentCustomValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+	// No validation needed on delete
+	return nil, nil
+}
+
+// validateAgent performs validation logic for Agent resources.
+func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admission.Warnings, error) {
+	var allErrs field.ErrorList
+
+	// Validate framework and image combination
+	if agent.Spec.Image == "" && agent.Spec.Framework != googleAdkFramework {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "framework"),
+			agent.Spec.Framework,
+			fmt.Sprintf("framework %q requires a custom image. Template agents are only supported for %q framework", agent.Spec.Framework, googleAdkFramework),
+		))
+	}
+
+	// Validate SubAgent URLs
+	for i, subAgent := range agent.Spec.SubAgents {
+		if err := v.validateURL(subAgent.Url, fmt.Sprintf("SubAgent[%d].Url", i)); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec", "subAgents").Index(i).Child("url"),
+				subAgent.Url,
+				err.Error(),
+			))
+		}
+	}
+
+	// Validate Tool URLs
+	for i, tool := range agent.Spec.Tools {
+		if err := v.validateURL(tool.Url, fmt.Sprintf("Tool[%d].Url", i)); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec", "tools").Index(i).Child("url"),
+				tool.Url,
+				err.Error(),
+			))
+		}
+	}
+
+	if len(allErrs) > 0 {
+		return nil, allErrs.ToAggregate()
+	}
+
+	return nil, nil
+}
+
+// validateURL validates that a URL is properly formatted and uses HTTP or HTTPS scheme.
+// Both schemes are allowed to support external HTTPS URLs and internal cluster HTTP URLs.
+func (v *AgentCustomValidator) validateURL(urlStr, fieldName string) error {
+	if urlStr == "" {
+		return nil // Empty URLs are allowed (optional fields)
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("%s must be a valid URL: %v", fieldName, err)
+	}
+
+	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
+		return fmt.Errorf("%s must use HTTP or HTTPS scheme, got %q", fieldName, parsedURL.Scheme)
+	}
+
+	if parsedURL.Host == "" {
+		return fmt.Errorf("%s must have a valid host", fieldName)
+	}
+
+	return nil
 }
 
 // sanitizeForPortName converts a string to be valid for Kubernetes port names.

@@ -79,8 +79,9 @@ The operator can be configured using the following environment variables:
 
 ### Custom Resource Configuration
 
-To deploy an agent, you define an `Agent` resource. Here is an example configuration for a "weather-agent":
+To deploy an agent, you define an `Agent` resource. Here are example configurations:
 
+**Using a Custom Docker Image:**
 ```yaml
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent
@@ -98,6 +99,38 @@ spec:
   env:
     - name: PORT
       value: "8080"
+  envFrom:
+    - secretRef:
+        name: api-key-secret
+```
+
+**Using Agent Templates (no custom image needed):**
+```yaml
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: weather-agent-template
+spec:
+  framework: google-adk  # Currently only google-adk supports templates
+  description: "A helpful weather information agent"
+  instruction: "You are a weather agent that provides current weather information and forecasts."
+  model: "gemini/gemini-2.0-flash"
+  subAgents:
+    - name: forecast_agent
+      url: "https://example.com/forecast-agent.json"
+    - name: location_agent
+      url: "https://example.com/location-agent.json"
+  tools:
+    - name: weather_api
+      url: "https://weather.mcpservers.org/mcp"
+    - name: web_fetch
+      url: "https://remote.mcpservers.org/fetch/mcp"
+  protocols:
+    - type: A2A
+  replicas: 1
   envFrom:
     - secretRef:
         name: api-key-secret

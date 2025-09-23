@@ -69,6 +69,20 @@ var _ = Describe("Manager", Ordered, func() {
 		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
+
+		sampleImages := []string{
+			"ghcr.io/agentic-layer/weather-agent:0.3.0",
+			"ghcr.io/agentic-layer/agent-template-adk:0.1.0",
+		}
+
+		By("loading the sample images on Kind")
+		for _, img := range sampleImages {
+			cmd = exec.Command("docker", "pull", img)
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to pull image ", img)
+			err = utils.LoadImageToKindClusterWithName(img)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load image ", img, " into Kind")
+		}
 	})
 
 	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
@@ -280,16 +294,293 @@ var _ = Describe("Manager", Ordered, func() {
 			Eventually(verifyCAInjection).Should(Succeed())
 		})
 
-		// +kubebuilder:scaffold:e2e-webhooks-checks
+		It("should have CA injection for validating webhooks", func() {
+			By("checking CA injection for validating webhooks")
+			verifyCAInjection := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get",
+					"validatingwebhookconfigurations.admissionregistration.k8s.io",
+					"agent-runtime-operator-validating-webhook-configuration",
+					"-o", "go-template={{ range .webhooks }}{{ .clientConfig.caBundle }}{{ end }}")
+				vwhOutput, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(vwhOutput)).To(BeNumerically(">", 10))
+			}
+			Eventually(verifyCAInjection).Should(Succeed())
+		})
 
-		// TODO: Customize the e2e test suite with scenarios specific to your project.
-		// Consider applying sample/CR(s) and check their status and/or verifying
-		// the reconciliation by using the metrics, i.e.:
-		// metricsOutput := getMetricsOutput()
-		// Expect(metricsOutput).To(ContainSubstring(
-		//    fmt.Sprintf(`controller_runtime_reconcile_total{controller="%s",result="success"} 1`,
-		//    strings.ToLower(<Kind>),
-		// ))
+		// +kubebuilder:scaffold:e2e-webhooks-checks
+	})
+
+	Context("Sample Agent Deployment", func() {
+		const testNamespace = "default"
+		const weatherAgentName = "weather-agent"
+		const newsAgentName = "news-agent"
+		const configMapName = "agent-config-map"
+
+		BeforeAll(func() {
+			By("waiting for webhook service to be ready")
+			Eventually(func(g Gomega) {
+				// Check that the webhook service exists and has endpoints
+				cmd := exec.Command("kubectl", "get", "service",
+					"agent-runtime-operator-webhook-service", "-n", "agent-runtime-operator-system")
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Check that the webhook service has endpoints (meaning pods are ready)
+				cmd = exec.Command("kubectl", "get", "endpoints", "agent-runtime-operator-webhook-service",
+					"-n", "agent-runtime-operator-system", "-o", "jsonpath={.subsets[*].addresses[*].ip}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
+			}, 2*time.Minute, 5*time.Second).Should(Succeed(), "Webhook service should be ready")
+
+			By("applying sample configmap")
+			cmd := exec.Command("kubectl", "apply", "-f", "config/samples/configmap.yaml",
+				"-n", testNamespace)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply sample configmap")
+		})
+
+		AfterAll(func() {
+			By("cleaning up sample agents")
+			cmd := exec.Command("kubectl", "delete", "-f", "config/samples/runtime_v1alpha1_agent.yaml",
+				"-n", testNamespace, "--ignore-not-found=true")
+			_, _ = utils.Run(cmd)
+
+			cmd = exec.Command("kubectl", "delete", "-f",
+				"config/samples/runtime_v1alpha1_agent_template.yaml", "-n", testNamespace, "--ignore-not-found=true")
+			_, _ = utils.Run(cmd)
+
+			By("cleaning up sample configmap")
+			cmd = exec.Command("kubectl", "delete", "configmap", configMapName, "-n", testNamespace,
+				"--ignore-not-found=true")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should successfully deploy and manage the weather agent (custom image)", func() {
+			By("applying the weather agent sample")
+			cmd := exec.Command("kubectl", "apply", "-f", "config/samples/runtime_v1alpha1_agent.yaml", "-n", testNamespace)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply weather agent sample")
+
+			By("verifying the weather agent resource is created")
+			verifyAgentExists := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "agent", weatherAgentName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			Eventually(verifyAgentExists).Should(Succeed())
+
+			By("waiting for the weather agent deployment to be created and ready")
+			verifyDeploymentReady := func(g Gomega) {
+				// Check deployment exists
+				cmd := exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Check deployment is ready
+				cmd = exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.readyReplicas}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("1"), "Deployment should have 1 ready replica")
+
+				// Check deployment status
+				cmd = exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.conditions[?(@.type=='Available')].status}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("True"), "Deployment should be available")
+			}
+			Eventually(verifyDeploymentReady, 3*time.Minute).Should(Succeed())
+
+			By("verifying the weather agent service is created")
+			verifyServiceExists := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "service", weatherAgentName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Verify service has the expected port
+				cmd = exec.Command("kubectl", "get", "service", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.ports[0].port}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("8000"), "Service should expose port 8000")
+			}
+			Eventually(verifyServiceExists).Should(Succeed())
+
+			By("verifying the weather agent pod is healthy")
+			verifyPodHealthy := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "pods", "-l", "app="+weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.items[0].status.phase}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("Running"), "Weather agent pod should be running")
+
+				// Check pod is ready
+				cmd = exec.Command("kubectl", "get", "pods", "-l", "app="+weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.items[0].status.containerStatuses[0].ready}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("true"), "Weather agent pod should be ready")
+			}
+			Eventually(verifyPodHealthy, 2*time.Minute).Should(Succeed())
+
+			By("verifying deployment has correct environment variables")
+			verifyEnvironmentVariables := func(g Gomega) {
+				// Get deployment env vars
+				cmd := exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].env[*].name}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring("AGENT_NAME"), "Should contain template AGENT_NAME env var")
+				g.Expect(output).To(ContainSubstring("PORT"), "Should contain user-defined PORT env var")
+				g.Expect(output).To(ContainSubstring("LOG_LEVEL"), "Should contain user-defined LOG_LEVEL env var")
+			}
+			Eventually(verifyEnvironmentVariables).Should(Succeed())
+		})
+
+		It("should successfully deploy and manage the news agent (template)", func() {
+			By("applying the news agent template sample")
+			cmd := exec.Command("kubectl", "apply", "-f",
+				"config/samples/runtime_v1alpha1_agent_template.yaml", "-n", testNamespace)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply news agent template sample")
+
+			By("verifying the news agent resource is created")
+			verifyAgentExists := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "agent", newsAgentName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			Eventually(verifyAgentExists).Should(Succeed())
+
+			By("waiting for the news agent deployment to be created and ready")
+			verifyDeploymentReady := func(g Gomega) {
+				// Check deployment exists
+				cmd := exec.Command("kubectl", "get", "deployment", newsAgentName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Check deployment is ready
+				cmd = exec.Command("kubectl", "get", "deployment", newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.readyReplicas}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("1"), "Deployment should have 1 ready replica")
+
+				// Check deployment status
+				cmd = exec.Command("kubectl", "get", "deployment", newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.conditions[?(@.type=='Available')].status}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("True"), "Deployment should be available")
+			}
+			Eventually(verifyDeploymentReady, 3*time.Minute).Should(Succeed())
+
+			By("verifying the news agent service is created")
+			verifyServiceExists := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "service", newsAgentName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Verify service has the expected port (google-adk default port 8000)
+				cmd = exec.Command("kubectl", "get", "service", newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.ports[0].port}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("8000"), "Service should expose port 8000")
+			}
+			Eventually(verifyServiceExists).Should(Succeed())
+
+			By("verifying the news agent pod is healthy")
+			verifyPodHealthy := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "pods", "-l", "app="+newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.items[0].status.phase}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("Running"), "News agent pod should be running")
+
+				// Check pod is ready
+				cmd = exec.Command("kubectl", "get", "pods", "-l", "app="+newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.items[0].status.containerStatuses[0].ready}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("true"), "News agent pod should be ready")
+			}
+			Eventually(verifyPodHealthy, 2*time.Minute).Should(Succeed())
+
+			By("verifying template image is set correctly")
+			verifyTemplateImage := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].image}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"), "Should use template image")
+			}
+			Eventually(verifyTemplateImage).Should(Succeed())
+
+			By("verifying template environment variables are set correctly")
+			verifyTemplateEnvironmentVariables := func(g Gomega) {
+				// Get all environment variable names
+				cmd := exec.Command("kubectl", "get", "deployment", newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].env[*].name}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Verify template-specific environment variables
+				g.Expect(output).To(ContainSubstring("AGENT_NAME"), "Should contain AGENT_NAME")
+				g.Expect(output).To(ContainSubstring("AGENT_DESCRIPTION"), "Should contain AGENT_DESCRIPTION")
+				g.Expect(output).To(ContainSubstring("AGENT_INSTRUCTION"), "Should contain AGENT_INSTRUCTION")
+				g.Expect(output).To(ContainSubstring("AGENT_MODEL"), "Should contain AGENT_MODEL")
+				g.Expect(output).To(ContainSubstring("SUB_AGENTS"), "Should contain SUB_AGENTS")
+				g.Expect(output).To(ContainSubstring("AGENT_TOOLS"), "Should contain AGENT_TOOLS")
+
+				// Verify AGENT_MODEL value
+				cmd = exec.Command("kubectl", "get", "deployment", newsAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='AGENT_MODEL')].value}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("gemini/gemini-2.0-flash"), "AGENT_MODEL should be set correctly")
+			}
+			Eventually(verifyTemplateEnvironmentVariables).Should(Succeed())
+		})
+
+		It("should verify successful reconciliation through metrics", func() {
+			By("getting metrics to verify successful reconciliation")
+			verifySuccessfulReconciliation := func(g Gomega) {
+				metricsOutput := getMetricsOutput()
+				g.Expect(metricsOutput).To(ContainSubstring(
+					`controller_runtime_reconcile_total{controller="agent",result="success"}`,
+				), "Should show successful agent reconciliation in metrics")
+			}
+			Eventually(verifySuccessfulReconciliation, 1*time.Minute).Should(Succeed())
+		})
+
+		It("should handle agent updates correctly", func() {
+			By("updating the weather agent replica count")
+			cmd := exec.Command("kubectl", "patch", "agent", weatherAgentName, "-n", testNamespace,
+				"--type=merge", "-p", `{"spec":{"replicas":2}}`)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to patch weather agent")
+
+			By("verifying deployment is updated with new replica count")
+			verifyReplicaUpdate := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.replicas}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("2"), "Deployment should be updated to 2 replicas")
+
+				// Wait for replicas to be ready
+				cmd = exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.readyReplicas}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("2"), "Deployment should have 2 ready replicas")
+			}
+			Eventually(verifyReplicaUpdate, 2*time.Minute).Should(Succeed())
+		})
 	})
 })
 

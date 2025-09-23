@@ -1,5 +1,6 @@
 ## Append samples of your project ##
 resources:
 - runtime_v1alpha1_agent.yaml
+- runtime_v1alpha1_agent_template.yaml
 - configmap.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

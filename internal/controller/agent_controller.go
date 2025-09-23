@@ -18,7 +18,9 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +35,10 @@ import (
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	"github.com/agentic-layer/agent-runtime-operator/internal/equality"
+)
+
+const (
+	agentContainerName = "agent"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -193,6 +199,154 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
+// buildTemplateEnvironmentVars creates template environment variables from Agent spec fields.
+// These template variables are always set regardless of whether using template or custom images,
+// providing a consistent interface for agent configuration.
+//
+// Template variables created:
+//   - AGENT_NAME: Always set to the agent's name
+//   - AGENT_DESCRIPTION: Set to spec.Description (empty string if not specified)
+//   - AGENT_INSTRUCTION: Set to spec.Instruction (empty string if not specified)
+//   - AGENT_MODEL: Set to spec.Model (empty string if not specified)
+//   - SUB_AGENTS: JSON-encoded map of sub-agent configurations (empty object if none)
+//   - AGENT_TOOLS: JSON-encoded map of MCP tool configurations (empty object if none)
+//
+// JSON Structure:
+//   - SubAgents: {"agentName": {"url": "https://..."}}
+//   - Tools: {"toolName": {"url": "https://..."}}
+//
+// Parameters:
+//   - agent: The Agent resource to generate template variables for
+//
+// Returns:
+//   - []corev1.EnvVar: Slice of environment variables for template configuration
+//   - error: JSON marshaling error if SubAgents or Tools contain invalid data
+func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent) ([]corev1.EnvVar, error) {
+	var templateEnvVars []corev1.EnvVar
+
+	// Always set AGENT_NAME (sanitized to meet environment variable requirements)
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_NAME",
+		Value: r.sanitizeAgentName(agent.Name),
+	})
+
+	// AGENT_DESCRIPTION - always set, even if empty
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_DESCRIPTION",
+		Value: agent.Spec.Description,
+	})
+
+	// AGENT_INSTRUCTION - always set, even if empty
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_INSTRUCTION",
+		Value: agent.Spec.Instruction,
+	})
+
+	// AGENT_MODEL - always set, even if empty
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_MODEL",
+		Value: agent.Spec.Model,
+	})
+
+	// SUB_AGENTS - always set, with empty object if no subagents
+	var subAgentsJSON []byte
+	var err error
+	if len(agent.Spec.SubAgents) > 0 {
+		subAgentsMap := make(map[string]map[string]string)
+		for _, subAgent := range agent.Spec.SubAgents {
+			subAgentsMap[subAgent.Name] = map[string]string{
+				"url": subAgent.Url,
+			}
+		}
+		subAgentsJSON, err = json.Marshal(subAgentsMap)
+	} else {
+		subAgentsJSON, err = json.Marshal(map[string]interface{}{})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subAgents: %w", err)
+	}
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "SUB_AGENTS",
+		Value: string(subAgentsJSON),
+	})
+
+	// AGENT_TOOLS - always set, with empty object if no tools
+	var toolsJSON []byte
+	if len(agent.Spec.Tools) > 0 {
+		toolsMap := make(map[string]map[string]string)
+		for _, tool := range agent.Spec.Tools {
+			toolsMap[tool.Name] = map[string]string{
+				"url": tool.Url,
+			}
+		}
+		toolsJSON, err = json.Marshal(toolsMap)
+	} else {
+		toolsJSON, err = json.Marshal(map[string]interface{}{})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tools: %w", err)
+	}
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "AGENT_TOOLS",
+		Value: string(toolsJSON),
+	})
+
+	return templateEnvVars, nil
+}
+
+// mergeEnvironmentVariables merges template and user environment variables with proper precedence.
+// User-defined environment variables override template variables with the same name, ensuring
+// that users can customize agent behavior while maintaining template functionality.
+//
+// Merge Logic:
+//  1. Start with all template variables
+//  2. For each template variable, check if user has provided an override
+//  3. If user override exists, use the user value instead of template value
+//  4. Add any additional user variables that don't override template variables
+//  5. Maintain original ordering where possible
+//
+// Example:
+//
+//	Template: [AGENT_NAME=test, AGENT_MODEL=default, TEMPLATE_VAR=value]
+//	User:     [AGENT_MODEL=custom, USER_VAR=user]
+//	Result:   [AGENT_NAME=test, AGENT_MODEL=custom, TEMPLATE_VAR=value, USER_VAR=user]
+//
+// Parameters:
+//   - templateEnvVars: Environment variables generated from Agent template fields
+//   - userEnvVars: Environment variables defined by user in Agent.Spec.Env
+//
+// Returns:
+//   - []corev1.EnvVar: Merged environment variables with user precedence
+func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars []corev1.EnvVar) []corev1.EnvVar {
+	// Create a map for efficient lookups of user environment variables
+	userEnvMap := make(map[string]corev1.EnvVar)
+	for _, env := range userEnvVars {
+		userEnvMap[env.Name] = env
+	}
+
+	// Pre-allocate result slice for efficiency
+	result := make([]corev1.EnvVar, 0, len(templateEnvVars)+len(userEnvVars))
+
+	// Add template environment variables, but skip if user has overridden them
+	for _, templateEnv := range templateEnvVars {
+		if userEnv, exists := userEnvMap[templateEnv.Name]; exists {
+			// User has overridden this variable, use user's version
+			result = append(result, userEnv)
+			delete(userEnvMap, templateEnv.Name) // Remove so we don't add it again
+		} else {
+			// No user override, use template variable
+			result = append(result, templateEnv)
+		}
+	}
+
+	// Add any remaining user environment variables that weren't overrides
+	for _, userEnv := range userEnvMap {
+		result = append(result, userEnv)
+	}
+
+	return result
+}
+
 // createDeploymentForAgent creates a deployment for the given Agent
 func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent, deploymentName string) (*appsv1.Deployment, error) {
 	replicas := agent.Spec.Replicas
@@ -223,6 +377,18 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 		})
 	}
 
+	// Use the image from spec (webhook ensures it's always set)
+	agentImage := agent.Spec.Image
+
+	// Build template-specific environment variables
+	templateEnvVars, err := r.buildTemplateEnvironmentVars(agent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build template environment variables: %w", err)
+	}
+
+	// Combine template and user environment variables (user vars override template vars)
+	allEnvVars := r.mergeEnvironmentVariables(templateEnvVars, agent.Spec.Env)
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
@@ -241,13 +407,10 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "agent",
-							Image: agent.Spec.Image,
-							Ports: containerPorts,
-							Env: append(agent.Spec.Env, corev1.EnvVar{
-								Name:  "AGENT_NAME",
-								Value: agent.Name,
-							}),
+							Name:    agentContainerName,
+							Image:   agentImage,
+							Ports:   containerPorts,
+							Env:     allEnvVars,
 							EnvFrom: agent.Spec.EnvFrom,
 						},
 					},
@@ -394,7 +557,7 @@ func (r *AgentReconciler) updateAgentContainer(deployment, desiredDeployment *ap
 // findAgentContainer finds the agent container by name in a container slice
 func (r *AgentReconciler) findAgentContainer(containers []corev1.Container) *corev1.Container {
 	for i := range containers {
-		if containers[i].Name == "agent" {
+		if containers[i].Name == agentContainerName {
 			return &containers[i]
 		}
 	}
@@ -489,6 +652,46 @@ func (r *AgentReconciler) servicePortsEqual(existing, desired []corev1.ServicePo
 	}
 
 	return true
+}
+
+// sanitizeAgentName sanitizes the agent name to meet environment variable naming requirements.
+// Environment variable names should start with a letter (a-z, A-Z) or underscore (_),
+// and can only contain letters, digits (0-9), and underscores.
+func (r *AgentReconciler) sanitizeAgentName(name string) string {
+	var result strings.Builder
+
+	// Process each character
+	for _, r := range name {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_':
+			// Valid character, keep it
+			result.WriteRune(r)
+		case r == '-':
+			// Convert hyphens to underscores
+			result.WriteRune('_')
+		default:
+			// Replace any other character with underscore
+			result.WriteRune('_')
+		}
+	}
+
+	sanitized := result.String()
+
+	// Ensure it starts with a letter or underscore
+	if len(sanitized) > 0 {
+		firstChar := sanitized[0]
+		if firstChar >= '0' && firstChar <= '9' {
+			// Starts with digit, prepend underscore
+			sanitized = "_" + sanitized
+		}
+	}
+
+	// Ensure we have a valid result
+	if sanitized == "" {
+		sanitized = agentContainerName
+	}
+
+	return sanitized
 }
 
 // SetupWithManager sets up the controller with the Manager.
