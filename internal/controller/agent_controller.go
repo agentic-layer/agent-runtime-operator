@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +35,10 @@ import (
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	"github.com/agentic-layer/agent-runtime-operator/internal/equality"
+)
+
+const (
+	agentContainerName = "agent"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -219,10 +224,10 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent) ([]corev1.EnvVar, error) {
 	var templateEnvVars []corev1.EnvVar
 
-	// Always set AGENT_NAME
+	// Always set AGENT_NAME (sanitized to meet environment variable requirements)
 	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 		Name:  "AGENT_NAME",
-		Value: agent.Name,
+		Value: r.sanitizeAgentName(agent.Name),
 	})
 
 	// AGENT_DESCRIPTION - always set, even if empty
@@ -402,7 +407,7 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "agent",
+							Name:    agentContainerName,
 							Image:   agentImage,
 							Ports:   containerPorts,
 							Env:     allEnvVars,
@@ -552,7 +557,7 @@ func (r *AgentReconciler) updateAgentContainer(deployment, desiredDeployment *ap
 // findAgentContainer finds the agent container by name in a container slice
 func (r *AgentReconciler) findAgentContainer(containers []corev1.Container) *corev1.Container {
 	for i := range containers {
-		if containers[i].Name == "agent" {
+		if containers[i].Name == agentContainerName {
 			return &containers[i]
 		}
 	}
@@ -647,6 +652,46 @@ func (r *AgentReconciler) servicePortsEqual(existing, desired []corev1.ServicePo
 	}
 
 	return true
+}
+
+// sanitizeAgentName sanitizes the agent name to meet environment variable naming requirements.
+// Environment variable names should start with a letter (a-z, A-Z) or underscore (_),
+// and can only contain letters, digits (0-9), and underscores.
+func (r *AgentReconciler) sanitizeAgentName(name string) string {
+	var result strings.Builder
+
+	// Process each character
+	for _, r := range name {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_':
+			// Valid character, keep it
+			result.WriteRune(r)
+		case r == '-':
+			// Convert hyphens to underscores
+			result.WriteRune('_')
+		default:
+			// Replace any other character with underscore
+			result.WriteRune('_')
+		}
+	}
+
+	sanitized := result.String()
+
+	// Ensure it starts with a letter or underscore
+	if len(sanitized) > 0 {
+		firstChar := sanitized[0]
+		if firstChar >= '0' && firstChar <= '9' {
+			// Starts with digit, prepend underscore
+			sanitized = "_" + sanitized
+		}
+	}
+
+	// Ensure we have a valid result
+	if sanitized == "" {
+		sanitized = agentContainerName
+	}
+
+	return sanitized
 }
 
 // SetupWithManager sets up the controller with the Manager.

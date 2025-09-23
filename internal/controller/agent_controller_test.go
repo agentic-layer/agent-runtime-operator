@@ -212,7 +212,7 @@ var _ = Describe("Agent Controller", func() {
 			// Check AGENT_NAME env var
 			agentNameVar := findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
-			Expect(agentNameVar.Value).To(Equal(resourceName))
+			Expect(agentNameVar.Value).To(Equal("test_update_resource"))
 
 			By("Manually updating environment variables to simulate external changes")
 			agentContainer.Env = append(agentContainer.Env, corev1.EnvVar{
@@ -240,7 +240,7 @@ var _ = Describe("Agent Controller", func() {
 			// Check AGENT_NAME env var
 			agentNameVar = findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
-			Expect(agentNameVar.Value).To(Equal(resourceName))
+			Expect(agentNameVar.Value).To(Equal("test_update_resource"))
 		})
 
 		It("should update Deployment when replicas change", func() {
@@ -468,7 +468,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(agentContainer.Env).To(ContainElement(newEnvVar))
 			Expect(agentContainer.Env).To(ContainElement(corev1.EnvVar{
 				Name:  "AGENT_NAME",
-				Value: resourceName,
+				Value: "test_update_resource",
 			}))
 		})
 
@@ -657,7 +657,7 @@ var _ = Describe("Agent Controller", func() {
 			// Verify template environment variables
 			agentNameVar := findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
-			Expect(agentNameVar.Value).To(Equal(resourceName))
+			Expect(agentNameVar.Value).To(Equal("test_template_agent"))
 
 			agentDescVar := findEnvVar(agentContainer.Env, "AGENT_DESCRIPTION")
 			Expect(agentDescVar).NotTo(BeNil())
@@ -732,7 +732,7 @@ var _ = Describe("Agent Controller", func() {
 			// Verify template vars that weren't overridden are still present
 			agentNameVar := findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
-			Expect(agentNameVar.Value).To(Equal(resourceName))
+			Expect(agentNameVar.Value).To(Equal("test_template_agent"))
 		})
 
 		It("should handle empty template fields gracefully", func() {
@@ -788,7 +788,7 @@ var _ = Describe("Agent Controller", func() {
 			// AGENT_NAME should always be set
 			agentNameVar := findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
-			Expect(agentNameVar.Value).To(Equal(emptyResourceName))
+			Expect(agentNameVar.Value).To(Equal("empty_template_agent"))
 
 			// Empty fields should still have environment variables, but with empty values
 			agentDescVar := findEnvVar(agentContainer.Env, "AGENT_DESCRIPTION")
@@ -927,7 +927,7 @@ var _ = Describe("Agent Controller", func() {
 			// Template env vars should be present even for custom images
 			agentNameVar := findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
-			Expect(agentNameVar.Value).To(Equal(resourceName))
+			Expect(agentNameVar.Value).To(Equal("test_custom_image"))
 
 			// Other template vars should be present with empty values
 			agentDescVar := findEnvVar(agentContainer.Env, "AGENT_DESCRIPTION")
@@ -962,7 +962,7 @@ var _ = Describe("Agent Controller", func() {
 				// Verify all required template variables are present with correct values
 				agentNameVar := findEnvVar(envVars, "AGENT_NAME")
 				Expect(agentNameVar).NotTo(BeNil())
-				Expect(agentNameVar.Value).To(Equal("test-agent"))
+				Expect(agentNameVar.Value).To(Equal("test_agent"))
 
 				agentDescVar := findEnvVar(envVars, "AGENT_DESCRIPTION")
 				Expect(agentDescVar).NotTo(BeNil())
@@ -1059,7 +1059,7 @@ var _ = Describe("Agent Controller", func() {
 		Describe("mergeEnvironmentVariables", func() {
 			It("should merge template and user variables with user precedence", func() {
 				templateVars := []corev1.EnvVar{
-					{Name: "AGENT_NAME", Value: "test-agent"},
+					{Name: "AGENT_NAME", Value: "test_agent"},
 					{Name: "AGENT_MODEL", Value: "default-model"},
 					{Name: "TEMPLATE_ONLY", Value: "template-value"},
 				}
@@ -1092,7 +1092,7 @@ var _ = Describe("Agent Controller", func() {
 				// Non-overridden template variable should remain
 				agentNameVar := findEnvVar(result, "AGENT_NAME")
 				Expect(agentNameVar).NotTo(BeNil())
-				Expect(agentNameVar.Value).To(Equal("test-agent"))
+				Expect(agentNameVar.Value).To(Equal("test_agent"))
 			})
 
 			It("should handle empty input slices", func() {
