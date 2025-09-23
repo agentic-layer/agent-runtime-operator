@@ -64,8 +64,7 @@ spec:
   interval: 5m
   url: oci://ghcr.io/agentic-layer/manifests/agent-runtime-operator
   ref:
-    # This will pull the latest version that is >=0.1.0 and <1.0.0.
-    semver: "^0.1.0"
+    semver: ">= 0, < 1"
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
