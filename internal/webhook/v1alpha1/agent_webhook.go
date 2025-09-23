@@ -47,6 +47,7 @@ var agentlog = logf.Log.WithName("agent-resource")
 func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.Agent{}).
 		WithDefaulter(&AgentCustomDefaulter{
+			DefaultFramework:     googleAdkFramework,
 			DefaultReplicas:      1,
 			DefaultPort:          8080,
 			DefaultPortGoogleAdk: 8000,
@@ -64,6 +65,7 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
 type AgentCustomDefaulter struct {
+	DefaultFramework     string
 	DefaultReplicas      int32
 	DefaultPort          int32
 	DefaultPortGoogleAdk int32
@@ -88,6 +90,11 @@ func (d *AgentCustomDefaulter) Default(_ context.Context, obj runtime.Object) er
 
 // applyDefaults applies default values to the Agent.
 func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
+	// Set default framework if not specified
+	if agent.Spec.Framework == "" {
+		agent.Spec.Framework = d.DefaultFramework
+	}
+
 	// Set default replicas if not specified
 	if agent.Spec.Replicas == nil {
 		agent.Spec.Replicas = new(int32)
