@@ -69,6 +69,20 @@ var _ = Describe("Manager", Ordered, func() {
 		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
+
+		sampleImages := []string{
+			"ghcr.io/agentic-layer/weather-agent:0.3.0",
+			"ghcr.io/agentic-layer/agent-template-adk:0.1.0",
+		}
+
+		By("loading the sample images on Kind")
+		for _, img := range sampleImages {
+			cmd = exec.Command("docker", "pull", img)
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to pull image ", img)
+			err = utils.LoadImageToKindClusterWithName(img)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load image ", img, " into Kind")
+		}
 	})
 
 	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
