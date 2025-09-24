@@ -9,11 +9,12 @@ spec:
   framework: google-adk
   image: ghcr.io/agentic-layer/weather-agent:0.3.0
   protocols:
-    - type: A2A
+    - type: A2A       # Will generate HTTP readiness probe: GET /a2a/.well-known/agent-card.json
+      port: 8000
   replicas: 1
   env:
     - name: PORT
-      value: "8080"
+      value: "8000"
     - name: LOG_LEVEL
       value: "info"
   envFrom:

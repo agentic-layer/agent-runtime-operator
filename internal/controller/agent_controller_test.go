@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,6 +118,437 @@ var _ = Describe("Agent Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(service.Spec.Ports).To(HaveLen(1))
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8000)))
+		})
+	})
+
+	Context("When testing health check probe generation", func() {
+		var reconciler *AgentReconciler
+
+		BeforeEach(func() {
+			reconciler = &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+		})
+
+		It("should generate HTTP probe for A2A agents", func() {
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+
+			probe := reconciler.generateReadinessProbe(agent)
+			Expect(probe).NotTo(BeNil())
+			Expect(probe.HTTPGet).NotTo(BeNil())
+			Expect(probe.HTTPGet.Path).To(Equal("/a2a/.well-known/agent-card.json"))
+			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000))
+			Expect(probe.InitialDelaySeconds).To(Equal(int32(10)))
+		})
+
+		It("should generate TCP probe for OpenAI-only agents", func() {
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "OpenAI", Port: 8000},
+					},
+				},
+			}
+
+			probe := reconciler.generateReadinessProbe(agent)
+			Expect(probe).NotTo(BeNil())
+			Expect(probe.TCPSocket).NotTo(BeNil())
+			Expect(probe.TCPSocket.Port.IntValue()).To(Equal(8000))
+			Expect(probe.InitialDelaySeconds).To(Equal(int32(10)))
+		})
+
+		It("should prioritize A2A probe over OpenAI when both protocols exist", func() {
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "OpenAI", Port: 3000},
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+
+			probe := reconciler.generateReadinessProbe(agent)
+			Expect(probe).NotTo(BeNil())
+			Expect(probe.HTTPGet).NotTo(BeNil())
+			Expect(probe.HTTPGet.Path).To(Equal("/a2a/.well-known/agent-card.json"))
+		})
+
+		It("should return nil probe for agents with no recognized protocols", func() {
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{},
+				},
+			}
+
+			probe := reconciler.generateReadinessProbe(agent)
+			Expect(probe).To(BeNil())
+		})
+
+		It("should correctly detect A2A protocol", func() {
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+
+			Expect(reconciler.hasA2AProtocol(agent)).To(BeTrue())
+			Expect(reconciler.hasOpenAIProtocol(agent)).To(BeFalse())
+		})
+
+		It("should correctly detect OpenAI protocol", func() {
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "OpenAI", Port: 3000},
+					},
+				},
+			}
+
+			Expect(reconciler.hasA2AProtocol(agent)).To(BeFalse())
+			Expect(reconciler.hasOpenAIProtocol(agent)).To(BeTrue())
+		})
+	})
+
+	Context("When testing probe comparison", func() {
+		var reconciler *AgentReconciler
+
+		BeforeEach(func() {
+			reconciler = &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+		})
+
+		It("should consider nil probes as equal", func() {
+			Expect(reconciler.probesEqual(nil, nil)).To(BeTrue())
+		})
+
+		It("should consider nil and non-nil probes as not equal", func() {
+			probe := &corev1.Probe{InitialDelaySeconds: 10}
+			Expect(reconciler.probesEqual(nil, probe)).To(BeFalse())
+			Expect(reconciler.probesEqual(probe, nil)).To(BeFalse())
+		})
+
+		It("should compare HTTP probes correctly", func() {
+			probe1 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/a2a/.well-known/agent-card.json",
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+			}
+			probe2 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/a2a/.well-known/agent-card.json",
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+			}
+
+			Expect(reconciler.probesEqual(probe1, probe2)).To(BeTrue())
+		})
+
+		It("should detect different HTTP probe paths", func() {
+			probe1 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/a2a/.well-known/agent-card.json",
+						Port: intstr.FromInt(8000),
+					},
+				},
+			}
+			probe2 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/health",
+						Port: intstr.FromInt(8000),
+					},
+				},
+			}
+
+			Expect(reconciler.probesEqual(probe1, probe2)).To(BeFalse())
+		})
+
+		It("should compare TCP probes correctly", func() {
+			probe1 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+			}
+			probe2 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+			}
+
+			Expect(reconciler.probesEqual(probe1, probe2)).To(BeTrue())
+		})
+
+		It("should detect different TCP probe ports", func() {
+			probe1 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+			}
+			probe2 := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(3000),
+					},
+				},
+			}
+
+			Expect(reconciler.probesEqual(probe1, probe2)).To(BeFalse())
+		})
+
+		It("should detect mixed probe types as different", func() {
+			httpProbe := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/a2a/.well-known/agent-card.json",
+						Port: intstr.FromInt(8000),
+					},
+				},
+			}
+			tcpProbe := &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+			}
+
+			Expect(reconciler.probesEqual(httpProbe, tcpProbe)).To(BeFalse())
+		})
+	})
+
+	Context("When testing deployment updates with probe changes", func() {
+		var reconciler *AgentReconciler
+
+		BeforeEach(func() {
+			reconciler = &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+		})
+
+		It("should trigger update when probe changes from HTTP to TCP", func() {
+			// Create existing deployment with HTTP probe (A2A agent)
+			existingAgent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test:v1",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			existingDeployment, err := reconciler.createDeploymentForAgent(existingAgent, "test-agent")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create desired deployment with TCP probe (OpenAI agent)
+			desiredAgent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test:v1",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "OpenAI", Port: 8000},
+					},
+				},
+			}
+			desiredDeployment, err := reconciler.createDeploymentForAgent(desiredAgent, "test-agent")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify update is needed due to probe change
+			updateNeeded := reconciler.needsDeploymentUpdate(existingDeployment, desiredDeployment)
+			Expect(updateNeeded).To(BeTrue())
+
+			// Verify existing has HTTP probe
+			existingContainer := reconciler.findAgentContainer(existingDeployment.Spec.Template.Spec.Containers)
+			Expect(existingContainer.ReadinessProbe).NotTo(BeNil())
+			Expect(existingContainer.ReadinessProbe.HTTPGet).NotTo(BeNil())
+
+			// Verify desired has TCP probe
+			desiredContainer := reconciler.findAgentContainer(desiredDeployment.Spec.Template.Spec.Containers)
+			Expect(desiredContainer.ReadinessProbe).NotTo(BeNil())
+			Expect(desiredContainer.ReadinessProbe.TCPSocket).NotTo(BeNil())
+		})
+
+		It("should trigger update when probe path changes", func() {
+			// Create existing deployment with old health endpoint
+			replicas := int32(1)
+			existingDeployment := &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "agent",
+									Image: "test:v1",
+									ReadinessProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Path: "/health", // Old endpoint
+												Port: intstr.FromInt(8000),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			// Create desired deployment with A2A endpoint
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Image: "test:v1",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			desiredDeployment, err := reconciler.createDeploymentForAgent(agent, "test-agent")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify update is needed due to path change
+			updateNeeded := reconciler.needsDeploymentUpdate(existingDeployment, desiredDeployment)
+			Expect(updateNeeded).To(BeTrue())
+
+			// Verify path difference
+			existingContainer := reconciler.findAgentContainer(existingDeployment.Spec.Template.Spec.Containers)
+			desiredContainer := reconciler.findAgentContainer(desiredDeployment.Spec.Template.Spec.Containers)
+
+			Expect(existingContainer.ReadinessProbe.HTTPGet.Path).To(Equal("/health"))
+			Expect(desiredContainer.ReadinessProbe.HTTPGet.Path).To(Equal("/a2a/.well-known/agent-card.json"))
+		})
+
+		It("should not trigger update when probes are identical", func() {
+			// Create two identical A2A agents
+			agent1 := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test:v1",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			deployment1, err := reconciler.createDeploymentForAgent(agent1, "test-agent")
+			Expect(err).NotTo(HaveOccurred())
+
+			agent2 := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test:v1",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			deployment2, err := reconciler.createDeploymentForAgent(agent2, "test-agent")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify no update needed
+			updateNeeded := reconciler.needsDeploymentUpdate(deployment1, deployment2)
+			Expect(updateNeeded).To(BeFalse())
+		})
+
+		It("should trigger update when adding probe to agent without probe", func() {
+			// Create existing deployment without probe
+			replicas := int32(1)
+			existingDeployment := &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:           "agent",
+									Image:          "test:v1",
+									ReadinessProbe: nil, // No probe
+								},
+							},
+						},
+					},
+				},
+			}
+
+			// Create desired deployment with A2A probe
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Image: "test:v1",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			desiredDeployment, err := reconciler.createDeploymentForAgent(agent, "test-agent")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify update is needed (nil -> probe)
+			updateNeeded := reconciler.needsDeploymentUpdate(existingDeployment, desiredDeployment)
+			Expect(updateNeeded).To(BeTrue())
+		})
+
+		It("should trigger update when removing probe from agent", func() {
+			// Create existing deployment with A2A probe
+			agent := &runtimev1alpha1.Agent{
+				Spec: runtimev1alpha1.AgentSpec{
+					Image: "test:v1",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			existingDeployment, err := reconciler.createDeploymentForAgent(agent, "test-agent")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create desired deployment without probe
+			replicas2 := int32(1)
+			desiredDeployment := &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas2,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:           "agent",
+									Image:          "test:v1",
+									ReadinessProbe: nil, // No probe
+								},
+							},
+						},
+					},
+				},
+			}
+
+			// Verify update is needed (probe -> nil)
+			updateNeeded := reconciler.needsDeploymentUpdate(existingDeployment, desiredDeployment)
+			Expect(updateNeeded).To(BeTrue())
 		})
 	})
 

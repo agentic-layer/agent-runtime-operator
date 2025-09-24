@@ -356,6 +356,64 @@ func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars
 	return result
 }
 
+// hasA2AProtocol checks if the agent has A2A protocol configured
+func (r *AgentReconciler) hasA2AProtocol(agent *runtimev1alpha1.Agent) bool {
+	for _, protocol := range agent.Spec.Protocols {
+		if protocol.Type == "A2A" {
+			return true
+		}
+	}
+	return false
+}
+
+// hasOpenAIProtocol checks if the agent has OpenAI protocol configured
+func (r *AgentReconciler) hasOpenAIProtocol(agent *runtimev1alpha1.Agent) bool {
+	for _, protocol := range agent.Spec.Protocols {
+		if protocol.Type == "OpenAI" {
+			return true
+		}
+	}
+	return false
+}
+
+// generateReadinessProbe generates appropriate readiness probe based on agent protocols
+func (r *AgentReconciler) generateReadinessProbe(agent *runtimev1alpha1.Agent) *corev1.Probe {
+	// Priority: A2A > OpenAI > None
+	if r.hasA2AProtocol(agent) {
+		// Use A2A agent card endpoint for health check
+		return &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/a2a/.well-known/agent-card.json",
+					Port: intstr.FromInt(8000),
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       5,
+			TimeoutSeconds:      3,
+			SuccessThreshold:    1,
+			FailureThreshold:    3,
+		}
+	} else if r.hasOpenAIProtocol(agent) {
+		// Use TCP probe for OpenAI-only agents
+		return &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(8000),
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       5,
+			TimeoutSeconds:      3,
+			SuccessThreshold:    1,
+			FailureThreshold:    3,
+		}
+	}
+
+	// No recognized protocols - no readiness probe
+	return nil
+}
+
 // createDeploymentForAgent creates a deployment for the given Agent
 func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent, deploymentName string) (*appsv1.Deployment, error) {
 	replicas := agent.Spec.Replicas
@@ -416,11 +474,12 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    agentContainerName,
-							Image:   agentImage,
-							Ports:   containerPorts,
-							Env:     allEnvVars,
-							EnvFrom: agent.Spec.EnvFrom,
+							Name:           agentContainerName,
+							Image:          agentImage,
+							Ports:          containerPorts,
+							Env:            allEnvVars,
+							EnvFrom:        agent.Spec.EnvFrom,
+							ReadinessProbe: r.generateReadinessProbe(agent),
 						},
 					},
 				},
@@ -524,6 +583,11 @@ func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deploy
 		return true
 	}
 
+	// Check readiness probes
+	if !r.probesEqual(existingContainer.ReadinessProbe, desiredContainer.ReadinessProbe) {
+		return true
+	}
+
 	return false
 }
 
@@ -559,6 +623,7 @@ func (r *AgentReconciler) updateAgentContainer(deployment, desiredDeployment *ap
 	agentContainer.Ports = desiredAgentContainer.Ports
 	agentContainer.Env = desiredAgentContainer.Env
 	agentContainer.EnvFrom = desiredAgentContainer.EnvFrom
+	agentContainer.ReadinessProbe = desiredAgentContainer.ReadinessProbe
 
 	return nil
 }
@@ -661,6 +726,44 @@ func (r *AgentReconciler) servicePortsEqual(existing, desired []corev1.ServicePo
 	}
 
 	return true
+}
+
+// probesEqual compares two readiness probes for equality
+func (r *AgentReconciler) probesEqual(existing, desired *corev1.Probe) bool {
+	// Both nil - equal
+	if existing == nil && desired == nil {
+		return true
+	}
+
+	// One nil, one not - not equal
+	if existing == nil || desired == nil {
+		return false
+	}
+
+	// Compare probe settings
+	if existing.InitialDelaySeconds != desired.InitialDelaySeconds ||
+		existing.PeriodSeconds != desired.PeriodSeconds ||
+		existing.TimeoutSeconds != desired.TimeoutSeconds ||
+		existing.SuccessThreshold != desired.SuccessThreshold ||
+		existing.FailureThreshold != desired.FailureThreshold {
+		return false
+	}
+
+	// Compare HTTP Get actions
+	if existing.HTTPGet != nil && desired.HTTPGet != nil {
+		return existing.HTTPGet.Path == desired.HTTPGet.Path &&
+			existing.HTTPGet.Port == desired.HTTPGet.Port &&
+			existing.HTTPGet.Scheme == desired.HTTPGet.Scheme
+	}
+
+	// Compare TCP Socket actions
+	if existing.TCPSocket != nil && desired.TCPSocket != nil {
+		return existing.TCPSocket.Port == desired.TCPSocket.Port
+	}
+
+	// Different probe handler types or one nil - not equal
+	return (existing.HTTPGet == nil && desired.HTTPGet == nil) &&
+		(existing.TCPSocket == nil && desired.TCPSocket == nil)
 }
 
 // sanitizeAgentName sanitizes the agent name to meet environment variable naming requirements.
