@@ -207,8 +207,8 @@ var _ = Describe("Agent Controller", func() {
 
 			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
 			Expect(agentContainer).NotTo(BeNil())
-			// Now expect 6 template environment variables
-			Expect(agentContainer.Env).To(HaveLen(6))
+			// Now expect 7 template environment variables (6 original + A2A_AGENT_CARD_URL)
+			Expect(agentContainer.Env).To(HaveLen(7))
 			// Check AGENT_NAME env var
 			agentNameVar := findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
@@ -235,8 +235,8 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
 			agentContainer = findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
 			Expect(agentContainer).NotTo(BeNil())
-			// Now expect 6 template environment variables
-			Expect(agentContainer.Env).To(HaveLen(6))
+			// Now expect 7 template environment variables (6 original + A2A_AGENT_CARD_URL)
+			Expect(agentContainer.Env).To(HaveLen(7))
 			// Check AGENT_NAME env var
 			agentNameVar = findEnvVar(agentContainer.Env, "AGENT_NAME")
 			Expect(agentNameVar).NotTo(BeNil())
@@ -463,8 +463,8 @@ var _ = Describe("Agent Controller", func() {
 			agentContainer := findAgentContainerHelper(deployment.Spec.Template.Spec.Containers)
 			Expect(agentContainer).NotTo(BeNil())
 
-			// Check for the new env var and template env vars (6 template + 1 user = 7 total)
-			Expect(agentContainer.Env).To(HaveLen(7))
+			// Check for the new env var and template env vars (6 original template + A2A_AGENT_CARD_URL + 1 user = 8 total)
+			Expect(agentContainer.Env).To(HaveLen(8))
 			Expect(agentContainer.Env).To(ContainElement(newEnvVar))
 			Expect(agentContainer.Env).To(ContainElement(corev1.EnvVar{
 				Name:  "AGENT_NAME",
@@ -1134,6 +1134,115 @@ var _ = Describe("Agent Controller", func() {
 				Expect(result[1].Value).To(Equal("user-b")) // But with user value
 				Expect(result[2].Name).To(Equal("C"))
 			})
+		})
+	})
+
+	Context("When testing A2A_AGENT_CARD_URL generation", func() {
+		var reconciler *AgentReconciler
+
+		BeforeEach(func() {
+			reconciler = &AgentReconciler{}
+		})
+
+		It("should generate correct A2A_AGENT_CARD_URL when A2A protocol is present", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent",
+					Namespace: "test-namespace",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{
+							Type: "A2A",
+							Port: 8080,
+							Name: "a2a",
+						},
+					},
+				},
+			}
+
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Find the A2A_AGENT_CARD_URL variable
+			a2aUrlVar := findEnvVar(templateVars, "A2A_AGENT_CARD_URL")
+			Expect(a2aUrlVar).NotTo(BeNil())
+			Expect(a2aUrlVar.Value).To(Equal("http://test-agent.test-namespace.svc.cluster.local:8080/.well-known/agent-card.json"))
+		})
+
+		It("should not generate A2A_AGENT_CARD_URL when no A2A protocol is present", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent",
+					Namespace: "test-namespace",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{
+							Type: "OpenAI",
+							Port: 8000,
+							Name: "openai",
+						},
+					},
+				},
+			}
+
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			// A2A_AGENT_CARD_URL should not be present
+			a2aUrlVar := findEnvVar(templateVars, "A2A_AGENT_CARD_URL")
+			Expect(a2aUrlVar).To(BeNil())
+		})
+
+		It("should not generate A2A_AGENT_CARD_URL when no protocols are defined", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent",
+					Namespace: "test-namespace",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{},
+				},
+			}
+
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			// A2A_AGENT_CARD_URL should not be present
+			a2aUrlVar := findEnvVar(templateVars, "A2A_AGENT_CARD_URL")
+			Expect(a2aUrlVar).To(BeNil())
+		})
+
+		It("should use the first A2A protocol when multiple A2A protocols are defined", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent",
+					Namespace: "test-namespace",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{
+							Type: "A2A",
+							Port: 8080,
+							Name: "a2a-first",
+						},
+						{
+							Type: "A2A",
+							Port: 9090,
+							Name: "a2a-second",
+						},
+					},
+				},
+			}
+
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Should use the first A2A protocol
+			a2aUrlVar := findEnvVar(templateVars, "A2A_AGENT_CARD_URL")
+			Expect(a2aUrlVar).NotTo(BeNil())
+			Expect(a2aUrlVar.Value).To(Equal("http://test-agent.test-namespace.svc.cluster.local:8080/.well-known/agent-card.json"))
 		})
 	})
 })

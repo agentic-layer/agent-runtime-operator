@@ -248,6 +248,15 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 		Value: agent.Spec.Model,
 	})
 
+	// A2A_AGENT_CARD_URL - construct URL from A2A protocol if present
+	a2aUrl := r.buildA2AAgentCardUrl(agent)
+	if a2aUrl != "" {
+		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+			Name:  "A2A_AGENT_CARD_URL",
+			Value: a2aUrl,
+		})
+	}
+
 	// SUB_AGENTS - always set, with empty object if no subagents
 	var subAgentsJSON []byte
 	var err error
@@ -692,6 +701,20 @@ func (r *AgentReconciler) sanitizeAgentName(name string) string {
 	}
 
 	return sanitized
+}
+
+// buildA2AAgentCardUrl constructs the fully qualified Kubernetes internal URL for the A2A agent card.
+// The URL format is: http://{agent.Name}.{agent.Namespace}.svc.cluster.local:{port}/.well-known/agent-card.json
+// Returns empty string if no A2A protocol is configured.
+func (r *AgentReconciler) buildA2AAgentCardUrl(agent *runtimev1alpha1.Agent) string {
+	// Find the A2A protocol
+	for _, protocol := range agent.Spec.Protocols {
+		if protocol.Type == "A2A" {
+			return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/.well-known/agent-card.json",
+				agent.Name, agent.Namespace, protocol.Port)
+		}
+	}
+	return ""
 }
 
 // SetupWithManager sets up the controller with the Manager.
