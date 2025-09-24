@@ -83,6 +83,10 @@ make docker-push
 - **Agent Controller** (`internal/controller/agent_controller.go`): Reconciles Agent resources by:
   - Creating Kubernetes Deployments for agent workloads
   - Managing Services for protocol exposure
+  - **Protocol-aware health checking**: Automatically generates appropriate readiness probes
+    - A2A agents: HTTP GET `/a2a/.well-known/agent-card.json` (validates agent functionality)
+    - OpenAI agents: TCP socket probe (validates service availability)
+    - No protocols: No readiness probe
   - Handling framework-specific configurations
 
 - **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent resources
@@ -99,8 +103,10 @@ make docker-push
 │   ├── webhook/          # Webhook configurations
 │   └── samples/          # Example Agent resources
 ├── internal/
-│   ├── controller/       # Reconciliation logic
+│   ├── controller/       # Reconciliation logic and health check implementation
 │   └── webhook/          # Admission webhook handlers
+├── docs/
+│   └── examples/        # Health check implementation examples
 └── test/
     ├── e2e/             # End-to-end tests
     └── utils/           # Test utilities
@@ -175,6 +181,51 @@ spec:
 - E2E tests automatically create/teardown Kind clusters
 - Tests cover controller reconciliation and webhook validation
 - Use `make test` for unit tests, `make test-e2e` for end-to-end tests
+
+## Health Check Architecture
+
+The operator implements **protocol-aware health checking** that automatically generates appropriate Kubernetes readiness probes based on agent protocol specifications:
+
+### Protocol-Based Health Checks
+
+**A2A Agents (Agent-to-Agent Protocol):**
+- **Probe Type**: HTTP GET request
+- **Endpoint**: `/a2a/.well-known/agent-card.json`
+- **Port**: 8000 (default)
+- **Purpose**: Validates that A2A framework is initialized and agent skills are loaded
+- **Benefits**: Meaningful readiness signal that confirms agent functionality, not just HTTP server availability
+
+**OpenAI Compatible Agents:**
+- **Probe Type**: TCP socket connection
+- **Port**: 8000 (or specified protocol port)
+- **Purpose**: Validates service is listening and accepting connections
+- **Benefits**: Lightweight health check suitable for stateless API endpoints
+
+**Agents without Recognized Protocols:**
+- **Probe Type**: None (no readiness probe generated)
+- **Purpose**: Allows custom health checking or agents that don't need readiness validation
+
+### Implementation Details
+
+The health check logic is implemented in `internal/controller/agent_controller.go`:
+
+- `generateReadinessProbe()`: Creates appropriate probe configuration based on agent protocols
+- `hasA2AProtocol()`: Detects A2A protocol in agent specification
+- `hasOpenAIProtocol()`: Detects OpenAI protocol in agent specification
+- `probesEqual()`: Compares probe configurations to determine if deployment updates are needed
+
+### Migration from Legacy Health Endpoints
+
+**Previous Approach (Deprecated):**
+- Generic `/health` endpoints in each agent
+- Only validated HTTP server availability
+- Required manual implementation in every agent
+
+**Current Approach (Recommended):**
+- Operator-managed, protocol-aware health checking
+- Validates actual agent functionality for A2A agents
+- Zero health code required in agents
+- Centralized management and consistent behavior
 
 ## Configuration
 
