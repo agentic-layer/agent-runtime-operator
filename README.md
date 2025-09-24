@@ -150,7 +150,7 @@ spec:
   framework: google-adk  # Currently only google-adk supports templates
   description: "A helpful weather information agent"
   instruction: "You are a weather agent that provides current weather information and forecasts."
-  model: "gemini/gemini-2.0-flash"
+  model: "gemini/gemini-2.5-flash"
   subAgents:
     - name: forecast_agent
       url: "https://example.com/forecast-agent.json"

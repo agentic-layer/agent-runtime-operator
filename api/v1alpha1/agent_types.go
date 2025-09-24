@@ -92,7 +92,7 @@ type AgentSpec struct {
 	// +optional
 	// Model specifies the language model to use for the agent.
 	// This is passed as AGENT_MODEL environment variable to the agent.
-	// Defaults to "gemini/gemini-2.0-flash" if not specified.
+	// Defaults to the agents default model if not specified.
 	Model string `json:"model,omitempty"`
 
 	// +optional

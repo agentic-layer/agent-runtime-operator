@@ -299,7 +299,7 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				By("verifying that template image is set")
-				Expect(obj.Spec.Image).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"))
+				Expect(obj.Spec.Image).To(Equal(DefaultTemplateImageAdk))
 			})
 
 			It("Should set fallback image for unknown framework when no image specified", func() {
@@ -450,7 +450,7 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.Tools[0].Url).To(Equal("https://news.mcpservers.org/mcp"))
 
 				By("verifying that template image is still set")
-				Expect(obj.Spec.Image).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"))
+				Expect(obj.Spec.Image).To(Equal(DefaultTemplateImageAdk))
 			})
 
 			It("Should work with empty template fields", func() {
@@ -470,7 +470,7 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.Tools).To(BeEmpty())
 
 				By("verifying that template image is still set")
-				Expect(obj.Spec.Image).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"))
+				Expect(obj.Spec.Image).To(Equal(DefaultTemplateImageAdk))
 			})
 		})
 

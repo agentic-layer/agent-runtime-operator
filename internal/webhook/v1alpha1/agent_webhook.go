@@ -35,7 +35,7 @@ import (
 
 const (
 	googleAdkFramework           = "google-adk"
-	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.2.0"
+	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.2.0"
 	defaultTemplateImageFallback = "invalid"
 )
 
@@ -105,7 +105,7 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 	if agent.Spec.Image == "" {
 		switch agent.Spec.Framework {
 		case googleAdkFramework:
-			agent.Spec.Image = defaultTemplateImageAdk
+			agent.Spec.Image = DefaultTemplateImageAdk
 		default:
 			// Validation will catch unsupported frameworks without images
 			// This shouldn't be reached due to validation, but set template as fallback

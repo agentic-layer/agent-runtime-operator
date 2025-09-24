@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	webhookv1alpha1 "github.com/agentic-layer/agent-runtime-operator/internal/webhook/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -598,10 +599,10 @@ var _ = Describe("Agent Controller", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Framework:   "google-adk",
-					Image:       "ghcr.io/agentic-layer/agent-template-adk:0.1.0",
+					Image:       webhookv1alpha1.DefaultTemplateImageAdk,
 					Description: "A test template agent",
 					Instruction: "You are a helpful assistant",
-					Model:       "gemini/gemini-2.0-flash",
+					Model:       "gemini/gemini-2.5-flash",
 					Protocols: []runtimev1alpha1.AgentProtocol{
 						{
 							Type: "A2A",
@@ -669,7 +670,7 @@ var _ = Describe("Agent Controller", func() {
 
 			agentModelVar := findEnvVar(agentContainer.Env, "AGENT_MODEL")
 			Expect(agentModelVar).NotTo(BeNil())
-			Expect(agentModelVar.Value).To(Equal("gemini/gemini-2.0-flash"))
+			Expect(agentModelVar.Value).To(Equal("gemini/gemini-2.5-flash"))
 
 			// Verify JSON-encoded fields
 			subAgentsVar := findEnvVar(agentContainer.Env, "SUB_AGENTS")
@@ -750,7 +751,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Framework: "google-adk",
-					Image:     "ghcr.io/agentic-layer/agent-template-adk:0.1.0",
+					Image:     webhookv1alpha1.DefaultTemplateImageAdk,
 					// All template fields are empty
 					Protocols: []runtimev1alpha1.AgentProtocol{
 						{

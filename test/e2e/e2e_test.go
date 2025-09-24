@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
+	webhookv1alpha1 "github.com/agentic-layer/agent-runtime-operator/internal/webhook/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -72,7 +73,7 @@ var _ = Describe("Manager", Ordered, func() {
 
 		sampleImages := []string{
 			"ghcr.io/agentic-layer/weather-agent:0.3.0",
-			"ghcr.io/agentic-layer/agent-template-adk:0.1.0",
+			webhookv1alpha1.DefaultTemplateImageAdk,
 		}
 
 		By("loading the sample images on Kind")
@@ -516,7 +517,7 @@ var _ = Describe("Manager", Ordered, func() {
 					"-o", "jsonpath={.spec.template.spec.containers[0].image}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.1.0"), "Should use template image")
+				g.Expect(output).To(Equal(webhookv1alpha1.DefaultTemplateImageAdk), "Should use template image")
 			}
 			Eventually(verifyTemplateImage).Should(Succeed())
 
@@ -541,7 +542,7 @@ var _ = Describe("Manager", Ordered, func() {
 					"-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='AGENT_MODEL')].value}")
 				output, err = utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("gemini/gemini-2.0-flash"), "AGENT_MODEL should be set correctly")
+				g.Expect(output).To(Equal("gemini/gemini-2.5-flash"), "AGENT_MODEL should be set correctly")
 			}
 			Eventually(verifyTemplateEnvironmentVariables).Should(Succeed())
 		})
