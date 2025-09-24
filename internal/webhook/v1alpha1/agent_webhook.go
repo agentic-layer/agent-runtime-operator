@@ -35,7 +35,7 @@ import (
 
 const (
 	googleAdkFramework           = "google-adk"
-	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.1.0"
+	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.2.0"
 	defaultTemplateImageFallback = "invalid"
 )
 
