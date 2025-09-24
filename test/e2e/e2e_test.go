@@ -395,21 +395,6 @@ var _ = Describe("Manager", Ordered, func() {
 			}
 			Eventually(verifyDeploymentReady, 3*time.Minute).Should(Succeed())
 
-			By("verifying the weather agent service is created")
-			verifyServiceExists := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "service", weatherAgentName, "-n", testNamespace)
-				_, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-
-				// Verify service has the expected port
-				cmd = exec.Command("kubectl", "get", "service", weatherAgentName, "-n", testNamespace,
-					"-o", "jsonpath={.spec.ports[0].port}")
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("8000"), "Service should expose port 8000")
-			}
-			Eventually(verifyServiceExists).Should(Succeed())
-
 			By("verifying the weather agent pod is healthy")
 			verifyPodHealthy := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "pods", "-l", "app="+weatherAgentName, "-n", testNamespace,
@@ -478,21 +463,6 @@ var _ = Describe("Manager", Ordered, func() {
 				g.Expect(output).To(Equal("True"), "Deployment should be available")
 			}
 			Eventually(verifyDeploymentReady, 3*time.Minute).Should(Succeed())
-
-			By("verifying the news agent service is created")
-			verifyServiceExists := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "service", newsAgentName, "-n", testNamespace)
-				_, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-
-				// Verify service has the expected port (google-adk default port 8000)
-				cmd = exec.Command("kubectl", "get", "service", newsAgentName, "-n", testNamespace,
-					"-o", "jsonpath={.spec.ports[0].port}")
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("8000"), "Service should expose port 8000")
-			}
-			Eventually(verifyServiceExists).Should(Succeed())
 
 			By("verifying the news agent pod is healthy")
 			verifyPodHealthy := func(g Gomega) {

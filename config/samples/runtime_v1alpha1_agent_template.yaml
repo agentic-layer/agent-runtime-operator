@@ -18,8 +18,6 @@ spec:
       url: "https://news.mcpservers.org/fetch/mcp"
     - name: web_fetch
       url: "https://remote.mcpservers.org/fetch/mcp"
-  protocols:
-    - type: A2A
   replicas: 1
   env:
     - name: LOG_LEVEL
