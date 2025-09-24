@@ -1156,6 +1156,7 @@ var _ = Describe("Agent Controller", func() {
 							Type: "A2A",
 							Port: 8080,
 							Name: "a2a",
+							Path: "/.well-known/agent-card.json",
 						},
 					},
 				},
@@ -1182,6 +1183,7 @@ var _ = Describe("Agent Controller", func() {
 							Type: "OpenAI",
 							Port: 8000,
 							Name: "openai",
+							Path: "/v1/chat/completions",
 						},
 					},
 				},
@@ -1226,11 +1228,13 @@ var _ = Describe("Agent Controller", func() {
 							Type: "A2A",
 							Port: 8080,
 							Name: "a2a-first",
+							Path: "/a2a",
 						},
 						{
 							Type: "A2A",
 							Port: 9090,
 							Name: "a2a-second",
+							Path: "/",
 						},
 					},
 				},
@@ -1242,7 +1246,7 @@ var _ = Describe("Agent Controller", func() {
 			// Should use the first A2A protocol
 			a2aUrlVar := findEnvVar(templateVars, "A2A_AGENT_CARD_URL")
 			Expect(a2aUrlVar).NotTo(BeNil())
-			Expect(a2aUrlVar.Value).To(Equal("http://test-agent.test-namespace.svc.cluster.local:8080/.well-known/agent-card.json"))
+			Expect(a2aUrlVar.Value).To(Equal("http://test-agent.test-namespace.svc.cluster.local:8080/a2a"))
 		})
 	})
 })

@@ -710,8 +710,8 @@ func (r *AgentReconciler) buildA2AAgentCardUrl(agent *runtimev1alpha1.Agent) str
 	// Find the A2A protocol
 	for _, protocol := range agent.Spec.Protocols {
 		if protocol.Type == "A2A" {
-			return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/.well-known/agent-card.json",
-				agent.Name, agent.Namespace, protocol.Port)
+			return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d%s",
+				agent.Name, agent.Namespace, protocol.Port, protocol.Path)
 		}
 	}
 	return ""
