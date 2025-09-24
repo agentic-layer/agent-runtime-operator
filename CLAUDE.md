@@ -37,6 +37,11 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
 - **Agent Controller** (`internal/controller/agent_controller.go`): Reconciles Agent resources by:
   - Creating Kubernetes Deployments for agent workloads
   - Managing Services for protocol exposure
+  - **Protocol-aware health checking**: Automatically generates appropriate readiness probes
+    - A2A agents: HTTP GET with configurable paths (validates agent functionality)
+    - OpenAI agents: TCP socket probe (validates service availability)
+    - Priority: A2A > OpenAI > No probe
+    - No protocols: No readiness probe
   - Handling framework-specific configurations
 
 - **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent resources

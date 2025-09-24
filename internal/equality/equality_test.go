@@ -7,6 +7,7 @@ import (
 
 	"github.com/agentic-layer/agent-runtime-operator/internal/equality"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // A helper function to easily get a pointer to a bool, as required by the 'Optional' field.
@@ -216,6 +217,154 @@ func TestEnvFromEqual(t *testing.T) {
 			got := equality.EnvFromEqual(tc.a, tc.b)
 			if got != tc.want {
 				t.Errorf("EnvFromEqual() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestProbesEqual(t *testing.T) {
+	testCases := []struct {
+		name string
+		a    *corev1.Probe
+		b    *corev1.Probe
+		want bool
+	}{
+		{
+			name: "should be equal for both nil",
+			a:    nil,
+			b:    nil,
+			want: true,
+		},
+		{
+			name: "should not be equal for one nil",
+			a:    nil,
+			b:    &corev1.Probe{InitialDelaySeconds: 10},
+			want: false,
+		},
+		{
+			name: "should not be equal for other nil",
+			a:    &corev1.Probe{InitialDelaySeconds: 10},
+			b:    nil,
+			want: false,
+		},
+		{
+			name: "should be equal for identical HTTP probes",
+			a: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/health",
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       5,
+			},
+			b: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/health",
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       5,
+			},
+			want: true,
+		},
+		{
+			name: "should be equal for identical TCP probes",
+			a: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+			},
+			b: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+				InitialDelaySeconds: 10,
+			},
+			want: true,
+		},
+		{
+			name: "should not be equal for different HTTP paths",
+			a: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/health",
+						Port: intstr.FromInt(8000),
+					},
+				},
+			},
+			b: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/readiness",
+						Port: intstr.FromInt(8000),
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "should not be equal for different ports",
+			a: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+			},
+			b: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(3000),
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "should not be equal for different probe types",
+			a: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/health",
+						Port: intstr.FromInt(8000),
+					},
+				},
+			},
+			b: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(8000),
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "should not be equal for different timing settings",
+			a: &corev1.Probe{
+				InitialDelaySeconds: 10,
+			},
+			b: &corev1.Probe{
+				InitialDelaySeconds: 15,
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := equality.ProbesEqual(tc.a, tc.b)
+			if got != tc.want {
+				t.Errorf("ProbesEqual() = %v, want %v", got, tc.want)
 			}
 		})
 	}

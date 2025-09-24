@@ -39,6 +39,8 @@ import (
 
 const (
 	agentContainerName = "agent"
+	agentCardEndpoint  = "/.well-known/agent-card.json"
+	a2AProtocol        = "A2A"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -356,6 +358,98 @@ func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars
 	return result
 }
 
+// hasA2AProtocol checks if the agent has A2A protocol configured
+func (r *AgentReconciler) hasA2AProtocol(agent *runtimev1alpha1.Agent) bool {
+	for _, protocol := range agent.Spec.Protocols {
+
+		if protocol.Type == a2AProtocol {
+			return true
+		}
+	}
+	return false
+}
+
+// hasOpenAIProtocol checks if the agent has OpenAI protocol configured
+func (r *AgentReconciler) hasOpenAIProtocol(agent *runtimev1alpha1.Agent) bool {
+	for _, protocol := range agent.Spec.Protocols {
+		if protocol.Type == "OpenAI" {
+			return true
+		}
+	}
+	return false
+}
+
+// getA2AProtocol returns the first A2A protocol configuration found
+func (r *AgentReconciler) getA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
+	for _, protocol := range agent.Spec.Protocols {
+		if protocol.Type == a2AProtocol {
+			return &protocol
+		}
+	}
+	return nil
+}
+
+// getOpenAIProtocol returns the first OpenAI protocol configuration found
+func (r *AgentReconciler) getOpenAIProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
+	for _, protocol := range agent.Spec.Protocols {
+		if protocol.Type == "OpenAI" {
+			return &protocol
+		}
+	}
+	return nil
+}
+
+// getProtocolPort returns the port from protocol or default if not specified
+func (r *AgentReconciler) getProtocolPort(protocol *runtimev1alpha1.AgentProtocol) int32 {
+	defaultPort := int32(8000) // Default port if none specified
+	if protocol != nil && protocol.Port != 0 {
+		return protocol.Port
+	}
+	return defaultPort
+}
+
+// getA2AHealthPath returns the A2A health check path based on protocol configuration
+func (r *AgentReconciler) getA2AHealthPath(protocol *runtimev1alpha1.AgentProtocol) string {
+	if protocol != nil && protocol.Path != "" {
+		// If path is explicitly specified, use it
+		// Special case: "/" means root path (no prefix)
+		if protocol.Path == "/" {
+			return agentCardEndpoint
+		}
+		return protocol.Path + agentCardEndpoint
+	}
+	// Default for agents without protocol specification or path
+	return "/a2a" + agentCardEndpoint
+}
+
+// generateReadinessProbe generates appropriate readiness probe based on agent protocols
+func (r *AgentReconciler) generateReadinessProbe(agent *runtimev1alpha1.Agent) *corev1.Probe {
+	// Check if agent has external dependencies (subAgents or tools)
+
+	// Priority: A2A > OpenAI > None
+	if r.hasA2AProtocol(agent) {
+		// Use A2A agent card endpoint for health check
+		a2aProtocol := r.getA2AProtocol(agent)
+		healthPath := r.getA2AHealthPath(a2aProtocol)
+		port := r.getProtocolPort(a2aProtocol)
+
+		probe := r.buildA2AReadinessProbe(healthPath, port)
+
+		return probe
+	} else if r.hasOpenAIProtocol(agent) {
+		// Use TCP probe for OpenAI-only agents
+		openaiProtocol := r.getOpenAIProtocol(agent)
+		port := r.getProtocolPort(openaiProtocol)
+
+		probe := r.buildOpenAIReadinessProbe(port)
+
+		return probe
+	}
+
+	// No recognized protocols - no readiness probe
+	return nil
+}
+
 // createDeploymentForAgent creates a deployment for the given Agent
 func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent, deploymentName string) (*appsv1.Deployment, error) {
 	replicas := agent.Spec.Replicas
@@ -416,11 +510,12 @@ func (r *AgentReconciler) createDeploymentForAgent(agent *runtimev1alpha1.Agent,
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    agentContainerName,
-							Image:   agentImage,
-							Ports:   containerPorts,
-							Env:     allEnvVars,
-							EnvFrom: agent.Spec.EnvFrom,
+							Name:           agentContainerName,
+							Image:          agentImage,
+							Ports:          containerPorts,
+							Env:            allEnvVars,
+							EnvFrom:        agent.Spec.EnvFrom,
+							ReadinessProbe: r.generateReadinessProbe(agent),
 						},
 					},
 				},
@@ -524,6 +619,11 @@ func (r *AgentReconciler) needsDeploymentUpdate(existing, desired *appsv1.Deploy
 		return true
 	}
 
+	// Check readiness probes
+	if !r.probesEqual(existingContainer.ReadinessProbe, desiredContainer.ReadinessProbe) {
+		return true
+	}
+
 	return false
 }
 
@@ -559,6 +659,7 @@ func (r *AgentReconciler) updateAgentContainer(deployment, desiredDeployment *ap
 	agentContainer.Ports = desiredAgentContainer.Ports
 	agentContainer.Env = desiredAgentContainer.Env
 	agentContainer.EnvFrom = desiredAgentContainer.EnvFrom
+	agentContainer.ReadinessProbe = desiredAgentContainer.ReadinessProbe
 
 	return nil
 }
@@ -663,6 +764,11 @@ func (r *AgentReconciler) servicePortsEqual(existing, desired []corev1.ServicePo
 	return true
 }
 
+// probesEqual compares two readiness probes for equality
+func (r *AgentReconciler) probesEqual(existing, desired *corev1.Probe) bool {
+	return equality.ProbesEqual(existing, desired)
+}
+
 // sanitizeAgentName sanitizes the agent name to meet environment variable naming requirements.
 // Environment variable names should start with a letter (a-z, A-Z) or underscore (_),
 // and can only contain letters, digits (0-9), and underscores.
@@ -709,7 +815,7 @@ func (r *AgentReconciler) sanitizeAgentName(name string) string {
 func (r *AgentReconciler) buildA2AAgentCardUrl(agent *runtimev1alpha1.Agent) string {
 	// Find the A2A protocol
 	for _, protocol := range agent.Spec.Protocols {
-		if protocol.Type == "A2A" {
+		if protocol.Type == a2AProtocol {
 			return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d%s",
 				agent.Name, agent.Namespace, protocol.Port, protocol.Path)
 		}
@@ -725,4 +831,37 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Named("agent").
 		Complete(r)
+}
+
+// buildOpenAIReadinessProbe creates TCP-readiness-probe for OpenAI-protocols
+func (r *AgentReconciler) buildOpenAIReadinessProbe(port int32) *corev1.Probe {
+	return &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt(int(port)),
+			},
+		},
+		InitialDelaySeconds: 60,
+		PeriodSeconds:       10,
+		TimeoutSeconds:      3,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+	}
+}
+
+// buildA2AReadinessProbe creates HTTP-readiness-probe for A2A-protocols.
+func (r *AgentReconciler) buildA2AReadinessProbe(healthPath string, port int32) *corev1.Probe {
+	return &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: healthPath,
+				Port: intstr.FromInt(int(port)),
+			},
+		},
+		InitialDelaySeconds: 60,
+		PeriodSeconds:       10,
+		TimeoutSeconds:      3,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+	}
 }

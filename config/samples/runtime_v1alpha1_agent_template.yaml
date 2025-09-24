@@ -13,13 +13,15 @@ spec:
   subAgents:
     - name: summarizer_agent
       url: "https://agents.example.com/summarizer-agent.json"
-  tools:
-    - name: news_fetcher
-      url: "https://news.mcpservers.org/fetch/mcp"
-    - name: web_fetch
-      url: "https://remote.mcpservers.org/fetch/mcp"
+#  Uncommented for now since health probe needs working mcp tools
+#  tools:
+#    - name: news_fetcher
+#      url: "https://news.mcpservers.org/fetch/mcp"
+#    - name: web_fetch
+#      url: "https://remote.mcpservers.org/fetch/mcp"
   protocols:
     - type: A2A
+      path: "/"
   replicas: 1
   env:
     - name: LOG_LEVEL
