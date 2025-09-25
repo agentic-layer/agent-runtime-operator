@@ -103,7 +103,7 @@ spec:
 
 Now that you have the Agent Runtime Operator installed, you can:
 
-1. xref:agents::how-to-guide.adoc[Create your first agent] - Learn how to deploy template-based and custom agents
+1. xref:agent-runtime-operator:agents:how-to-guide.adoc[Create your first agent] - Learn how to deploy template-based and custom agents
 2. Explore agent samples at https://github.com/agentic-layer/agent-samples
 3. Build custom agents using the SDK at https://github.com/agentic-layer/sdk-python
 
