@@ -1,0 +1,198 @@
+= Create an AI Agent
+
+This guide walks you through creating and deploying agents using the Agent Runtime Operator. Whether you're building your first agent or exploring advanced patterns, this guide provides step-by-step instructions to get you up and running.
+
+IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Install the Agent Runtime Operator] for installation instructions.
+
+== Quick Start: Your First Agent
+
+Get your first agent running in under 5 minutes.
+
+=== Deploy your first agent
+
+NOTE: Replace `your-gemini-api-key-here` with your actual Gemini API key before deploying.
+
+[source,bash]
+----
+# Create a simple helpful assistant using templates
+cat <<EOF | kubectl apply -f -
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: my-first-agent
+spec:
+  framework: google-adk
+  description: "A helpful AI assistant"
+  instruction: "You are a helpful AI assistant that can answer questions, provide explanations, and help with various tasks. Be friendly, informative, and concise in your responses."
+  model: "gemini/gemini-2.5-flash"
+  protocols:
+    - type: A2A
+  replicas: 1
+  env:
+    - name: GEMINI_API_KEY
+      value: "your-gemini-api-key-here"
+EOF
+----
+
+=== Verify your agent is running
+
+[source,bash]
+----
+# Check the agent resource
+kubectl get agent my-first-agent
+
+# Check the deployment
+kubectl get deployment my-first-agent
+
+# Check the service
+kubectl get service my-first-agent
+----
+
+=== Check the logs
+
+[source,bash]
+----
+# View agent logs
+kubectl logs -l app=my-first-agent
+----
+
+🎉 *Congratulations!* You've successfully deployed your first agent.
+
+== Template-Based Agents (Recommended)
+
+Template-based agents are the easiest way to get started. The operator handles the container image and runtime configuration for you.
+
+=== When to use templates vs custom images
+
+*Use templates when:*
+
+* You're just getting started with agents
+* You want to quickly prototype agent behavior
+* You need standard agent capabilities with tools and sub-agents
+* You don't need custom dependencies or specialized runtime environments
+
+*Use custom images when:*
+
+* You have specific runtime requirements
+* You need custom dependencies or libraries
+* You want full control over the agent implementation
+* You're migrating existing agent code
+
+=== Step-by-Step: News Agent with Tools
+
+Let's create a more sophisticated news agent that uses external tools:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: news-agent
+spec:
+  framework: google-adk
+  description: "A news agent that fetches and summarizes current articles"
+  instruction: "You are a news agent that can fetch current news articles and provide summaries. Use the news fetcher tool to get articles and provide concise summaries."
+  model: "gemini/gemini-2.5-flash"
+
+  # External tools the agent can use
+  tools:
+    - name: news_fetcher
+      url: "https://news.mcpservers.org/fetch/mcp"
+    - name: web_fetch
+      url: "https://remote.mcpservers.org/fetch/mcp"
+
+  # Sub-agents this agent can delegate to
+  subAgents:
+    - name: summarizer_agent
+      url: "https://agents.example.com/summarizer-agent.json"
+
+  protocols:
+    - type: A2A
+  replicas: 1
+----
+
+=== Configuration Options for Templates
+
+==== Basic Configuration
+
+* *description*: Brief description of your agent's purpose
+* *instruction*: Detailed system prompt defining the agent's behavior
+* *model*: Language model to use (defaults to framework default if not specified)
+
+== Custom Image Agents
+
+When you need full control over your agent's implementation, use custom images.
+
+=== When you need custom images
+
+* Custom runtime environments or dependencies
+* Specialized libraries or frameworks
+* Legacy agent code migration
+* Performance-critical implementations
+
+=== Step-by-Step: Weather Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: weather-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  protocols:
+    - type: A2A
+  replicas: 1
+  env:
+    - name: LOG_LEVEL
+      value: "info"
+----
+
+=== Building Custom Agents
+
+For examples and guidance on building custom agent images:
+
+* *Examples*: https://github.com/agentic-layer/agent-samples
+* *SDK for ADK-based agents*: https://github.com/agentic-layer/sdk-python
+
+=== Container Requirements
+
+Your custom agent container must:
+
+1. Expose an HTTP server on the configured port
+2. Implement the A2A protocol specification
+
+== Agent-Specific Configuration
+
+=== Protocols
+
+All agents use the *A2A (Agent-to-Agent) protocol* for communication:
+
+[source,yaml]
+----
+protocols:
+  - type: A2A
+    port: 8000  # Optional: defaults to framework default
+    path: "/"   # Optional: defaults to root path
+----
+
+=== Framework Options
+
+The configured framework determines the base image and runtime environment.
+
+Currently supported:
+
+* *google-adk*: Google Agent Development Kit framework
+
+[source,yaml]
+----
+spec:
+  framework: google-adk  # Default framework
+----
+
+Additional frameworks will be supported in the future.
+
+'''
+
+Happy agent building! 🤖

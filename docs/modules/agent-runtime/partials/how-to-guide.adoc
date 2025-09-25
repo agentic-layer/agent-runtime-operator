@@ -1,0 +1,112 @@
+= Install the Agent Runtime Operator
+
+This guide walks you through installing the Agent Runtime Operator on your Kubernetes cluster. The operator provides a unified, framework-agnostic way to deploy and manage agentic workloads.
+
+== Prerequisites
+
+Before you begin, ensure you have:
+
+* *kubectl*: Kubernetes command-line tool
+* *kind*: For running Kubernetes locally (optional)
+* *Docker*: Running and accessible
+* A Kubernetes cluster (local or remote)
+
+== Quick Installation
+
+=== Step 1: Set up your cluster (for local development)
+
+If you don't have a Kubernetes cluster, create a local one with kind:
+
+[source,bash]
+----
+# Create a local Kubernetes cluster
+kind create cluster
+----
+
+=== Step 2: Install cert-manager
+
+The Agent Runtime Operator requires cert-manager for webhook support:
+
+[source,bash]
+----
+# Install cert-manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+
+# Wait for cert-manager to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
+----
+
+=== Step 3: Install the Agent Runtime Operator
+
+[source,bash]
+----
+# Install the operator
+kubectl apply -f https://github.com/agentic-layer/agent-runtime-operator/releases/download/v0.4.4/install.yaml
+
+# Wait for the operator to be ready
+kubectl wait --for=condition=Available --timeout=60s -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager
+----
+
+Find the latest version at https://github.com/agentic-layer/agent-runtime-operator/releases
+
+=== Step 4: Verify the installation
+
+[source,bash]
+----
+# Check that the operator is running
+kubectl get pods -n agent-runtime-operator-system
+
+# Check that the CRDs are installed
+kubectl get crd agents.runtime.agentic-layer.ai
+----
+
+You should see the operator pod running and the Agent CRD available.
+
+== Alternative Installation Methods
+
+=== Using Flux (GitOps)
+
+If you're using Flux for GitOps, you can install the operator using an OCI repository:
+
+[source,yaml]
+----
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: agent-runtime-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: oci://ghcr.io/agentic-layer/manifests/agent-runtime-operator
+  ref:
+    semver: ">= 0, < 1"
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: agent-runtime-operator
+  namespace: flux-system
+spec:
+  sourceRef:
+    kind: OCIRepository
+    name: agent-runtime-operator
+  interval: 10m
+  path: ./default
+  prune: true
+  wait: true
+  dependsOn:
+    # Ensure cert-manager is installed first (if you install it with Flux as well)
+    - name: cert-manager
+----
+
+== Next Steps
+
+Now that you have the Agent Runtime Operator installed, you can:
+
+1. xref:agents::how-to-guide.adoc[Create your first agent] - Learn how to deploy template-based and custom agents
+2. Explore agent samples at https://github.com/agentic-layer/agent-samples
+3. Build custom agents using the SDK at https://github.com/agentic-layer/sdk-python
+
+'''
+
+The operator is now ready to manage your agent workloads! 🚀

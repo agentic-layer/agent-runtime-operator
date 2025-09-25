@@ -1,7 +1,8 @@
-:repo-name: agentic-layer/agent-runtime-operator
+.How-To Guides
+* xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[]
+* xref:agent-runtime-operator:agents:how-to-guide.adoc[]
+* xref:agent-runtime-operator:agent-gateways:how-to-guide.adoc[]
 
-* {repo-name}
-** xref:tutorials.adoc[Tutorials]
-** xref:how-to-guides.adoc[How-to Guides]
-** xref:reference.adoc[Reference]
-** xref:explanation.adoc[Explanation]
+.Reference
+* xref:agent-runtime-operator:agents:reference.adoc[]
+* xref:agent-runtime-operator:agent-gateways:reference.adoc[]
