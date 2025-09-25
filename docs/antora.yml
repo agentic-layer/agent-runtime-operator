@@ -1,3 +1,5 @@
 name: agent-runtime-operator
 title: Agent Runtime Operator
 version: ~
+nav:
+  - modules/ROOT/nav.adoc
