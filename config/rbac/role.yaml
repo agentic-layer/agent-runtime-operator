@@ -31,6 +31,14 @@ rules:
 - apiGroups:
   - runtime.agentic-layer.ai
   resources:
+  - agentgatewayclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - runtime.agentic-layer.ai
+  resources:
   - agents
   verbs:
   - create

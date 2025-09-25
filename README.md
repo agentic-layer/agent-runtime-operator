@@ -176,15 +176,13 @@ To expose agents through a unified gateway, you define an `AgentGateway` resourc
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: AgentGateway
 metadata:
-  labels:
-    app.kubernetes.io/name: agent-runtime-operator
-    app.kubernetes.io/managed-by: kustomize
   name: agent-gateway
 spec:
-  agentGatewayClass: krakend  # Specifies the controller class to use for this gateway instance.
+  agentGatewayClassName: krakend  # Specifies the controller class to use for this gateway instance.
   replicas: 1  # Number of gateway replicas
 ```
 
+> **Note**: The actual implementation of the agent gateway is not part of this repository. The Agent Runtime Operator provides the CRDs, but the gateway functionality is implemented by separate controller operators. One possible implementation for KrakenD can be found here: [agent-gateway-krakend-operator](https://github.com/agentic-layer/agent-gateway-krakend-operator).
 
 ## End-to-End (E2E) Testing
 

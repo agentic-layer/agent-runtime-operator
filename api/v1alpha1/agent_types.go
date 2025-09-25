@@ -109,6 +109,7 @@ type AgentSpec struct {
 	Protocols []AgentProtocol `json:"protocols,omitempty"`
 
 	// Exposed indicates whether this agent should be exposed via the AgentGateway
+	// +kubebuilder:default=false
 	Exposed bool `json:"exposed,omitempty"`
 
 	// +optional

@@ -252,6 +252,7 @@ spec:
                   type: object
                 type: array
               exposed:
+                default: false
                 description: Exposed indicates whether this agent should be exposed
                   via the AgentGateway
                 type: boolean
