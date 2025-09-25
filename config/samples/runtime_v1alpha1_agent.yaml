@@ -8,10 +8,13 @@ metadata:
 spec:
   framework: google-adk
   image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  protocols:
+    - type: A2A
+      path: "/"
   replicas: 1
   env:
     - name: PORT
-      value: "8000"
+      value: "8080"
     - name: LOG_LEVEL
       value: "info"
   envFrom:

@@ -3,7 +3,5 @@ resources:
 - runtime_v1alpha1_agent.yaml
 - runtime_v1alpha1_agent_template.yaml
 - runtime_v1alpha1_agent_openai.yaml
-- runtime_v1alpha1_agent_mixed.yaml
-- runtime_v1alpha1_agent_no_probe.yaml
 - configmap.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
