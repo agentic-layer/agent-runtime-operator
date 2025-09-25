@@ -14,14 +14,7 @@ spec:
     singular: agentgateway
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.conditions[?(@.type=="Ready")].status
-      name: Ready
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: AgentGateway is the Schema for the agentgateways API
@@ -52,13 +45,13 @@ spec:
                   This is only needed if multiple gateway classes are defined in the cluster.
                 type: string
               replicas:
-                default: 2
+                default: 1
                 description: Replicas is the number of gateway replicas
                 format: int32
                 minimum: 1
                 type: integer
               timeout:
-                default: 60s
+                default: 360s
                 description: Timeout specifies the gateway timeout for requests
                 type: string
             type: object

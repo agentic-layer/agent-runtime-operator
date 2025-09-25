@@ -28,11 +28,11 @@ type AgentGatewaySpec struct {
 
 	// Replicas is the number of gateway replicas
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=2
+	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Timeout specifies the gateway timeout for requests
-	// +kubebuilder:default="60s"
+	// +kubebuilder:default="360s"
 	Timeout metav1.Duration `json:"timeout,omitempty"`
 }
 
@@ -44,8 +44,6 @@ type AgentGatewayStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // AgentGateway is the Schema for the agentgateways API
 type AgentGateway struct {
