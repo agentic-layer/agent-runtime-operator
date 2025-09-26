@@ -4,5 +4,4 @@
 * xref:agent-runtime-operator:agent-gateways:how-to-guide.adoc[]
 
 .Reference
-* xref:agent-runtime-operator:agents:reference.adoc[]
-* xref:agent-runtime-operator:agent-gateways:reference.adoc[]
+* xref:agent-runtime-operator:agent-runtime:reference.adoc[]

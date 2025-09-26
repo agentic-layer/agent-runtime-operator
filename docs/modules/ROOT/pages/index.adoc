@@ -19,8 +19,7 @@ For advanced routing and gateway patterns:
 
 Detailed reference information for all components:
 
-* xref:agent-runtime-operator:agents:reference.adoc[] - Complete API reference for Agent resources
-* xref:agent-runtime-operator:agent-gateways:reference.adoc[] - Complete API reference for Agent Gateway resources
+* xref:agent-runtime-operator:agent-runtime:reference.adoc[] - Complete API reference for Agent resources
 
 == External Resources
 
