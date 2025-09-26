@@ -1,0 +1,22 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: openai-agent
+spec:
+  framework: custom
+  image: ghcr.io/example/openai-agent:latest
+  protocols:
+    - type: OpenAI    # Will generate TCP readiness probe on port 8000
+      port: 8000
+  replicas: 1
+  env:
+    - name: OPENAI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: openai-secret
+          key: api-key
+    - name: PORT
+      value: "8000"

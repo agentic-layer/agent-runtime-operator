@@ -83,6 +83,11 @@ make docker-push
 - **Agent Controller** (`internal/controller/agent_controller.go`): Reconciles Agent resources by:
   - Creating Kubernetes Deployments for agent workloads
   - Managing Services for protocol exposure
+  - **Protocol-aware health checking**: Automatically generates appropriate readiness probes
+    - A2A agents: HTTP GET with configurable paths (validates agent functionality)
+    - OpenAI agents: TCP socket probe (validates service availability)
+    - Priority: A2A > OpenAI > No probe
+    - No protocols: No readiness probe
   - Handling framework-specific configurations
 
 - **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent resources
@@ -101,6 +106,7 @@ make docker-push
 ├── internal/
 │   ├── controller/       # Reconciliation logic
 │   └── webhook/          # Admission webhook handlers
+├── docs/                 # Documentation
 └── test/
     ├── e2e/             # End-to-end tests
     └── utils/           # Test utilities
@@ -175,6 +181,37 @@ spec:
 - E2E tests automatically create/teardown Kind clusters
 - Tests cover controller reconciliation and webhook validation
 - Use `make test` for unit tests, `make test-e2e` for end-to-end tests
+
+## Health Check Architecture
+
+The operator implements **protocol-aware health checking** that automatically generates appropriate Kubernetes readiness 
+probes based on agent protocol specifications:
+
+### Protocol-Based Health Checks
+
+**A2A Agents (Agent-to-Agent Protocol):**
+- **Probe Type**: HTTP GET request
+- **Endpoint**: Configurable based on protocol path:
+  - **Default**: `/a2a/.well-known/agent-card.json` (when no path specified)
+  - **Custom path**: `{protocol.path}/.well-known/agent-card.json` (e.g., `/custom/.well-known/agent-card.json`)
+  - **Root path**: `/.well-known/agent-card.json` (when path is explicitly set to `/`)
+- **Port**: Uses protocol.port or defaults to 8000
+- **Purpose**: Validates that A2A framework is initialized and agent skills are loaded
+- **Benefits**: Meaningful readiness signal that confirms agent functionality, not just HTTP server availability
+
+**OpenAI Compatible Agents:**
+- **Probe Type**: TCP socket connection
+- **Port**: Uses protocol.port or defaults to 8000
+- **Purpose**: Validates service is listening and accepting connections
+- **Benefits**: Lightweight health check suitable for stateless API endpoints
+
+**Agent Priority Logic:**
+- If agent has both A2A and OpenAI protocols, **A2A takes precedence**
+- Only one readiness probe is generated per agent (the highest priority protocol type)
+
+**Agents without Recognized Protocols:**
+- **Probe Type**: None (no readiness probe generated)
+- **Purpose**: Allows custom health checking or agents that don't need readiness validation
 
 ## Configuration
 
