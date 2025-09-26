@@ -7,23 +7,11 @@ This guide walks you through installing the Agent Runtime Operator on your Kuber
 Before you begin, ensure you have:
 
 * *kubectl*: Kubernetes command-line tool
-* *kind*: For running Kubernetes locally (optional)
-* *Docker*: Running and accessible
 * A Kubernetes cluster (local or remote)
 
 == Quick Installation
 
-=== Step 1: Set up your cluster (for local development)
-
-If you don't have a Kubernetes cluster, create a local one with kind:
-
-[source,bash]
-----
-# Create a local Kubernetes cluster
-kind create cluster
-----
-
-=== Step 2: Install cert-manager
+=== Step 1: Install cert-manager
 
 The Agent Runtime Operator requires cert-manager for webhook support:
 
@@ -36,7 +24,7 @@ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
 ----
 
-=== Step 3: Install the Agent Runtime Operator
+=== Step 2: Install the Agent Runtime Operator
 
 [source,bash]
 ----
@@ -49,7 +37,7 @@ kubectl wait --for=condition=Available --timeout=60s -n agent-runtime-operator-s
 
 Find the latest version at https://github.com/agentic-layer/agent-runtime-operator/releases
 
-=== Step 4: Verify the installation
+=== Step 3: Verify the installation
 
 [source,bash]
 ----
