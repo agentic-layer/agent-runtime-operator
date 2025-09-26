@@ -1,17 +1,20 @@
 = Install the Agent Runtime Operator
 
-This guide walks you through installing the Agent Runtime Operator on your Kubernetes cluster. The operator provides a unified, framework-agnostic way to deploy and manage agentic workloads.
+This guide walks you through installing the Agent Runtime Operator on your Kubernetes cluster.
+The operator provides a unified, framework-agnostic way to deploy and manage agentic workloads.
 
-== Prerequisites
+== Dependencies
 
-Before you begin, ensure you have:
+The Agent Runtime Operator requires the following dependencies:
 
-* *kubectl*: Kubernetes command-line tool
-* A Kubernetes cluster (local or remote)
+* **Kubernetes**: A running Kubernetes cluster
+* **cert-manager**: For managing TLS certificates for webhooks
 
-== Quick Installation
+== Installation
 
-=== Step 1: Install cert-manager
+=== Install with Kubernetes YAML
+
+==== Step 1: Install cert-manager
 
 The Agent Runtime Operator requires cert-manager for webhook support:
 
@@ -24,7 +27,7 @@ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
 ----
 
-=== Step 2: Install the Agent Runtime Operator
+==== Step 2: Install the Agent Runtime Operator
 
 [source,bash]
 ----
@@ -37,22 +40,7 @@ kubectl wait --for=condition=Available --timeout=60s -n agent-runtime-operator-s
 
 Find the latest version at https://github.com/agentic-layer/agent-runtime-operator/releases
 
-=== Step 3: Verify the installation
-
-[source,bash]
-----
-# Check that the operator is running
-kubectl get pods -n agent-runtime-operator-system
-
-# Check that the CRDs are installed
-kubectl get crd agents.runtime.agentic-layer.ai
-----
-
-You should see the operator pod running and the Agent CRD available.
-
-== Alternative Installation Methods
-
-=== Using Flux (GitOps)
+=== Install with Flux
 
 If you're using Flux for GitOps, you can install the operator using an OCI repository:
 
@@ -87,6 +75,19 @@ spec:
     - name: cert-manager
 ----
 
+== Verify the installation
+
+[source,bash]
+----
+# Check that the operator is running
+kubectl get pods -n agent-runtime-operator-system
+
+# Check that the CRDs are installed
+kubectl get crd agents.runtime.agentic-layer.ai
+----
+
+You should see the operator pod running and the Agent CRD available.
+
 == Next Steps
 
 Now that you have the Agent Runtime Operator installed, you can:
@@ -97,4 +98,5 @@ Now that you have the Agent Runtime Operator installed, you can:
 
 '''
 
-The operator is now ready to manage your agent workloads! 🚀
+The operator is now ready to manage your agent workloads!
+🚀
