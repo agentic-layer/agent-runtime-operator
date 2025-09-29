@@ -40,15 +40,29 @@ type AgentProtocol struct {
 	Path string `json:"path,omitempty"`
 }
 
-// SubAgent defines configuration for connecting to a remote agent
+// SubAgent defines configuration for connecting to either a cluster agent or remote agent.
+// The controller automatically determines the type based on whether a URL is provided:
+// - If URL is provided: treats this as a remote agent reference
+// - If URL is empty: treats this as a cluster agent reference and resolves by name/namespace
 type SubAgent struct {
-	// Name is the unique identifier for this sub-agent
+	// Name is the identifier for this sub-agent.
+	// For cluster agents: this is the name of the Agent resource to reference.
+	// For remote agents: this is a user-defined identifier for the remote agent.
 	Name string `json:"name"`
 
-	// Url is the HTTP/HTTPS endpoint URL for the remote agent configuration.
-	// Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
+	// Namespace is the namespace of the Agent resource to reference (for cluster agents).
+	// If not specified, defaults to the same namespace as the current Agent.
+	// Only used when URL is not provided (cluster agent mode).
+	// Ignored when URL is provided (remote agent mode).
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// Url is the HTTP/HTTPS endpoint URL for remote agent configuration.
+	// If specified, this subAgent is treated as a remote agent.
+	// If not specified, this subAgent is treated as a cluster agent reference.
+	// +optional
 	// +kubebuilder:validation:Format=uri
-	Url string `json:"url"`
+	Url string `json:"url,omitempty"`
 }
 
 // AgentTool defines configuration for integrating an MCP (Model Context Protocol) tool
@@ -96,7 +110,8 @@ type AgentSpec struct {
 	Model string `json:"model,omitempty"`
 
 	// +optional
-	// SubAgents defines configuration for connecting to remote agents.
+	// SubAgents defines configuration for connecting to cluster or remote agents.
+	// The controller automatically determines the type based on whether a URL is provided.
 	// This is converted to JSON and passed as SUB_AGENTS environment variable to the agent.
 	SubAgents []SubAgent `json:"subAgents,omitempty"`
 
@@ -125,6 +140,12 @@ type AgentSpec struct {
 // AgentStatus defines the observed state of Agent.
 type AgentStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// Url is the cluster-local URL where this agent can be accessed via A2A protocol.
+	// This is automatically populated by the controller when the agent has an A2A protocol configured.
+	// Format: http://{name}.{namespace}.svc.cluster.local:{port}/.well-known/agent-card.json
+	// +optional
+	Url string `json:"url,omitempty"`
 }
 
 // +kubebuilder:object:root=true
