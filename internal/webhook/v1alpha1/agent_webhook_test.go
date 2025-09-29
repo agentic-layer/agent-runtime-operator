@@ -535,7 +535,9 @@ var _ = Describe("Agent Webhook", func() {
 
 				It("should accept empty URLs", func() {
 					obj.Spec.SubAgents = []runtimev1alpha1.SubAgent{
-						{Name: "test", Url: ""}, // Empty URL should be allowed
+						{Name: "test",
+							AgentRef: &corev1.ObjectReference{Name: "test"},
+							Url:      ""}, // Empty URL should be allowed
 					}
 
 					warnings, err := validator.validateAgent(obj)

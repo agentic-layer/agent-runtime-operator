@@ -184,25 +184,23 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 		))
 	}
 
-	// Validate SubAgent URLs
+	// Validate SubAgents
 	for i, subAgent := range agent.Spec.SubAgents {
-		if err := v.validateURL(subAgent.Url, fmt.Sprintf("SubAgent[%d].Url", i)); err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("spec", "subAgents").Index(i).Child("url"),
-				subAgent.Url,
-				err.Error(),
-			))
+		if errs := v.validateSubAgent(subAgent, i); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
 		}
 	}
 
-	// Validate Tool URLs
+	// Validate Tool URLs (only scheme validation, kubebuilder handles URI format)
 	for i, tool := range agent.Spec.Tools {
-		if err := v.validateURL(tool.Url, fmt.Sprintf("Tool[%d].Url", i)); err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("spec", "tools").Index(i).Child("url"),
-				tool.Url,
-				err.Error(),
-			))
+		if tool.Url != "" {
+			if err := v.validateHTTPScheme(tool.Url); err != nil {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "tools").Index(i).Child("url"),
+					tool.Url,
+					fmt.Sprintf("Tool[%d].Url: %s", i, err.Error()),
+				))
+			}
 		}
 	}
 
@@ -213,24 +211,74 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 	return nil, nil
 }
 
-// validateURL validates that a URL is properly formatted and uses HTTP or HTTPS scheme.
-// Both schemes are allowed to support external HTTPS URLs and internal cluster HTTP URLs.
-func (v *AgentCustomValidator) validateURL(urlStr, fieldName string) error {
+// validateSubAgent validates a SubAgent configuration for business logic correctness.
+// This performs stateless validation only - no cluster state checks.
+// Basic URI format validation is handled by kubebuilder annotation.
+func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgent, index int) []*field.Error {
+	var errs []*field.Error
+
+	hasAgentRef := subAgent.AgentRef != nil
+	hasURL := subAgent.Url != ""
+
+	// Must have a name
+	if subAgent.Name == "" {
+		errs = append(errs, field.Required(
+			field.NewPath("spec", "subAgents").Index(index).Child("name"),
+			"subAgent must have a name"))
+	}
+
+	// Exactly one of agentRef or url must be specified (mutually exclusive)
+	if hasAgentRef && hasURL {
+		errs = append(errs, field.Forbidden(
+			field.NewPath("spec", "subAgents").Index(index),
+			"agentRef and url are mutually exclusive - specify exactly one"))
+	}
+
+	if !hasAgentRef && !hasURL {
+		errs = append(errs, field.Required(
+			field.NewPath("spec", "subAgents").Index(index),
+			"either agentRef or url must be specified"))
+	}
+
+	// Validate agentRef if provided
+	if hasAgentRef && subAgent.AgentRef.Name == "" {
+		errs = append(errs, field.Required(
+			field.NewPath("spec", "subAgents").Index(index).Child("agentRef", "name"),
+			"agentRef.name must be specified"))
+	}
+
+	// Only validate scheme restriction (kubebuilder handles URI format)
+	if hasURL {
+		if err := v.validateHTTPScheme(subAgent.Url); err != nil {
+			errs = append(errs, field.Invalid(
+				field.NewPath("spec", "subAgents").Index(index).Child("url"),
+				subAgent.Url,
+				fmt.Sprintf("SubAgent[%d].Url: %s", index, err.Error())))
+		}
+	}
+
+	return errs
+}
+
+// validateHTTPScheme validates that a URL uses HTTP or HTTPS scheme.
+// URI format validation is handled by kubebuilder annotation.
+func (v *AgentCustomValidator) validateHTTPScheme(urlStr string) error {
 	if urlStr == "" {
-		return nil // Empty URLs are allowed (optional fields)
+		return nil
 	}
 
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("%s must be a valid URL: %v", fieldName, err)
+		// This shouldn't happen since kubebuilder validates URI format
+		return fmt.Errorf("invalid URL format")
 	}
 
 	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
-		return fmt.Errorf("%s must use HTTP or HTTPS scheme, got %q", fieldName, parsedURL.Scheme)
+		return fmt.Errorf("must use HTTP or HTTPS scheme, got %q", parsedURL.Scheme)
 	}
 
 	if parsedURL.Host == "" {
-		return fmt.Errorf("%s must have a valid host", fieldName)
+		return fmt.Errorf("must have a valid host")
 	}
 
 	return nil

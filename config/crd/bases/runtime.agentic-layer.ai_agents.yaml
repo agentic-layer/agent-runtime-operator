@@ -316,24 +316,74 @@ spec:
                 type: integer
               subAgents:
                 description: |-
-                  SubAgents defines configuration for connecting to remote agents.
+                  SubAgents defines configuration for connecting to cluster or remote agents.
+                  The controller automatically determines the type based on whether a URL is provided.
                   This is converted to JSON and passed as SUB_AGENTS environment variable to the agent.
                 items:
-                  description: SubAgent defines configuration for connecting to a
-                    remote agent
+                  description: SubAgent defines configuration for connecting to either
+                    a cluster agent or remote agent
                   properties:
+                    agentRef:
+                      description: |-
+                        AgentRef references an Agent resource in the cluster.
+                        When specified, the operator will resolve the Agent's service URL automatically.
+                        Only Name and Namespace fields are used; other fields (Kind, APIVersion, etc.) are ignored.
+                        If Namespace is not specified, defaults to the same namespace as the current Agent.
+                        Mutually exclusive with Url - exactly one must be specified.
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: |-
+                            If referring to a piece of an object instead of an entire object, this string
+                            should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container within a pod, this would take on a value like:
+                            "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                            the event) or if no container name is specified "spec.containers[2]" (container with
+                            index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                            referencing a part of an object.
+                          type: string
+                        kind:
+                          description: |-
+                            Kind of the referent.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                          type: string
+                        name:
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        namespace:
+                          description: |-
+                            Namespace of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                          type: string
+                        resourceVersion:
+                          description: |-
+                            Specific resourceVersion to which this reference is made, if any.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                          type: string
+                        uid:
+                          description: |-
+                            UID of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
                     name:
-                      description: Name is the unique identifier for this sub-agent
+                      description: Name is a descriptive identifier for this sub-agent
+                        connection
                       type: string
                     url:
                       description: |-
-                        Url is the HTTP/HTTPS endpoint URL for the remote agent configuration.
-                        Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
+                        Url is the HTTP/HTTPS endpoint URL for a remote agent outside the cluster.
+                        It refers to the agent's well-known agent card URL, e.g. https://agent.example.com/.well-known/agent-card.json
+                        Mutually exclusive with AgentRef - exactly one must be specified.
                       format: uri
                       type: string
                   required:
                   - name
-                  - url
                   type: object
                 type: array
               tools:
@@ -418,6 +468,12 @@ spec:
                   - type
                   type: object
                 type: array
+              url:
+                description: |-
+                  Url is the cluster-local URL where this agent can be accessed via A2A protocol.
+                  This is automatically populated by the controller when the agent has an A2A protocol configured.
+                  Format: http://{name}.{namespace}.svc.cluster.local:{port}/.well-known/agent-card.json
+                type: string
             type: object
         type: object
     served: true
