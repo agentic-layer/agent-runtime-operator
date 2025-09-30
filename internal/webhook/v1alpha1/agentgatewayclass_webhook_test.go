@@ -83,10 +83,6 @@ var _ = Describe("AgentGatewayClass Webhook", func() {
 				Expect(warnings).To(BeEmpty())
 			})
 
-			It("should reject creating a second AgentGatewayClass with default annotation", func() {
-				Skip("Skipping test that requires cluster resources - validation logic works correctly")
-			})
-
 			It("should allow creating AgentGatewayClass with default annotation set to 'false'", func() {
 				// Create a second AgentGatewayClass with default annotation set to "false"
 				secondAgwc := &runtimev1alpha1.AgentGatewayClass{
@@ -137,14 +133,6 @@ var _ = Describe("AgentGatewayClass Webhook", func() {
 		})
 
 		Context("ValidateUpdate", func() {
-			It("should allow updating existing default AgentGatewayClass", func() {
-				Skip("Skipping test that requires cluster resources - validation logic works correctly")
-			})
-
-			It("should reject updating non-default AgentGatewayClass to become default when another exists", func() {
-				Skip("Skipping test that requires cluster resources - validation logic works correctly")
-			})
-
 			It("should allow updating non-default AgentGatewayClass without changing default status", func() {
 				// Update a non-default AgentGatewayClass without making it default
 				oldAgwc := &runtimev1alpha1.AgentGatewayClass{

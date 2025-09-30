@@ -1,0 +1,47 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgenticWorkforce
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: customer-service-workforce
+spec:
+  # Human-readable name for the workforce
+  name: "Customer Service Team"
+
+  # Description of the workforce's purpose and capabilities
+  description: "A workforce of agents handling customer inquiries, support tickets, and product recommendations"
+
+  # Owner of the workforce (email or identifier)
+  owner: "user-name@example.com"
+
+  # Optional tags for categorization and organization
+  tags:
+    - customer-service
+    - support
+    - production
+
+  # Entry point agents - these are the initial agents users interact with
+  # References to existing Agent resources in the cluster
+  entryPointAgents:
+    # Agent in the same namespace (namespace field omitted)
+    - name: weather-agent
+
+    # Agent with explicit namespace reference (commented out example)
+    - name: assistant-agent
+      # namespace: ai-agents
+---
+# Minimal AgenticWorkforce configuration
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgenticWorkforce
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: minimal-workforce
+spec:
+  name: "Minimal Workforce"
+  description: "A minimal workforce example with one entry point"
+  owner: "admin@example.com"
+  entryPointAgents:
+    - name: news-agent
