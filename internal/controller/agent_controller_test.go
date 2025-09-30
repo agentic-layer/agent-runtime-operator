@@ -956,7 +956,7 @@ var _ = Describe("Agent Controller", func() {
 					Spec: runtimev1alpha1.AgentSpec{},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(envVars).To(HaveLen(6))
 
@@ -1006,7 +1006,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(envVars).To(HaveLen(6))
 
@@ -1045,7 +1045,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify JSON structure is valid
@@ -1163,7 +1163,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Find the A2A_AGENT_CARD_URL variable
@@ -1190,7 +1190,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// A2A_AGENT_CARD_URL should not be present
@@ -1209,7 +1209,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// A2A_AGENT_CARD_URL should not be present
@@ -1241,7 +1241,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should use the first A2A protocol

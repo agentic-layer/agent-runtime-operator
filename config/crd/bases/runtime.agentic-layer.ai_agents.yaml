@@ -316,24 +316,38 @@ spec:
                 type: integer
               subAgents:
                 description: |-
-                  SubAgents defines configuration for connecting to remote agents.
+                  SubAgents defines configuration for connecting to cluster or remote agents.
+                  The controller automatically determines the type based on whether a URL is provided.
                   This is converted to JSON and passed as SUB_AGENTS environment variable to the agent.
                 items:
-                  description: SubAgent defines configuration for connecting to a
-                    remote agent
+                  description: |-
+                    SubAgent defines configuration for connecting to either a cluster agent or remote agent.
+                    The controller automatically determines the type based on whether a URL is provided:
+                    - If URL is provided: treats this as a remote agent reference
+                    - If URL is empty: treats this as a cluster agent reference and resolves by name/namespace
                   properties:
                     name:
-                      description: Name is the unique identifier for this sub-agent
+                      description: |-
+                        Name is the identifier for this sub-agent.
+                        For cluster agents: this is the name of the Agent resource to reference.
+                        For remote agents: this is a user-defined identifier for the remote agent.
+                      type: string
+                    namespace:
+                      description: |-
+                        Namespace is the namespace of the Agent resource to reference (for cluster agents).
+                        If not specified, defaults to the same namespace as the current Agent.
+                        Only used when URL is not provided (cluster agent mode).
+                        Ignored when URL is provided (remote agent mode).
                       type: string
                     url:
                       description: |-
-                        Url is the HTTP/HTTPS endpoint URL for the remote agent configuration.
-                        Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
+                        Url is the HTTP/HTTPS endpoint URL for remote agent configuration.
+                        If specified, this subAgent is treated as a remote agent.
+                        If not specified, this subAgent is treated as a cluster agent reference.
                       format: uri
                       type: string
                   required:
                   - name
-                  - url
                   type: object
                 type: array
               tools:
@@ -418,6 +432,12 @@ spec:
                   - type
                   type: object
                 type: array
+              url:
+                description: |-
+                  Url is the cluster-local URL where this agent can be accessed via A2A protocol.
+                  This is automatically populated by the controller when the agent has an A2A protocol configured.
+                  Format: http://{name}.{namespace}.svc.cluster.local:{port}/.well-known/agent-card.json
+                type: string
             type: object
         type: object
     served: true
