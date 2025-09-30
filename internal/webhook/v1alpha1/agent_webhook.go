@@ -35,11 +35,10 @@ import (
 
 const (
 	googleAdkFramework           = "google-adk"
-	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.2.0"
+	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.3.0"
 	defaultTemplateImageFallback = "invalid"
 )
 
-// nolint:unused
 // log is for logging in this package.
 var agentlog = logf.Log.WithName("agent-resource")
 

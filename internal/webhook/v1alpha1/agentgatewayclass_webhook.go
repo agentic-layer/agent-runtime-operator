@@ -35,7 +35,6 @@ const (
 	DefaultClassAnnotation = "agentgatewayclass.kubernetes.io/is-default-class"
 )
 
-// nolint:unused
 // log is for logging in this package.
 var agentgatewayclasslog = logf.Log.WithName("agentgatewayclass-resource")
 
