@@ -33,7 +33,7 @@ type AgentGatewaySpec struct {
 
 	// Timeout specifies the gateway timeout for requests
 	// +kubebuilder:default="360s"
-	Timeout metav1.Duration `json:"timeout,omitempty"`
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
 
 // AgentGatewayStatus defines the observed state of AgentGateway
