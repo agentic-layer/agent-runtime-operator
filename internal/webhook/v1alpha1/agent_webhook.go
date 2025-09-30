@@ -199,7 +199,7 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 				allErrs = append(allErrs, field.Invalid(
 					field.NewPath("spec", "tools").Index(i).Child("url"),
 					tool.Url,
-					err.Error(),
+					fmt.Sprintf("Tool[%d].Url: %s", i, err.Error()),
 				))
 			}
 		}
@@ -241,7 +241,7 @@ func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgen
 			errs = append(errs, field.Invalid(
 				field.NewPath("spec", "subAgents").Index(index).Child("url"),
 				subAgent.Url,
-				err.Error()))
+				fmt.Sprintf("SubAgent[%d].Url: %s", index, err.Error())))
 		}
 	}
 
@@ -263,6 +263,10 @@ func (v *AgentCustomValidator) validateHTTPScheme(urlStr string) error {
 
 	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
 		return fmt.Errorf("must use HTTP or HTTPS scheme, got %q", parsedURL.Scheme)
+	}
+
+	if parsedURL.Host == "" {
+		return fmt.Errorf("must have a valid host")
 	}
 
 	return nil
