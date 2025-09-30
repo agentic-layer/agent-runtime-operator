@@ -1,0 +1,19 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgenticWorkforce
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: customer-service-workforce
+spec:
+  name: "Customer Service Team"
+  description: "A workforce of agents handling customer inquiries, support tickets, and product recommendations"
+  owner: "user-name@example.com"
+  tags:
+    - customer-service
+    - support
+    - production
+  entryPointAgents:
+    - name: weather-agent
+    - name: assistant-agent
+      #namespace: ai-agents
