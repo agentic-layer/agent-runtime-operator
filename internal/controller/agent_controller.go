@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
@@ -548,12 +549,63 @@ func (r *AgentReconciler) resolveSubAgentUrl(ctx context.Context, subAgent runti
 	return referencedAgent.Status.Url, nil
 }
 
+// findAgentsReferencingSubAgent finds all agents that reference a given agent as a subAgent
+func (r *AgentReconciler) findAgentsReferencingSubAgent(ctx context.Context, obj client.Object) []ctrl.Request {
+	updatedAgent, ok := obj.(*runtimev1alpha1.Agent)
+	if !ok {
+		return nil
+	}
+
+	// Find all agents that reference this agent as a subAgent
+	var agentList runtimev1alpha1.AgentList
+	if err := r.List(ctx, &agentList); err != nil {
+		logf.FromContext(ctx).Error(err, "Failed to list agents for subAgent watch")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	// Enqueue agents that reference this agent
+	for _, agent := range agentList.Items {
+		for _, subAgent := range agent.Spec.SubAgents {
+			// Check if this is a cluster agent reference (no URL)
+			if subAgent.Url == "" && subAgent.Name == updatedAgent.Name {
+				// Check namespace match
+				subAgentNamespace := subAgent.Namespace
+				if subAgentNamespace == "" {
+					subAgentNamespace = agent.Namespace
+				}
+
+				if subAgentNamespace == updatedAgent.Namespace {
+					// This agent references the updated agent - enqueue it
+					requests = append(requests, ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      agent.Name,
+							Namespace: agent.Namespace,
+						},
+					})
+					logf.FromContext(ctx).Info("Enqueuing parent agent due to subAgent status change",
+						"parent", agent.Name,
+						"subAgent", updatedAgent.Name,
+						"updatedAgentURL", updatedAgent.Status.Url)
+					break // Found a match, no need to check other subAgents
+				}
+			}
+		}
+	}
+
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&runtimev1alpha1.Agent{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		Watches(
+			&runtimev1alpha1.Agent{},
+			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingSubAgent),
+		).
 		Named("agent").
 		Complete(r)
 }
