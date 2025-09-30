@@ -216,6 +216,10 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Agent")
 			os.Exit(1)
 		}
+		if err := webhookv1alpha1.SetupAgentGatewayWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "AgentGateway")
+			os.Exit(1)
+		}
 		if err := webhookv1alpha1.SetupAgentGatewayClassWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "AgentGatewayClass")
 			os.Exit(1)
