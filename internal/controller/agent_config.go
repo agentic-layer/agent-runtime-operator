@@ -89,7 +89,6 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(ctx context.Context, agen
 	// SUB_AGENTS - always set, with empty object if no subagents
 	var subAgentsJSON []byte
 	var err error
-	var failedSubAgents []string
 	if len(agent.Spec.SubAgents) > 0 {
 		subAgentsMap := make(map[string]map[string]string)
 		for _, subAgent := range agent.Spec.SubAgents {
@@ -99,7 +98,6 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(ctx context.Context, agen
 				// The controller will retry and status conditions will reflect the failure
 				logf.FromContext(ctx).Error(err, "Failed to resolve subAgent URL",
 					"subAgent", subAgent.Name, "agent", agent.Name)
-				failedSubAgents = append(failedSubAgents, fmt.Sprintf("%s: %v", subAgent.Name, err))
 				continue
 			}
 			subAgentsMap[subAgent.Name] = map[string]string{
@@ -112,12 +110,6 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(ctx context.Context, agen
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal subAgents: %w", err)
-	}
-
-	// Store failed subAgents in context for status update
-	if len(failedSubAgents) > 0 {
-		// We'll handle this in updateAgentStatus by passing it as a parameter
-		// For now, we continue and log
 	}
 
 	templateEnvVars = append(templateEnvVars, corev1.EnvVar{

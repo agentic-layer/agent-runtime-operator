@@ -605,7 +605,7 @@ spec:
 			stdin, err := cmd.StdinPipe()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				defer stdin.Close()
+				defer func() { _ = stdin.Close() }()
 				_, _ = stdin.Write([]byte(subAgentYAML))
 			}()
 			_, err = utils.Run(cmd)
@@ -641,7 +641,7 @@ spec:
 			stdin, err = cmd.StdinPipe()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				defer stdin.Close()
+				defer func() { _ = stdin.Close() }()
 				_, _ = stdin.Write([]byte(parentAgentYAML))
 			}()
 			_, err = utils.Run(cmd)
@@ -708,7 +708,7 @@ spec:
 			stdin, err := cmd.StdinPipe()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				defer stdin.Close()
+				defer func() { _ = stdin.Close() }()
 				_, _ = stdin.Write([]byte(subAgentYAML))
 			}()
 			_, err = utils.Run(cmd)
@@ -743,7 +743,7 @@ spec:
 			stdin, err = cmd.StdinPipe()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
-				defer stdin.Close()
+				defer func() { _ = stdin.Close() }()
 				_, _ = stdin.Write([]byte(parentAgentYAML))
 			}()
 			_, err = utils.Run(cmd)

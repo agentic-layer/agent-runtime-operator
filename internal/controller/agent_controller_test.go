@@ -1543,7 +1543,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 
 			requests := reconciler.findAgentsReferencingSubAgent(ctx, subAgent)
-			Expect(requests).To(HaveLen(0))
+			Expect(requests).To(BeEmpty())
 
 			By("Cleaning up")
 			Expect(k8sClient.Delete(ctx, parentAgent)).To(Succeed())
