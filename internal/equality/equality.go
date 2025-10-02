@@ -36,3 +36,9 @@ func getEnvFromSourceKey(s corev1.EnvFromSource) string {
 	}
 	return ""
 }
+
+// ProbesEqual compares two Kubernetes readiness probes for equality.
+// This function handles nil cases and uses deep comparison for comprehensive equality checking.
+func ProbesEqual(existing, desired *corev1.Probe) bool {
+	return cmp.Equal(existing, desired)
+}
