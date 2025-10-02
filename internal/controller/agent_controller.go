@@ -411,15 +411,10 @@ func (r *AgentReconciler) getProtocolPort(protocol *runtimev1alpha1.AgentProtoco
 // getA2AHealthPath returns the A2A health check path based on protocol configuration
 func (r *AgentReconciler) getA2AHealthPath(protocol *runtimev1alpha1.AgentProtocol) string {
 	if protocol != nil && protocol.Path != "" {
-		// If path is explicitly specified, use it
-		// Special case: "/" means root path (no prefix)
-		if protocol.Path == "/" {
-			return agentCardEndpoint
-		}
 		return protocol.Path + agentCardEndpoint
 	}
 	// Default for agents without protocol specification or path
-	return "/a2a" + agentCardEndpoint
+	return agentCardEndpoint
 }
 
 // generateReadinessProbe generates appropriate readiness probe based on agent protocols

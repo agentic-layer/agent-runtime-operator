@@ -10,7 +10,6 @@ spec:
   image: ghcr.io/agentic-layer/weather-agent:0.3.0
   protocols:
     - type: A2A
-      path: "/"
   replicas: 1
   env:
     - name: PORT

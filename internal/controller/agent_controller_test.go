@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -145,7 +144,7 @@ var _ = Describe("Agent Controller", func() {
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
-			Expect(probe.HTTPGet.Path).To(Equal("/a2a" + agentCardEndpoint))
+			Expect(probe.HTTPGet.Path).To(Equal(agentCardEndpoint))
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000))
 			Expect(probe.InitialDelaySeconds).To(Equal(int32(60)))
 		})
@@ -179,7 +178,7 @@ var _ = Describe("Agent Controller", func() {
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
-			Expect(probe.HTTPGet.Path).To(Equal("/a2a" + agentCardEndpoint))
+			Expect(probe.HTTPGet.Path).To(Equal(agentCardEndpoint))
 		})
 
 		It("should return nil probe for agents with no recognized protocols", func() {
@@ -230,11 +229,11 @@ var _ = Describe("Agent Controller", func() {
 			}
 		})
 
-		It("should use custom port from A2A protocol", func() {
+		It("should use custom port from protocol", func() {
 			agent := &runtimev1alpha1.Agent{
 				Spec: runtimev1alpha1.AgentSpec{
 					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "A2A", Port: 3000},
+						{Type: "A2A", Port: 3000, Path: "/a2a"},
 					},
 				},
 			}
@@ -273,7 +272,7 @@ var _ = Describe("Agent Controller", func() {
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
-			Expect(probe.HTTPGet.Path).To(Equal(fmt.Sprintf("/custom%s", agentCardEndpoint)))
+			Expect(probe.HTTPGet.Path).To(Equal("/custom" + agentCardEndpoint))
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000)) // Default port
 		})
 
@@ -289,7 +288,7 @@ var _ = Describe("Agent Controller", func() {
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
-			Expect(probe.HTTPGet.Path).To(Equal(fmt.Sprintf("/agent-api%s", agentCardEndpoint)))
+			Expect(probe.HTTPGet.Path).To(Equal("/agent-api" + agentCardEndpoint))
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(4000))
 		})
 
@@ -305,7 +304,7 @@ var _ = Describe("Agent Controller", func() {
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
-			Expect(probe.HTTPGet.Path).To(Equal("/a2a" + agentCardEndpoint))
+			Expect(probe.HTTPGet.Path).To(Equal(agentCardEndpoint))
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000))
 		})
 
@@ -337,7 +336,7 @@ var _ = Describe("Agent Controller", func() {
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
-			Expect(probe.HTTPGet.Path).To(Equal(agentCardEndpoint))
+			Expect(probe.HTTPGet.Path).To(Equal("/" + agentCardEndpoint))
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000))
 		})
 	})
@@ -417,21 +416,21 @@ var _ = Describe("Agent Controller", func() {
 			// Test with custom path
 			protocolWithPath := &runtimev1alpha1.AgentProtocol{Type: "A2A", Path: "/custom-mount"}
 			path := reconciler.getA2AHealthPath(protocolWithPath)
-			Expect(path).To(Equal(fmt.Sprintf("/custom-mount%s", agentCardEndpoint)))
+			Expect(path).To(Equal("/custom-mount" + agentCardEndpoint))
 
 			// Test with root path (special "/" value)
-			protocolRootPath := &runtimev1alpha1.AgentProtocol{Type: "A2A", Path: "/"}
+			protocolRootPath := &runtimev1alpha1.AgentProtocol{Type: "A2A", Path: "/a2a"}
 			pathRoot := reconciler.getA2AHealthPath(protocolRootPath)
-			Expect(pathRoot).To(Equal(agentCardEndpoint))
+			Expect(pathRoot).To(Equal("/a2a" + agentCardEndpoint))
 
 			// Test with unspecified path field (should use default /a2a)
 			protocolNoPath := &runtimev1alpha1.AgentProtocol{Type: "A2A"}
 			pathDefault := reconciler.getA2AHealthPath(protocolNoPath)
-			Expect(pathDefault).To(Equal("/a2a" + agentCardEndpoint))
+			Expect(pathDefault).To(Equal(agentCardEndpoint))
 
 			// Test with nil protocol (should use default)
 			pathNil := reconciler.getA2AHealthPath(nil)
-			Expect(pathNil).To(Equal("/a2a" + agentCardEndpoint))
+			Expect(pathNil).To(Equal(agentCardEndpoint))
 		})
 	})
 
@@ -660,7 +659,7 @@ var _ = Describe("Agent Controller", func() {
 			desiredContainer := reconciler.findAgentContainer(desiredDeployment.Spec.Template.Spec.Containers)
 
 			Expect(existingContainer.ReadinessProbe.HTTPGet.Path).To(Equal("/health"))
-			Expect(desiredContainer.ReadinessProbe.HTTPGet.Path).To(Equal("/a2a" + agentCardEndpoint))
+			Expect(desiredContainer.ReadinessProbe.HTTPGet.Path).To(Equal(agentCardEndpoint))
 		})
 
 		It("should not trigger update when probes are identical", func() {
@@ -1818,7 +1817,7 @@ var _ = Describe("Agent Controller", func() {
 			// Find the A2A_AGENT_CARD_URL variable
 			a2aUrlVar := findEnvVar(templateVars, "A2A_AGENT_CARD_URL")
 			Expect(a2aUrlVar).NotTo(BeNil())
-			Expect(a2aUrlVar.Value).To(Equal(fmt.Sprintf("http://test-agent.test-namespace.svc.cluster.local:8080%s", agentCardEndpoint)))
+			Expect(a2aUrlVar.Value).To(Equal("http://test-agent.test-namespace.svc.cluster.local:8080" + agentCardEndpoint))
 		})
 
 		It("should not generate A2A_AGENT_CARD_URL when no A2A protocol is present", func() {

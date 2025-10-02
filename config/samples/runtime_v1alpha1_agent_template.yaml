@@ -21,7 +21,6 @@ spec:
 #      url: "https://remote.mcpservers.org/fetch/mcp"
   protocols:
     - type: A2A
-      path: "/"
   replicas: 1
   env:
     - name: LOG_LEVEL
