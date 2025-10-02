@@ -2,7 +2,7 @@
 
 The Agent Runtime Operator is a Kubernetes operator that provides a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the management of components like wiring of agents with a observability stack or model routers.
 
-The operator is built with the [Operator SDK](https://sdk.operatorframework.io/) framework.
+The operator is built with the [Operator SDK](https://sdk.operatorframework.io/docs/) framework. Make sure to be familiar with the Operator SDK concepts when working with this project.
 
 ## Getting Started
 
@@ -114,6 +114,20 @@ When E2E tests fail, the cleanup step is not run to allow for manual analysis of
 
 ```shell
 make cleanup-test-e2e
+```
+
+### Create or Update API and Webhooks
+
+The operator-sdk CLI can be used to create or update APIs and webhooks.
+This is the preferred way to add new APIs and webhooks to the operator.
+If the operator-sdk CLI is updated, you may need to re-run these commands to update the generated code.
+
+```shell
+# Create API for Agent CRD
+operator-sdk create api --group runtime --version v1alpha1 --kind Agent
+
+# Create webhook for Agent CRD
+operator-sdk create webhook --group runtime --version v1alpha1 --kind Agent --defaulting --programmatic-validation
 ```
 
 ## Contribution
