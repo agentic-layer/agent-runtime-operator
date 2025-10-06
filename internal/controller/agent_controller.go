@@ -72,7 +72,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Reconciling Agent", "name", agent.Name, "namespace", agent.Namespace)
+	log.Info("Reconciling Agent")
 
 	// Check if deployment already exists
 	deployment := &appsv1.Deployment{}
@@ -81,7 +81,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	if err != nil && errors.IsNotFound(err) {
 		// Deployment does not exist, create it
-		log.Info("Creating new Deployment", "name", deploymentName, "namespace", agent.Namespace)
+		log.Info("Creating new Deployment")
 
 		deployment, err = r.createDeploymentForAgent(ctx, &agent, deploymentName)
 		if err != nil {
@@ -90,11 +90,11 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 
 		if err := r.Create(ctx, deployment); err != nil {
-			log.Error(err, "Failed to create new Deployment", "name", deploymentName)
+			log.Error(err, "Failed to create new Deployment")
 			return ctrl.Result{}, err
 		}
 
-		log.Info("Successfully created Deployment", "name", deploymentName, "namespace", agent.Namespace)
+		log.Info("Successfully created Deployment")
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
@@ -107,7 +107,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 
 		if r.needsDeploymentUpdate(deployment, desiredDeployment) {
-			log.Info("Updating existing Deployment", "name", deploymentName, "namespace", agent.Namespace)
+			log.Info("Updating existing Deployment")
 
 			// Update deployment spec - only fields we manage
 			deployment.Spec.Replicas = desiredDeployment.Spec.Replicas
@@ -122,11 +122,11 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			}
 
 			if err := r.Update(ctx, deployment); err != nil {
-				log.Error(err, "Failed to update Deployment", "name", deploymentName)
+				log.Error(err, "Failed to update Deployment")
 				return ctrl.Result{}, err
 			}
 
-			log.Info("Successfully updated Deployment", "name", deploymentName, "namespace", agent.Namespace)
+			log.Info("Successfully updated Deployment")
 		}
 	}
 
@@ -137,7 +137,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: agent.Namespace}, service)
 
 		if err != nil && errors.IsNotFound(err) {
-			log.Info("Creating new Service", "name", serviceName, "namespace", agent.Namespace)
+			log.Info("Creating new Service")
 
 			service, err = r.createServiceForAgent(&agent, serviceName)
 			if err != nil {
@@ -146,11 +146,11 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			}
 
 			if err := r.Create(ctx, service); err != nil {
-				log.Error(err, "Failed to create new Service", "name", serviceName)
+				log.Error(err, "Failed to create new Service")
 				return ctrl.Result{}, err
 			}
 
-			log.Info("Successfully created Service", "name", serviceName, "namespace", agent.Namespace)
+			log.Info("Successfully created Service")
 		} else if err != nil {
 			log.Error(err, "Failed to get Service")
 			return ctrl.Result{}, err
@@ -163,7 +163,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			}
 
 			if r.needsServiceUpdate(service, desiredService) {
-				log.Info("Updating existing Service", "name", serviceName, "namespace", agent.Namespace)
+				log.Info("Updating existing Service")
 
 				// Update service spec
 				// Note: Selector should remain stable, only update ports and labels
@@ -171,11 +171,11 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				service.Labels = desiredService.Labels
 
 				if err := r.Update(ctx, service); err != nil {
-					log.Error(err, "Failed to update Service", "name", serviceName)
+					log.Error(err, "Failed to update Service")
 					return ctrl.Result{}, err
 				}
 
-				log.Info("Successfully updated Service", "name", serviceName, "namespace", agent.Namespace)
+				log.Info("Successfully updated Service")
 			}
 		}
 	} else {
@@ -185,9 +185,9 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: agent.Namespace}, service)
 
 		if err == nil {
-			log.Info("Deleting Service as no protocols are defined", "name", serviceName, "namespace", agent.Namespace)
+			log.Info("Deleting Service as no protocols are defined")
 			if err := r.Delete(ctx, service); err != nil {
-				log.Error(err, "Failed to delete Service", "name", serviceName)
+				log.Error(err, "Failed to delete Service")
 				return ctrl.Result{}, err
 			}
 		} else if !errors.IsNotFound(err) {
@@ -720,7 +720,7 @@ func (r *AgentReconciler) buildOpenAIReadinessProbe(port int32) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(int(port)),
+				Port: intstr.FromInt32(port),
 			},
 		},
 		InitialDelaySeconds: 60,
@@ -737,7 +737,7 @@ func (r *AgentReconciler) buildA2AReadinessProbe(healthPath string, port int32) 
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: healthPath,
-				Port: intstr.FromInt(int(port)),
+				Port: intstr.FromInt32(port),
 			},
 		},
 		InitialDelaySeconds: 60,
