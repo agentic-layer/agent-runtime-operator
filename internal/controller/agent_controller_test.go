@@ -146,7 +146,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Path).To(Equal(agentCardEndpoint))
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000))
-			Expect(probe.InitialDelaySeconds).To(Equal(int32(60)))
+			Expect(probe.InitialDelaySeconds).To(Equal(int32(10)))
 		})
 
 		It("should generate TCP probe for OpenAI-only agents", func() {
@@ -162,7 +162,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.TCPSocket).NotTo(BeNil())
 			Expect(probe.TCPSocket.Port.IntValue()).To(Equal(8000))
-			Expect(probe.InitialDelaySeconds).To(Equal(int32(60)))
+			Expect(probe.InitialDelaySeconds).To(Equal(int32(10)))
 		})
 
 		It("should prioritize A2A probe over OpenAI when both protocols exist", func() {

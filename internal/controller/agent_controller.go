@@ -723,11 +723,11 @@ func (r *AgentReconciler) buildOpenAIReadinessProbe(port int32) *corev1.Probe {
 				Port: intstr.FromInt32(port),
 			},
 		},
-		InitialDelaySeconds: 60,
+		InitialDelaySeconds: 10,
 		PeriodSeconds:       10,
 		TimeoutSeconds:      3,
 		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		FailureThreshold:    10,
 	}
 }
 
@@ -740,10 +740,10 @@ func (r *AgentReconciler) buildA2AReadinessProbe(healthPath string, port int32) 
 				Port: intstr.FromInt32(port),
 			},
 		},
-		InitialDelaySeconds: 60,
+		InitialDelaySeconds: 10,
 		PeriodSeconds:       10,
 		TimeoutSeconds:      3,
 		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		FailureThreshold:    10,
 	}
 }
