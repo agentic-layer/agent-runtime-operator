@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
@@ -246,4 +247,44 @@ func (r *AgentReconciler) buildA2AAgentCardUrl(agent *runtimev1alpha1.Agent) str
 		}
 	}
 	return ""
+}
+
+// resolveSubAgentUrl resolves a SubAgent configuration to its actual URL.
+// For remote agents (with URL): returns the URL directly
+// For cluster agents (with agentRef): looks up the Agent resource and uses its status.url
+// If namespace is not specified in agentRef, defaults to the parent agent's namespace
+func (r *AgentReconciler) resolveSubAgentUrl(ctx context.Context, subAgent runtimev1alpha1.SubAgent, parentNamespace string) (string, error) {
+	// If URL is provided, this is a remote agent - use URL directly
+	if subAgent.Url != "" {
+		return subAgent.Url, nil
+	}
+
+	// This is a cluster agent reference - resolve by looking up the Agent resource
+	if subAgent.AgentRef == nil {
+		return "", fmt.Errorf("subAgent has neither url nor agentRef specified")
+	}
+
+	// Use namespace from ObjectReference, or default to parent namespace
+	namespace := subAgent.AgentRef.Namespace
+	if namespace == "" {
+		// Default to parent agent's namespace (following Kubernetes conventions)
+		namespace = parentNamespace
+	}
+
+	var referencedAgent runtimev1alpha1.Agent
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      subAgent.AgentRef.Name,
+		Namespace: namespace,
+	}, &referencedAgent)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve cluster agent %s/%s: %w", namespace, subAgent.AgentRef.Name, err)
+	}
+
+	// Use the URL from the agent's status (populated by the controller)
+	if referencedAgent.Status.Url == "" {
+		return "", fmt.Errorf("cluster Agent %s/%s has no URL in its Status field (may not be ready or have A2A protocol)", namespace, subAgent.AgentRef.Name)
+	}
+
+	return referencedAgent.Status.Url, nil
 }

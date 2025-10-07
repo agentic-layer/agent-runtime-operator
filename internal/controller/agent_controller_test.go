@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -159,18 +158,6 @@ var _ = Describe("Agent Controller", func() {
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).To(BeNil())
 		})
-
-		It("should correctly detect A2A protocol", func() {
-			agent := &runtimev1alpha1.Agent{
-				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "A2A", Port: 8000},
-					},
-				},
-			}
-
-			Expect(reconciler.hasA2AProtocol(agent)).To(BeTrue())
-		})
 	})
 
 	Context("When testing protocol-aware health check configuration", func() {
@@ -203,7 +190,7 @@ var _ = Describe("Agent Controller", func() {
 			agent := &runtimev1alpha1.Agent{
 				Spec: runtimev1alpha1.AgentSpec{
 					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "A2A", Path: "/custom"},
+						{Type: "A2A", Path: "/custom", Port: 8000},
 					},
 				},
 			}
@@ -212,7 +199,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Path).To(Equal("/custom" + agentCardEndpoint))
-			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000)) // Default port
+			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000))
 		})
 
 		It("should use both custom path and port from A2A protocol", func() {
@@ -231,11 +218,11 @@ var _ = Describe("Agent Controller", func() {
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(4000))
 		})
 
-		It("should use default values when protocol has no port or path specified", func() {
+		It("should use default values when protocol has no path specified", func() {
 			agent := &runtimev1alpha1.Agent{
 				Spec: runtimev1alpha1.AgentSpec{
 					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "A2A"}, // No port or path specified
+						{Type: "A2A", Port: 8000}, // No path specified
 					},
 				},
 			}
@@ -298,7 +285,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			protocol := reconciler.getA2AProtocol(agent)
+			protocol := reconciler.findA2AProtocol(agent)
 			Expect(protocol).NotTo(BeNil())
 			Expect(protocol.Type).To(Equal("A2A"))
 			Expect(protocol.Port).To(Equal(int32(4000)))
@@ -312,169 +299,8 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			protocol := reconciler.getA2AProtocol(agent)
+			protocol := reconciler.findA2AProtocol(agent)
 			Expect(protocol).To(BeNil())
-		})
-
-		It("should get protocol port with fallback to default", func() {
-			protocol := &runtimev1alpha1.AgentProtocol{Type: "A2A", Port: 9000}
-			port := reconciler.getProtocolPort(protocol)
-			Expect(port).To(Equal(int32(9000)))
-
-			// Test with zero port (should use default)
-			protocolNoPort := &runtimev1alpha1.AgentProtocol{Type: "A2A", Port: 0}
-			portDefault := reconciler.getProtocolPort(protocolNoPort)
-			Expect(portDefault).To(Equal(int32(8000)))
-
-			// Test with nil protocol (should use default)
-			portNil := reconciler.getProtocolPort(nil)
-			Expect(portNil).To(Equal(int32(8000)))
-		})
-
-		It("should get A2A health path correctly", func() {
-			// Test with custom path
-			protocolWithPath := &runtimev1alpha1.AgentProtocol{Type: "A2A", Path: "/custom-mount"}
-			path := reconciler.getA2AHealthPath(protocolWithPath)
-			Expect(path).To(Equal("/custom-mount" + agentCardEndpoint))
-
-			// Test with root path (special "/" value)
-			protocolRootPath := &runtimev1alpha1.AgentProtocol{Type: "A2A", Path: "/a2a"}
-			pathRoot := reconciler.getA2AHealthPath(protocolRootPath)
-			Expect(pathRoot).To(Equal("/a2a" + agentCardEndpoint))
-
-			// Test with unspecified path field (should use default /a2a)
-			protocolNoPath := &runtimev1alpha1.AgentProtocol{Type: "A2A"}
-			pathDefault := reconciler.getA2AHealthPath(protocolNoPath)
-			Expect(pathDefault).To(Equal(agentCardEndpoint))
-
-			// Test with nil protocol (should use default)
-			pathNil := reconciler.getA2AHealthPath(nil)
-			Expect(pathNil).To(Equal(agentCardEndpoint))
-		})
-	})
-
-	Context("When testing probe comparison", func() {
-		var reconciler *AgentReconciler
-
-		BeforeEach(func() {
-			reconciler = &AgentReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-		})
-
-		It("should consider nil probes as equal", func() {
-			Expect(reconciler.probesEqual(nil, nil)).To(BeTrue())
-		})
-
-		It("should consider nil and non-nil probes as not equal", func() {
-			probe := &corev1.Probe{InitialDelaySeconds: 10}
-			Expect(reconciler.probesEqual(nil, probe)).To(BeFalse())
-			Expect(reconciler.probesEqual(probe, nil)).To(BeFalse())
-		})
-
-		It("should compare HTTP probes correctly", func() {
-			probe1 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/a2a" + agentCardEndpoint,
-						Port: intstr.FromInt(8000),
-					},
-				},
-				InitialDelaySeconds: 10,
-			}
-			probe2 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/a2a" + agentCardEndpoint,
-						Port: intstr.FromInt(8000),
-					},
-				},
-				InitialDelaySeconds: 10,
-			}
-
-			Expect(reconciler.probesEqual(probe1, probe2)).To(BeTrue())
-		})
-
-		It("should detect different HTTP probe paths", func() {
-			probe1 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/a2a" + agentCardEndpoint,
-						Port: intstr.FromInt(8000),
-					},
-				},
-			}
-			probe2 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/health",
-						Port: intstr.FromInt(8000),
-					},
-				},
-			}
-
-			Expect(reconciler.probesEqual(probe1, probe2)).To(BeFalse())
-		})
-
-		It("should compare TCP probes correctly", func() {
-			probe1 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(8000),
-					},
-				},
-				InitialDelaySeconds: 10,
-			}
-			probe2 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(8000),
-					},
-				},
-				InitialDelaySeconds: 10,
-			}
-
-			Expect(reconciler.probesEqual(probe1, probe2)).To(BeTrue())
-		})
-
-		It("should detect different TCP probe ports", func() {
-			probe1 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(8000),
-					},
-				},
-			}
-			probe2 := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(3000),
-					},
-				},
-			}
-
-			Expect(reconciler.probesEqual(probe1, probe2)).To(BeFalse())
-		})
-
-		It("should detect mixed probe types as different", func() {
-			httpProbe := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/a2a" + agentCardEndpoint,
-						Port: intstr.FromInt(8000),
-					},
-				},
-			}
-			tcpProbe := &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(8000),
-					},
-				},
-			}
-
-			Expect(reconciler.probesEqual(httpProbe, tcpProbe)).To(BeFalse())
 		})
 	})
 

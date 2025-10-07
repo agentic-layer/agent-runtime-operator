@@ -21,6 +21,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	A2AProtocol = "A2A"
+)
+
 // AgentProtocol defines a port configuration for the agent
 type AgentProtocol struct {
 	// Name is the name of the port

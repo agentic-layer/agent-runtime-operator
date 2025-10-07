@@ -40,7 +40,7 @@ const (
 )
 
 // log is for logging in this package.
-var agentlog = logf.Log.WithName("agent-resource")
+var log = logf.Log.WithName("agent-resource")
 
 // SetupAgentWebhookWithManager registers the webhook for Agent in the manager.
 func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
@@ -80,7 +80,7 @@ func (d *AgentCustomDefaulter) Default(_ context.Context, obj runtime.Object) er
 	if !ok {
 		return fmt.Errorf("expected an Agent object but got %T", obj)
 	}
-	agentlog.Info("Defaulting for Agent", "name", agent.GetName())
+	log.Info("Defaulting for Agent", "name", agent.GetName())
 
 	d.applyDefaults(agent)
 
@@ -110,6 +110,13 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 			// This shouldn't be reached due to validation, but set template as fallback
 			agent.Spec.Image = defaultTemplateImageFallback
 		}
+	}
+
+	// Add default protocols if none are specified
+	if len(agent.Spec.Protocols) == 0 {
+		agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{{
+			Type: "A2A",
+		}}
 	}
 
 	// Set default ports for protocols if not specified
@@ -151,7 +158,7 @@ func (v *AgentCustomValidator) ValidateCreate(_ context.Context, obj runtime.Obj
 	if !ok {
 		return nil, fmt.Errorf("expected an Agent object but got %T", obj)
 	}
-	agentlog.Info("Validating Agent on create", "name", agent.GetName())
+	log.Info("Validating Agent on create", "name", agent.GetName())
 	return v.validateAgent(agent)
 }
 
@@ -161,7 +168,7 @@ func (v *AgentCustomValidator) ValidateUpdate(_ context.Context, _, newObj runti
 	if !ok {
 		return nil, fmt.Errorf("expected an Agent object but got %T", newObj)
 	}
-	agentlog.Info("Validating Agent on update", "name", agent.GetName())
+	log.Info("Validating Agent on update", "name", agent.GetName())
 	return v.validateAgent(agent)
 }
 
