@@ -258,17 +258,20 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(emptyAgent.Spec.Replicas).NotTo(BeNil())
 				Expect(*emptyAgent.Spec.Replicas).To(Equal(int32(1)))
 
-				By("verifying that protocols list is empty but handled gracefully")
-				Expect(emptyAgent.Spec.Protocols).To(BeEmpty())
+				By("verifying that protocol list is populated with default protocol")
+				Expect(emptyAgent.Spec.Protocols).To(HaveLen(1))
+				Expect(emptyAgent.Spec.Protocols[0].Type).To(Equal(runtimev1alpha1.A2AProtocol))
+				Expect(emptyAgent.Spec.Protocols[0].Name).To(Equal("a2a-8080"))
+				Expect(emptyAgent.Spec.Protocols[0].Port).To(Equal(int32(8080)))
 			})
 
 			It("Should handle multiple protocols with mixed configurations", func() {
 				By("setting up multiple protocols with different configurations")
 				obj.Spec.Framework = googleAdkFramework
 				obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
-					{Type: "A2A"},                             // No port, no name
-					{Type: "OpenAI", Port: 9000},              // Port set, no name
-					{Type: "A2A", Name: "custom", Port: 8500}, // Both set
+					{Type: runtimev1alpha1.A2AProtocol},                             // No port, no name
+					{Type: runtimev1alpha1.A2AProtocol, Port: 9000},                 // Port set, no name
+					{Type: runtimev1alpha1.A2AProtocol, Name: "custom", Port: 8500}, // Both set
 				}
 
 				By("calling the Default method")
@@ -281,8 +284,8 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.Protocols[0].Port).To(Equal(int32(8000))) // google-adk default
 				Expect(obj.Spec.Protocols[0].Name).To(Equal("a2a-8000"))  // generated name with lowercase
 
-				Expect(obj.Spec.Protocols[1].Port).To(Equal(int32(9000)))   // preserved port
-				Expect(obj.Spec.Protocols[1].Name).To(Equal("openai-9000")) // generated name with lowercase
+				Expect(obj.Spec.Protocols[1].Port).To(Equal(int32(9000))) // preserved port
+				Expect(obj.Spec.Protocols[1].Name).To(Equal("a2a-9000"))  // generated name with lowercase
 
 				Expect(obj.Spec.Protocols[2].Port).To(Equal(int32(8500))) // preserved port
 				Expect(obj.Spec.Protocols[2].Name).To(Equal("custom"))    // preserved name

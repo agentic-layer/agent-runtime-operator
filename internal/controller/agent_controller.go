@@ -22,7 +22,6 @@ import (
 	"maps"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	"github.com/agentic-layer/agent-runtime-operator/internal/equality"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +39,6 @@ import (
 const (
 	agentContainerName = "agent"
 	agentCardEndpoint  = "/.well-known/agent-card.json"
-	a2AProtocol        = "A2A"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -150,7 +148,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		allEnvVars := r.mergeEnvironmentVariables(templateEnvVars, agent.Spec.Env)
 
 		// Set immutable fields only on creation
-		if deployment.ObjectMeta.CreationTimestamp.IsZero() {
+		if deployment.CreationTimestamp.IsZero() {
 			// Deployment selector is immutable so we set this value only if
 			// a new object is going to be created
 			deployment.Spec.Selector = &metav1.LabelSelector{
@@ -273,103 +271,36 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 	return nil
 }
 
-// hasA2AProtocol checks if the agent has A2A protocol configured
-func (r *AgentReconciler) hasA2AProtocol(agent *runtimev1alpha1.Agent) bool {
+// findA2AProtocol returns the first A2A protocol configuration found
+func (r *AgentReconciler) findA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
 	for _, protocol := range agent.Spec.Protocols {
-
-		if protocol.Type == a2AProtocol {
-			return true
-		}
-	}
-	return false
-}
-
-// getA2AProtocol returns the first A2A protocol configuration found
-func (r *AgentReconciler) getA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
-	for _, protocol := range agent.Spec.Protocols {
-		if protocol.Type == a2AProtocol {
+		if protocol.Type == runtimev1alpha1.A2AProtocol {
 			return &protocol
 		}
 	}
 	return nil
 }
 
-// getProtocolPort returns the port from protocol or default if not specified
-func (r *AgentReconciler) getProtocolPort(protocol *runtimev1alpha1.AgentProtocol) int32 {
-	defaultPort := int32(8000) // Default port if none specified
-	if protocol != nil && protocol.Port != 0 {
-		return protocol.Port
-	}
-	return defaultPort
-}
-
-// getA2AHealthPath returns the A2A health check path based on protocol configuration
-func (r *AgentReconciler) getA2AHealthPath(protocol *runtimev1alpha1.AgentProtocol) string {
-	if protocol != nil && protocol.Path != "" {
-		return protocol.Path + agentCardEndpoint
-	}
-	// Default for agents without protocol specification or path
-	return agentCardEndpoint
-}
-
 // generateReadinessProbe generates appropriate readiness probe based on agent protocols
 func (r *AgentReconciler) generateReadinessProbe(agent *runtimev1alpha1.Agent) *corev1.Probe {
-	if r.hasA2AProtocol(agent) {
-		// Use A2A agent card endpoint for health check
-		a2aProtocol := r.getA2AProtocol(agent)
-		healthPath := r.getA2AHealthPath(a2aProtocol)
-		port := r.getProtocolPort(a2aProtocol)
-
-		return r.buildA2AReadinessProbe(healthPath, port)
+	// Use A2A agent card endpoint for health check
+	protocol := r.findA2AProtocol(agent)
+	if protocol != nil {
+		return &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: protocol.Path + agentCardEndpoint,
+					Port: intstr.FromInt32(protocol.Port),
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       10,
+			TimeoutSeconds:      3,
+			SuccessThreshold:    1,
+			FailureThreshold:    10,
+		}
 	}
-
-	// No A2A protocol - no readiness probe
 	return nil
-}
-
-// probesEqual compares two readiness probes for equality
-func (r *AgentReconciler) probesEqual(existing, desired *corev1.Probe) bool {
-	return equality.ProbesEqual(existing, desired)
-}
-
-// resolveSubAgentUrl resolves a SubAgent configuration to its actual URL.
-// For remote agents (with URL): returns the URL directly
-// For cluster agents (with agentRef): looks up the Agent resource and uses its status.url
-// If namespace is not specified in agentRef, defaults to the parent agent's namespace
-func (r *AgentReconciler) resolveSubAgentUrl(ctx context.Context, subAgent runtimev1alpha1.SubAgent, parentNamespace string) (string, error) {
-	// If URL is provided, this is a remote agent - use URL directly
-	if subAgent.Url != "" {
-		return subAgent.Url, nil
-	}
-
-	// This is a cluster agent reference - resolve by looking up the Agent resource
-	if subAgent.AgentRef == nil {
-		return "", fmt.Errorf("subAgent has neither url nor agentRef specified")
-	}
-
-	// Use namespace from ObjectReference, or default to parent namespace
-	namespace := subAgent.AgentRef.Namespace
-	if namespace == "" {
-		// Default to parent agent's namespace (following Kubernetes conventions)
-		namespace = parentNamespace
-	}
-
-	var referencedAgent runtimev1alpha1.Agent
-	err := r.Get(ctx, types.NamespacedName{
-		Name:      subAgent.AgentRef.Name,
-		Namespace: namespace,
-	}, &referencedAgent)
-
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve cluster agent %s/%s: %w", namespace, subAgent.AgentRef.Name, err)
-	}
-
-	// Use the URL from the agent's status (populated by the controller)
-	if referencedAgent.Status.Url == "" {
-		return "", fmt.Errorf("cluster Agent %s/%s has no URL in its Status field (may not be ready or have A2A protocol)", namespace, subAgent.AgentRef.Name)
-	}
-
-	return referencedAgent.Status.Url, nil
 }
 
 // findAgentsReferencingSubAgent finds all agents that reference a given agent as a subAgent
@@ -431,21 +362,4 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Named("agent").
 		Complete(r)
-}
-
-// buildA2AReadinessProbe creates HTTP-readiness-probe for A2A-protocols.
-func (r *AgentReconciler) buildA2AReadinessProbe(healthPath string, port int32) *corev1.Probe {
-	return &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: healthPath,
-				Port: intstr.FromInt32(port),
-			},
-		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       10,
-		TimeoutSeconds:      3,
-		SuccessThreshold:    1,
-		FailureThreshold:    10,
-	}
 }
