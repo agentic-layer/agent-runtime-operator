@@ -342,6 +342,16 @@ var _ = Describe("Manager", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred(), "Failed to apply sample configmap")
 		})
 
+		AfterEach(func() {
+			By("cleaning up test agents from individual tests")
+			// Clean up test agents created in individual tests
+			testAgents := []string{"test-subagent", "test-parent-agent", "watch-subagent", "watch-parent"}
+			for _, agentName := range testAgents {
+				cmd := exec.Command("kubectl", "delete", "agent", agentName, "-n", testNamespace, "--ignore-not-found=true")
+				_, _ = utils.Run(cmd)
+			}
+		})
+
 		AfterAll(func() {
 			By("cleaning up sample agents")
 			cmd := exec.Command("kubectl", "delete", "-f", "config/samples/runtime_v1alpha1_agent.yaml",
@@ -581,6 +591,215 @@ var _ = Describe("Manager", Ordered, func() {
 				g.Expect(output).To(Equal("2"), "Deployment should have 2 ready replicas")
 			}
 			Eventually(verifyReplicaUpdate, 2*time.Minute).Should(Succeed())
+		})
+
+		It("should resolve cluster-local subAgent references and populate SUB_AGENTS", func() {
+			const subAgentName = "test-subagent"
+			const parentAgentName = "test-parent-agent"
+
+			By("creating a subAgent with A2A protocol")
+			subAgentYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  image: %s
+  protocols:
+    - type: A2A
+      port: 8000
+`, subAgentName, webhookv1alpha1.DefaultTemplateImageAdk)
+
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(subAgentYAML))
+			}()
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create subAgent")
+
+			By("waiting for subAgent Status.Url to be populated")
+			verifySubAgentStatus := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "agent", subAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.url}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).NotTo(BeEmpty(), "SubAgent status URL should be set")
+			}
+			Eventually(verifySubAgentStatus).Should(Succeed())
+
+			By("creating a parent agent that references the subAgent by name")
+			parentAgentYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  image: %s
+  subAgents:
+    - name: %s
+      agentRef:
+        name: %s
+  protocols:
+    - type: A2A
+      port: 8000
+`, parentAgentName, webhookv1alpha1.DefaultTemplateImageAdk, subAgentName, subAgentName)
+
+			cmd = exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err = cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(parentAgentYAML))
+			}()
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create parent agent")
+
+			By("waiting for parent agent deployment to be ready")
+			verifyParentDeploymentReady := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.readyReplicas}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("1"), "Parent deployment should have 1 ready replica")
+			}
+			Eventually(verifyParentDeploymentReady, 3*time.Minute).Should(Succeed())
+
+			By("verifying SUB_AGENTS environment variable contains resolved URL")
+			verifySUBAGENTSenv := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='SUB_AGENTS')].value}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring(subAgentName), "SUB_AGENTS should contain subAgent name")
+				g.Expect(output).To(ContainSubstring(fmt.Sprintf("%s.%s.svc.cluster.local", subAgentName, testNamespace)),
+					"SUB_AGENTS should contain resolved cluster-local URL")
+			}
+			Eventually(verifySUBAGENTSenv).Should(Succeed())
+
+			By("verifying parent agent status has SubAgentsResolved condition set to True")
+			verifyStatusCondition := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "agent", parentAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.conditions[?(@.type=='SubAgentsResolved')].status}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("True"), "SubAgentsResolved condition should be True")
+			}
+			Eventually(verifyStatusCondition).Should(Succeed())
+		})
+
+		It("should trigger reconciliation when subAgent status URL changes", func() {
+			const subAgentName = "watch-subagent"
+			const parentAgentName = "watch-parent"
+
+			By("creating a subAgent with A2A protocol on port 8000")
+			subAgentYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  image: %s
+  protocols:
+    - type: A2A
+      port: 8000
+`, subAgentName, webhookv1alpha1.DefaultTemplateImageAdk)
+
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(subAgentYAML))
+			}()
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create subAgent")
+
+			By("waiting for subAgent to be ready")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "agent", subAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.url}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring(":8000"), "SubAgent should have port 8000")
+			}).Should(Succeed())
+
+			By("creating parent agent referencing subAgent")
+			parentAgentYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  image: %s
+  subAgents:
+    - name: %s
+      agentRef:
+        name: %s
+  protocols:
+    - type: A2A
+      port: 8000
+`, parentAgentName, webhookv1alpha1.DefaultTemplateImageAdk, subAgentName, subAgentName)
+
+			cmd = exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err = cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(parentAgentYAML))
+			}()
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create parent agent")
+
+			By("waiting for parent deployment to be ready and verify initial SUB_AGENTS")
+			var initialSubAgentsValue string
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.readyReplicas}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("1"))
+
+				cmd = exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='SUB_AGENTS')].value}")
+				subAgentsValue, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(subAgentsValue).To(ContainSubstring(":8000"))
+				initialSubAgentsValue = subAgentsValue
+			}, 3*time.Minute).Should(Succeed())
+
+			By("updating subAgent to change port to 9000")
+			cmd = exec.Command("kubectl", "patch", "agent", subAgentName, "-n", testNamespace,
+				"--type=merge", "-p", `{"spec":{"protocols":[{"type":"A2A","port":9000}]}}`)
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to patch subAgent")
+
+			By("waiting for subAgent status URL to update")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "agent", subAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.status.url}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring(":9000"), "SubAgent URL should now use port 9000")
+			}).Should(Succeed())
+
+			By("verifying parent deployment SUB_AGENTS was updated with new port")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='SUB_AGENTS')].value}")
+				newSubAgentsValue, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(newSubAgentsValue).To(ContainSubstring(":9000"),
+					"Parent SUB_AGENTS should be updated to port 9000")
+				g.Expect(newSubAgentsValue).NotTo(Equal(initialSubAgentsValue),
+					"SUB_AGENTS value should have changed")
+			}, 2*time.Minute).Should(Succeed())
 		})
 	})
 })

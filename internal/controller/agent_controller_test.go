@@ -562,6 +562,8 @@ var _ = Describe("Agent Controller", func() {
 	Context("When testing deployment updates with probe changes", func() {
 		var reconciler *AgentReconciler
 
+		ctx := context.Background()
+
 		BeforeEach(func() {
 			reconciler = &AgentReconciler{
 				Client: k8sClient,
@@ -580,7 +582,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				},
 			}
-			existingDeployment, err := reconciler.createDeploymentForAgent(existingAgent, "test-agent")
+			existingDeployment, err := reconciler.createDeploymentForAgent(ctx, existingAgent, "test-agent")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create desired deployment with TCP probe (OpenAI agent)
@@ -593,7 +595,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				},
 			}
-			desiredDeployment, err := reconciler.createDeploymentForAgent(desiredAgent, "test-agent")
+			desiredDeployment, err := reconciler.createDeploymentForAgent(ctx, desiredAgent, "test-agent")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify update is needed due to probe change
@@ -647,7 +649,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				},
 			}
-			desiredDeployment, err := reconciler.createDeploymentForAgent(agent, "test-agent")
+			desiredDeployment, err := reconciler.createDeploymentForAgent(ctx, agent, "test-agent")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify update is needed due to path change
@@ -673,7 +675,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				},
 			}
-			deployment1, err := reconciler.createDeploymentForAgent(agent1, "test-agent")
+			deployment1, err := reconciler.createDeploymentForAgent(ctx, agent1, "test-agent")
 			Expect(err).NotTo(HaveOccurred())
 
 			agent2 := &runtimev1alpha1.Agent{
@@ -685,7 +687,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				},
 			}
-			deployment2, err := reconciler.createDeploymentForAgent(agent2, "test-agent")
+			deployment2, err := reconciler.createDeploymentForAgent(ctx, agent2, "test-agent")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify no update needed
@@ -722,7 +724,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				},
 			}
-			desiredDeployment, err := reconciler.createDeploymentForAgent(agent, "test-agent")
+			desiredDeployment, err := reconciler.createDeploymentForAgent(ctx, agent, "test-agent")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify update is needed (nil -> probe)
@@ -740,7 +742,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				},
 			}
-			existingDeployment, err := reconciler.createDeploymentForAgent(agent, "test-agent")
+			existingDeployment, err := reconciler.createDeploymentForAgent(ctx, agent, "test-agent")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create desired deployment without probe
@@ -1323,7 +1325,7 @@ var _ = Describe("Agent Controller", func() {
 			// Verify JSON-encoded fields
 			subAgentsVar := findEnvVar(agentContainer.Env, "SUB_AGENTS")
 			Expect(subAgentsVar).NotTo(BeNil())
-			Expect(subAgentsVar.Value).To(ContainSubstring("test-sub-agent"))
+			Expect(subAgentsVar.Value).To(ContainSubstring("test_sub_agent"))
 			Expect(subAgentsVar.Value).To(ContainSubstring("https://example.com/sub-agent.json"))
 
 			toolsVar := findEnvVar(agentContainer.Env, "AGENT_TOOLS")
@@ -1508,8 +1510,8 @@ var _ = Describe("Agent Controller", func() {
 
 			subAgentsVar := findEnvVar(agentContainer.Env, "SUB_AGENTS")
 			Expect(subAgentsVar).NotTo(BeNil())
-			Expect(subAgentsVar.Value).To(ContainSubstring("updated-sub-agent"))
-			Expect(subAgentsVar.Value).To(ContainSubstring("second-sub-agent"))
+			Expect(subAgentsVar.Value).To(ContainSubstring("updated_sub_agent"))
+			Expect(subAgentsVar.Value).To(ContainSubstring("second_sub_agent"))
 		})
 	})
 
@@ -1604,7 +1606,7 @@ var _ = Describe("Agent Controller", func() {
 					Spec: runtimev1alpha1.AgentSpec{},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(envVars).To(HaveLen(6))
 
@@ -1654,7 +1656,7 @@ var _ = Describe("Agent Controller", func() {
 					},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(envVars).To(HaveLen(6))
 
@@ -1693,12 +1695,12 @@ var _ = Describe("Agent Controller", func() {
 					},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify JSON structure is valid
 				subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
-				Expect(subAgentsVar.Value).To(MatchJSON(`{"test-sub":{"url":"https://example.com/sub.json"}}`))
+				Expect(subAgentsVar.Value).To(MatchJSON(`{"test_sub":{"url":"https://example.com/sub.json"}}`))
 
 				toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
 				Expect(toolsVar.Value).To(MatchJSON(`{"test-tool":{"url":"https://example.com/tool"}}`))
@@ -1811,7 +1813,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Find the A2A_AGENT_CARD_URL variable
@@ -1838,7 +1840,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// A2A_AGENT_CARD_URL should not be present
@@ -1857,7 +1859,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// A2A_AGENT_CARD_URL should not be present
@@ -1889,13 +1891,711 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should use the first A2A protocol
 			a2aUrlVar := findEnvVar(templateVars, "A2A_AGENT_CARD_URL")
 			Expect(a2aUrlVar).NotTo(BeNil())
 			Expect(a2aUrlVar.Value).To(Equal("http://test-agent.test-namespace.svc.cluster.local:8080/a2a"))
+		})
+	})
+
+	Context("When resolving subAgent URLs", func() {
+		ctx := context.Background()
+
+		It("should return URL directly for remote agent references", func() {
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			subAgent := runtimev1alpha1.SubAgent{
+				Name: "remote-agent",
+				Url:  "https://example.com/.well-known/agent-card.json",
+			}
+
+			url, err := reconciler.resolveSubAgentUrl(ctx, subAgent, "default")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(Equal("https://example.com/.well-known/agent-card.json"))
+		})
+
+		It("should resolve cluster agent reference with explicit namespace", func() {
+			By("Creating the namespace")
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "other-namespace",
+				},
+			}
+			_ = k8sClient.Create(ctx, ns)
+
+			By("Creating a cluster agent with A2A protocol")
+			clusterAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster-agent",
+					Namespace: "other-namespace",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, clusterAgent)).To(Succeed())
+
+			By("Setting the agent's status URL")
+			clusterAgent.Status.Url = "http://cluster-agent.other-namespace.svc.cluster.local:8000/test-url"
+			Expect(k8sClient.Status().Update(ctx, clusterAgent)).To(Succeed())
+
+			By("Resolving the subAgent URL")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			subAgent := runtimev1alpha1.SubAgent{
+				Name: "cluster-agent",
+				AgentRef: &corev1.ObjectReference{
+					Name:      "cluster-agent",
+					Namespace: "other-namespace",
+				},
+			}
+
+			url, err := reconciler.resolveSubAgentUrl(ctx, subAgent, "default")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(Equal("http://cluster-agent.other-namespace.svc.cluster.local:8000/test-url"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, clusterAgent)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
+		})
+
+		It("should default to parent agent's namespace", func() {
+			By("Creating a cluster agent in default namespace")
+			clusterAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster-agent-default",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, clusterAgent)).To(Succeed())
+
+			By("Setting the agent's status URL")
+			clusterAgent.Status.Url = "http://cluster-agent-default.default.svc.cluster.local:8000/test-url"
+			Expect(k8sClient.Status().Update(ctx, clusterAgent)).To(Succeed())
+
+			By("Resolving without specifying namespace")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			subAgent := runtimev1alpha1.SubAgent{
+				Name: "cluster-agent-default",
+				AgentRef: &corev1.ObjectReference{
+					Name: "cluster-agent-default",
+					// Namespace is omitted to test defaulting
+				},
+			}
+
+			url, err := reconciler.resolveSubAgentUrl(ctx, subAgent, "default")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(Equal("http://cluster-agent-default.default.svc.cluster.local:8000/test-url"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, clusterAgent)).To(Succeed())
+		})
+
+		It("should return error when cluster agent doesn't exist", func() {
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			subAgent := runtimev1alpha1.SubAgent{
+				Name: "nonexistent-agent",
+				AgentRef: &corev1.ObjectReference{
+					Name: "nonexistent-agent",
+				},
+			}
+
+			_, err := reconciler.resolveSubAgentUrl(ctx, subAgent, "default")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not found"))
+		})
+
+		It("should return error when cluster agent has empty Status.Url", func() {
+			By("Creating a cluster agent without setting status URL")
+			clusterAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-no-url",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, clusterAgent)).To(Succeed())
+
+			By("Attempting to resolve")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			subAgent := runtimev1alpha1.SubAgent{
+				Name: "agent-no-url",
+				AgentRef: &corev1.ObjectReference{
+					Name: "agent-no-url",
+				},
+			}
+
+			_, err := reconciler.resolveSubAgentUrl(ctx, subAgent, "default")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("has no URL in its Status field"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, clusterAgent)).To(Succeed())
+		})
+	})
+
+	Context("When finding agents referencing a subAgent", func() {
+		ctx := context.Background()
+
+		It("should identify parent agents referencing the changed agent", func() {
+			By("Creating a subAgent")
+			subAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "referenced-subagent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, subAgent)).To(Succeed())
+
+			By("Creating a parent agent that references it")
+			parentAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-agent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "referenced-subagent",
+							AgentRef: &corev1.ObjectReference{
+								Name:      "referenced-subagent",
+								Namespace: "default",
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, parentAgent)).To(Succeed())
+
+			By("Finding agents that reference the subAgent")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			requests := reconciler.findAgentsReferencingSubAgent(ctx, subAgent)
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("parent-agent"))
+			Expect(requests[0].Namespace).To(Equal("default"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, parentAgent)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, subAgent)).To(Succeed())
+		})
+
+		It("should match with namespace defaulting", func() {
+			By("Creating a subAgent in default namespace")
+			subAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "subagent-with-defaulting",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, subAgent)).To(Succeed())
+
+			By("Creating a parent agent without specifying namespace")
+			parentAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-with-defaulting",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "subagent-with-defaulting",
+							AgentRef: &corev1.ObjectReference{
+								Name: "subagent-with-defaulting",
+							}}, // No namespace specified
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, parentAgent)).To(Succeed())
+
+			By("Finding agents - should match with defaulted namespace")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			requests := reconciler.findAgentsReferencingSubAgent(ctx, subAgent)
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("parent-with-defaulting"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, parentAgent)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, subAgent)).To(Succeed())
+		})
+
+		It("should ignore remote URL references", func() {
+			By("Creating a subAgent")
+			subAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "subagent-remote",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, subAgent)).To(Succeed())
+
+			By("Creating a parent agent with remote URL reference (same name)")
+			parentAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-with-url",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "subagent-remote", Url: "https://example.com/agent.json"}, // Has URL
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, parentAgent)).To(Succeed())
+
+			By("Finding agents - should NOT match because URL is set")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			requests := reconciler.findAgentsReferencingSubAgent(ctx, subAgent)
+			Expect(requests).To(BeEmpty())
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, parentAgent)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, subAgent)).To(Succeed())
+		})
+
+		It("should handle multiple parents referencing same subAgent", func() {
+			By("Creating a subAgent")
+			subAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "shared-subagent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, subAgent)).To(Succeed())
+
+			By("Creating multiple parent agents")
+			parent1 := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-one",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "shared-subagent",
+							AgentRef: &corev1.ObjectReference{
+								Name:      "shared-subagent",
+								Namespace: "default"},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, parent1)).To(Succeed())
+
+			parent2 := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-two",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "shared-subagent",
+							AgentRef: &corev1.ObjectReference{
+								Name:      "shared-subagent",
+								Namespace: "default"},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, parent2)).To(Succeed())
+
+			By("Finding agents - should find both parents")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			requests := reconciler.findAgentsReferencingSubAgent(ctx, subAgent)
+			Expect(requests).To(HaveLen(2))
+
+			names := []string{requests[0].Name, requests[1].Name}
+			Expect(names).To(ContainElements("parent-one", "parent-two"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, parent1)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, parent2)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, subAgent)).To(Succeed())
+		})
+	})
+
+	Context("When building template environment variables with subAgents", func() {
+		ctx := context.Background()
+
+		It("should create SUB_AGENTS JSON with resolved URLs", func() {
+			By("Creating a cluster agent")
+			clusterAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "sub-for-env",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, clusterAgent)).To(Succeed())
+
+			clusterAgent.Status.Url = "http://sub-for-env.default.svc.cluster.local:8000/test-url"
+			Expect(k8sClient.Status().Update(ctx, clusterAgent)).To(Succeed())
+
+			By("Building template environment variables")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			parentAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "sub-for-env",
+							AgentRef: &corev1.ObjectReference{
+								Name:      "sub-for-env",
+								Namespace: "default",
+							},
+						},
+					},
+				},
+			}
+
+			envVars, err := reconciler.buildTemplateEnvironmentVars(ctx, parentAgent)
+			Expect(err).NotTo(HaveOccurred())
+
+			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
+			Expect(subAgentsVar).NotTo(BeNil())
+			Expect(subAgentsVar.Value).To(ContainSubstring("sub-for-env"))
+			Expect(subAgentsVar.Value).To(ContainSubstring("http://sub-for-env.default.svc.cluster.local:8000"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, clusterAgent)).To(Succeed())
+		})
+
+		It("should handle mixed cluster and remote references", func() {
+			By("Creating a cluster agent")
+			clusterAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-sub",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, clusterAgent)).To(Succeed())
+
+			clusterAgent.Status.Url = "http://local-sub.default.svc.cluster.local:8000/test-url"
+			Expect(k8sClient.Status().Update(ctx, clusterAgent)).To(Succeed())
+
+			By("Building template vars with mixed references")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			parentAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-mixed",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "local-sub",
+							AgentRef: &corev1.ObjectReference{
+								Name:      "local-sub",
+								Namespace: "default",
+							},
+						},
+						// Remote reference
+						{Name: "remote-sub", Url: "https://external.com/.well-known/agent-card.json"},
+					},
+				},
+			}
+
+			envVars, err := reconciler.buildTemplateEnvironmentVars(ctx, parentAgent)
+			Expect(err).NotTo(HaveOccurred())
+
+			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
+			Expect(subAgentsVar).NotTo(BeNil())
+			Expect(subAgentsVar.Value).To(ContainSubstring("local_sub"))
+			Expect(subAgentsVar.Value).To(ContainSubstring("http://local-sub.default.svc.cluster.local:8000"))
+			Expect(subAgentsVar.Value).To(ContainSubstring("remote_sub"))
+			Expect(subAgentsVar.Value).To(ContainSubstring("https://external.com/.well-known/agent-card.json"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, clusterAgent)).To(Succeed())
+		})
+
+		It("should continue processing when some subAgents fail to resolve", func() {
+			By("Creating one valid cluster agent")
+			validAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "valid-sub",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, validAgent)).To(Succeed())
+
+			validAgent.Status.Url = "http://valid-sub.default.svc.cluster.local:8000/test-url"
+			Expect(k8sClient.Status().Update(ctx, validAgent)).To(Succeed())
+
+			By("Building template vars with one valid and one invalid")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			parentAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-partial",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					SubAgents: []runtimev1alpha1.SubAgent{
+						{Name: "valid-sub",
+							AgentRef: &corev1.ObjectReference{
+								Name:      "valid-sub",
+								Namespace: "default",
+							},
+						},
+						// This one doesn't exist
+						{Name: "nonexistent-sub"},
+					},
+				},
+			}
+
+			envVars, err := reconciler.buildTemplateEnvironmentVars(ctx, parentAgent)
+			Expect(err).NotTo(HaveOccurred())
+
+			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
+			Expect(subAgentsVar).NotTo(BeNil())
+			Expect(subAgentsVar.Value).To(ContainSubstring("valid-sub"))
+			Expect(subAgentsVar.Value).NotTo(ContainSubstring("nonexistent-sub"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, validAgent)).To(Succeed())
+		})
+	})
+
+	Context("When updating agent status", func() {
+		ctx := context.Background()
+
+		It("should set Status.Url from A2A protocol", func() {
+			By("Creating an agent with A2A protocol")
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-status-url",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: "A2A", Port: 8000},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			By("Updating agent status")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			err := reconciler.updateAgentStatus(ctx, agent, []string{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying Status.Url was set")
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-status-url", Namespace: "default"}, updatedAgent)).To(Succeed())
+			Expect(updatedAgent.Status.Url).To(ContainSubstring("http://agent-status-url.default.svc.cluster.local:8000"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, agent)).To(Succeed())
+		})
+
+		It("should set SubAgentsResolved condition to True when all resolve", func() {
+			By("Creating an agent")
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-condition-true",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			By("Updating status with no errors")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			err := reconciler.updateAgentStatus(ctx, agent, []string{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying condition")
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-condition-true", Namespace: "default"}, updatedAgent)).To(Succeed())
+
+			var condition *metav1.Condition
+			for i := range updatedAgent.Status.Conditions {
+				if updatedAgent.Status.Conditions[i].Type == "SubAgentsResolved" {
+					condition = &updatedAgent.Status.Conditions[i]
+					break
+				}
+			}
+
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(condition.Reason).To(Equal("AllResolved"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, agent)).To(Succeed())
+		})
+
+		It("should set SubAgentsResolved condition to False with error details", func() {
+			By("Creating an agent")
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-condition-false",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			By("Updating status with errors")
+			reconciler := &AgentReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			errors := []string{"subagent-1: not found", "subagent-2: status URL not available"}
+			err := reconciler.updateAgentStatus(ctx, agent, errors)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying condition")
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-condition-false", Namespace: "default"}, updatedAgent)).To(Succeed())
+
+			var condition *metav1.Condition
+			for i := range updatedAgent.Status.Conditions {
+				if updatedAgent.Status.Conditions[i].Type == "SubAgentsResolved" {
+					condition = &updatedAgent.Status.Conditions[i]
+					break
+				}
+			}
+
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(condition.Reason).To(Equal("ResolutionFailed"))
+			Expect(condition.Message).To(ContainSubstring("subagent-1"))
+			Expect(condition.Message).To(ContainSubstring("subagent-2"))
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, agent)).To(Succeed())
 		})
 	})
 })
