@@ -303,7 +303,6 @@ spec:
                       description: Type of the protocol used by the agent
                       enum:
                       - A2A
-                      - OpenAI
                       type: string
                   required:
                   - type

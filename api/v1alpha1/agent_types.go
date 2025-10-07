@@ -28,7 +28,7 @@ type AgentProtocol struct {
 	Name string `json:"name,omitempty"`
 
 	// Type of the protocol used by the agent
-	// +kubebuilder:validation:Enum=A2A;OpenAI
+	// +kubebuilder:validation:Enum=A2A
 	Type string `json:"type"`
 
 	// Port is the port number, defaults to the default port for the protocol

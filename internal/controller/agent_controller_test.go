@@ -149,39 +149,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(probe.InitialDelaySeconds).To(Equal(int32(10)))
 		})
 
-		It("should generate TCP probe for OpenAI-only agents", func() {
-			agent := &runtimev1alpha1.Agent{
-				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "OpenAI", Port: 8000},
-					},
-				},
-			}
-
-			probe := reconciler.generateReadinessProbe(agent)
-			Expect(probe).NotTo(BeNil())
-			Expect(probe.TCPSocket).NotTo(BeNil())
-			Expect(probe.TCPSocket.Port.IntValue()).To(Equal(8000))
-			Expect(probe.InitialDelaySeconds).To(Equal(int32(10)))
-		})
-
-		It("should prioritize A2A probe over OpenAI when both protocols exist", func() {
-			agent := &runtimev1alpha1.Agent{
-				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "OpenAI", Port: 3000},
-						{Type: "A2A", Port: 8000},
-					},
-				},
-			}
-
-			probe := reconciler.generateReadinessProbe(agent)
-			Expect(probe).NotTo(BeNil())
-			Expect(probe.HTTPGet).NotTo(BeNil())
-			Expect(probe.HTTPGet.Path).To(Equal(agentCardEndpoint))
-		})
-
-		It("should return nil probe for agents with no recognized protocols", func() {
+		It("should return nil probe for agents with no protocols", func() {
 			agent := &runtimev1alpha1.Agent{
 				Spec: runtimev1alpha1.AgentSpec{
 					Protocols: []runtimev1alpha1.AgentProtocol{},
@@ -202,20 +170,6 @@ var _ = Describe("Agent Controller", func() {
 			}
 
 			Expect(reconciler.hasA2AProtocol(agent)).To(BeTrue())
-			Expect(reconciler.hasOpenAIProtocol(agent)).To(BeFalse())
-		})
-
-		It("should correctly detect OpenAI protocol", func() {
-			agent := &runtimev1alpha1.Agent{
-				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "OpenAI", Port: 3000},
-					},
-				},
-			}
-
-			Expect(reconciler.hasA2AProtocol(agent)).To(BeFalse())
-			Expect(reconciler.hasOpenAIProtocol(agent)).To(BeTrue())
 		})
 	})
 
@@ -243,21 +197,6 @@ var _ = Describe("Agent Controller", func() {
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(3000))
 			Expect(probe.HTTPGet.Path).To(Equal("/a2a" + agentCardEndpoint))
-		})
-
-		It("should use custom port from OpenAI protocol", func() {
-			agent := &runtimev1alpha1.Agent{
-				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "OpenAI", Port: 9000},
-					},
-				},
-			}
-
-			probe := reconciler.generateReadinessProbe(agent)
-			Expect(probe).NotTo(BeNil())
-			Expect(probe.TCPSocket).NotTo(BeNil())
-			Expect(probe.TCPSocket.Port.IntValue()).To(Equal(9000))
 		})
 
 		It("should use custom path from A2A protocol", func() {
@@ -308,20 +247,19 @@ var _ = Describe("Agent Controller", func() {
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(8000))
 		})
 
-		It("should handle multiple protocols with different ports correctly", func() {
+		It("should handle custom port correctly", func() {
 			agent := &runtimev1alpha1.Agent{
 				Spec: runtimev1alpha1.AgentSpec{
 					Protocols: []runtimev1alpha1.AgentProtocol{
 						{Type: "A2A", Port: 7000},
-						{Type: "OpenAI", Port: 8080},
 					},
 				},
 			}
 
 			probe := reconciler.generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
-			Expect(probe.HTTPGet).NotTo(BeNil())                  // A2A takes priority
-			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(7000)) // A2A port used
+			Expect(probe.HTTPGet).NotTo(BeNil())
+			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(7000))
 		})
 
 		It("should use root path when path is set to '/'", func() {
@@ -355,7 +293,6 @@ var _ = Describe("Agent Controller", func() {
 			agent := &runtimev1alpha1.Agent{
 				Spec: runtimev1alpha1.AgentSpec{
 					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "OpenAI", Port: 3000},
 						{Type: "A2A", Port: 4000, Path: "/test"},
 					},
 				},
@@ -368,28 +305,10 @@ var _ = Describe("Agent Controller", func() {
 			Expect(protocol.Path).To(Equal("/test"))
 		})
 
-		It("should get OpenAI protocol correctly", func() {
+		It("should return nil when A2A protocol not found", func() {
 			agent := &runtimev1alpha1.Agent{
 				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "A2A", Port: 4000},
-						{Type: "OpenAI", Port: 5000},
-					},
-				},
-			}
-
-			protocol := reconciler.getOpenAIProtocol(agent)
-			Expect(protocol).NotTo(BeNil())
-			Expect(protocol.Type).To(Equal("OpenAI"))
-			Expect(protocol.Port).To(Equal(int32(5000)))
-		})
-
-		It("should return nil when protocol not found", func() {
-			agent := &runtimev1alpha1.Agent{
-				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{Type: "OpenAI"},
-					},
+					Protocols: []runtimev1alpha1.AgentProtocol{},
 				},
 			}
 
@@ -719,11 +638,6 @@ var _ = Describe("Agent Controller", func() {
 					Port: 9000,
 					Name: "a2a-updated",
 				},
-				{
-					Type: "OpenAI",
-					Port: 9001,
-					Name: "openai",
-				},
 			}
 			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
 
@@ -737,25 +651,21 @@ var _ = Describe("Agent Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Verifying the Service was updated with new ports")
+			By("Verifying the Service was updated with new port")
 			service := &corev1.Service{}
 			serviceKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
 			Expect(k8sClient.Get(ctx, serviceKey, service)).To(Succeed())
-			Expect(service.Spec.Ports).To(HaveLen(2))
+			Expect(service.Spec.Ports).To(HaveLen(1))
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(9000)))
 			Expect(service.Spec.Ports[0].Name).To(Equal("a2a-updated"))
-			Expect(service.Spec.Ports[1].Port).To(Equal(int32(9001)))
-			Expect(service.Spec.Ports[1].Name).To(Equal("openai"))
 
 			By("Verifying the Deployment container ports were updated")
 			deployment := &appsv1.Deployment{}
 			deploymentKey := types.NamespacedName{Name: resourceName, Namespace: "default"}
 			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).To(Succeed())
-			Expect(deployment.Spec.Template.Spec.Containers[0].Ports).To(HaveLen(2))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Ports).To(HaveLen(1))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort).To(Equal(int32(9000)))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Ports[0].Name).To(Equal("a2a-updated"))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Ports[1].ContainerPort).To(Equal(int32(9001)))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Ports[1].Name).To(Equal("openai"))
 		})
 
 		It("should delete Service when all protocols are removed", func() {
@@ -799,9 +709,9 @@ var _ = Describe("Agent Controller", func() {
 			agent.Spec.Framework = "custom"
 			agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
 				{
-					Type: "OpenAI",
+					Type: "A2A",
 					Port: 8080,
-					Name: "openai-api",
+					Name: "a2a-api",
 				},
 			}
 			Expect(k8sClient.Update(ctx, agent)).To(Succeed())
@@ -832,7 +742,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Get(ctx, serviceKey, service)).To(Succeed())
 			Expect(service.Spec.Ports).To(HaveLen(1))
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8080)))
-			Expect(service.Spec.Ports[0].Name).To(Equal("openai-api"))
+			Expect(service.Spec.Ports[0].Name).To(Equal("a2a-api"))
 		})
 
 		It("should preserve unmanaged fields in Deployment", func() {
@@ -1325,7 +1235,7 @@ var _ = Describe("Agent Controller", func() {
 					Image:     "ghcr.io/custom/agent:1.0.0",
 					Protocols: []runtimev1alpha1.AgentProtocol{
 						{
-							Type: "OpenAI",
+							Type: "A2A",
 							Port: 8080,
 						},
 					},
@@ -1618,14 +1528,7 @@ var _ = Describe("Agent Controller", func() {
 					Namespace: "test-namespace",
 				},
 				Spec: runtimev1alpha1.AgentSpec{
-					Protocols: []runtimev1alpha1.AgentProtocol{
-						{
-							Type: "OpenAI",
-							Port: 8000,
-							Name: "openai",
-							Path: "/v1/chat/completions",
-						},
-					},
+					Protocols: []runtimev1alpha1.AgentProtocol{},
 				},
 			}
 

@@ -284,30 +284,10 @@ func (r *AgentReconciler) hasA2AProtocol(agent *runtimev1alpha1.Agent) bool {
 	return false
 }
 
-// hasOpenAIProtocol checks if the agent has OpenAI protocol configured
-func (r *AgentReconciler) hasOpenAIProtocol(agent *runtimev1alpha1.Agent) bool {
-	for _, protocol := range agent.Spec.Protocols {
-		if protocol.Type == "OpenAI" {
-			return true
-		}
-	}
-	return false
-}
-
 // getA2AProtocol returns the first A2A protocol configuration found
 func (r *AgentReconciler) getA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
 	for _, protocol := range agent.Spec.Protocols {
 		if protocol.Type == a2AProtocol {
-			return &protocol
-		}
-	}
-	return nil
-}
-
-// getOpenAIProtocol returns the first OpenAI protocol configuration found
-func (r *AgentReconciler) getOpenAIProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
-	for _, protocol := range agent.Spec.Protocols {
-		if protocol.Type == "OpenAI" {
 			return &protocol
 		}
 	}
@@ -334,29 +314,16 @@ func (r *AgentReconciler) getA2AHealthPath(protocol *runtimev1alpha1.AgentProtoc
 
 // generateReadinessProbe generates appropriate readiness probe based on agent protocols
 func (r *AgentReconciler) generateReadinessProbe(agent *runtimev1alpha1.Agent) *corev1.Probe {
-	// Check if agent has external dependencies (subAgents or tools)
-
-	// Priority: A2A > OpenAI > None
 	if r.hasA2AProtocol(agent) {
 		// Use A2A agent card endpoint for health check
 		a2aProtocol := r.getA2AProtocol(agent)
 		healthPath := r.getA2AHealthPath(a2aProtocol)
 		port := r.getProtocolPort(a2aProtocol)
 
-		probe := r.buildA2AReadinessProbe(healthPath, port)
-
-		return probe
-	} else if r.hasOpenAIProtocol(agent) {
-		// Use TCP probe for OpenAI-only agents
-		openaiProtocol := r.getOpenAIProtocol(agent)
-		port := r.getProtocolPort(openaiProtocol)
-
-		probe := r.buildOpenAIReadinessProbe(port)
-
-		return probe
+		return r.buildA2AReadinessProbe(healthPath, port)
 	}
 
-	// No recognized protocols - no readiness probe
+	// No A2A protocol - no readiness probe
 	return nil
 }
 
@@ -464,22 +431,6 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Named("agent").
 		Complete(r)
-}
-
-// buildOpenAIReadinessProbe creates TCP-readiness-probe for OpenAI-protocols
-func (r *AgentReconciler) buildOpenAIReadinessProbe(port int32) *corev1.Probe {
-	return &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt32(port),
-			},
-		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       10,
-		TimeoutSeconds:      3,
-		SuccessThreshold:    1,
-		FailureThreshold:    10,
-	}
 }
 
 // buildA2AReadinessProbe creates HTTP-readiness-probe for A2A-protocols.
