@@ -285,6 +285,7 @@ spec:
                     agent
                   properties:
                     name:
+                      default: ""
                       description: Name is the name of the port
                       type: string
                     path:
@@ -308,6 +309,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               replicas:
                 description: Replicas is the number of replicas for the microservice
                   deployment

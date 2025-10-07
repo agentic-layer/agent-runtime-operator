@@ -24,6 +24,7 @@ import (
 // AgentProtocol defines a port configuration for the agent
 type AgentProtocol struct {
 	// Name is the name of the port
+	// +kubebuilder:default=``
 	Name string `json:"name,omitempty"`
 
 	// Type of the protocol used by the agent
@@ -35,8 +36,8 @@ type AgentProtocol struct {
 	// +kubebuilder:validation:Maximum=65535
 	Port int32 `json:"port,omitempty"`
 
-	// +kubebuilder:validation:Pattern=`^/[a-zA-Z0-9/_-]*$`
 	// Path is the path used for HTTP-based protocols
+	// +kubebuilder:validation:Pattern=`^/[a-zA-Z0-9/_-]*$`
 	Path string `json:"path,omitempty"`
 }
 
@@ -74,61 +75,65 @@ type AgentTool struct {
 
 // AgentSpec defines the desired state of Agent.
 type AgentSpec struct {
-	// +optional
 	// Framework defines the supported agent frameworks
 	// +kubebuilder:validation:Enum=google-adk;custom
+	// +optional
 	Framework string `json:"framework,omitempty"`
 
-	// +optional
 	// Replicas is the number of replicas for the microservice deployment
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// +optional
 	// Image is the Docker image and tag to use for the microservice deployment.
 	// When not specified, the operator will use a framework-specific template image.
+	// +optional
 	Image string `json:"image,omitempty"`
 
-	// +optional
 	// Description provides a description of the agent.
 	// This is passed as AGENT_DESCRIPTION environment variable to the agent.
+	// +optional
 	Description string `json:"description,omitempty"`
 
-	// +optional
 	// Instruction defines the system instruction/prompt for the agent when using template images.
 	// This is passed as AGENT_INSTRUCTION environment variable to the agent.
+	// +optional
 	Instruction string `json:"instruction,omitempty"`
 
-	// +optional
 	// Model specifies the language model to use for the agent.
 	// This is passed as AGENT_MODEL environment variable to the agent.
 	// Defaults to the agents default model if not specified.
+	// +optional
 	Model string `json:"model,omitempty"`
 
-	// +optional
 	// SubAgents defines configuration for connecting to cluster or remote agents.
 	// This is converted to JSON and passed as SUB_AGENTS environment variable to the agent.
+	// +optional
 	SubAgents []SubAgent `json:"subAgents,omitempty"`
 
-	// +optional
 	// Tools defines configuration for integrating MCP (Model Context Protocol) tools.
 	// This is converted to JSON and passed as AGENT_TOOLS environment variable to the agent.
+	// +optional
 	Tools []AgentTool `json:"tools,omitempty"`
 
 	// Protocols defines the protocols supported by the agent
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Protocols []AgentProtocol `json:"protocols,omitempty"`
 
 	// Exposed indicates whether this agent should be exposed via the AgentGateway
 	// +kubebuilder:default=false
 	Exposed bool `json:"exposed,omitempty"`
 
-	// +optional
 	// Env defines additional environment variables to be injected into the agent container.
 	// These are take precedence over operator-managed environment variables.
+	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// +optional
 	// EnvFrom defines sources to populate environment variables from.
+	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
