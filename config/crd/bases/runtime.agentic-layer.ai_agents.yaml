@@ -317,7 +317,6 @@ spec:
               subAgents:
                 description: |-
                   SubAgents defines configuration for connecting to cluster or remote agents.
-                  The controller automatically determines the type based on whether a URL is provided.
                   This is converted to JSON and passed as SUB_AGENTS environment variable to the agent.
                 items:
                   description: SubAgent defines configuration for connecting to either
