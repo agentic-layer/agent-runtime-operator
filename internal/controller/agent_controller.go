@@ -271,6 +271,20 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 	return nil
 }
 
+// resolveSubAgents checks if all subAgents can be resolved and returns a list of errors
+func (r *AgentReconciler) resolveSubAgents(ctx context.Context, agent *runtimev1alpha1.Agent) []string {
+	var errorMessages []string
+
+	for _, subAgent := range agent.Spec.SubAgents {
+		_, err := r.resolveSubAgentUrl(ctx, subAgent, agent.Namespace)
+		if err != nil {
+			errorMessages = append(errorMessages, fmt.Sprintf("%s: %v", subAgent.Name, err))
+		}
+	}
+
+	return errorMessages
+}
+
 // findA2AProtocol returns the first A2A protocol configuration found
 func (r *AgentReconciler) findA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
 	for _, protocol := range agent.Spec.Protocols {
