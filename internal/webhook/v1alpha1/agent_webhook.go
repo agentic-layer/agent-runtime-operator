@@ -115,7 +115,7 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 	// Add default protocols if none are specified
 	if len(agent.Spec.Protocols) == 0 {
 		agent.Spec.Protocols = []runtimev1alpha1.AgentProtocol{{
-			Type: "A2A",
+			Type: runtimev1alpha1.A2AProtocol,
 		}}
 	}
 

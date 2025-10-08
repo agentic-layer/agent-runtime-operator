@@ -49,8 +49,8 @@ func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *run
 
 // updateAgentStatusNotReady sets the agent status to not Ready with a specific reason
 func (r *AgentReconciler) updateAgentStatusNotReady(ctx context.Context, agent *runtimev1alpha1.Agent, reason, message string) error {
-	// Update URL even when not ready
-	agent.Status.Url = r.buildA2AAgentCardUrl(agent)
+	// Clear the A2A URL since the agent is not ready
+	agent.Status.Url = ""
 
 	// Set Ready condition to False with the provided reason
 	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{
