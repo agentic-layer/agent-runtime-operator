@@ -22,7 +22,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	webhookv1alpha1 "github.com/agentic-layer/agent-runtime-operator/internal/webhook/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -774,7 +773,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Framework:   "google-adk",
-					Image:       webhookv1alpha1.DefaultTemplateImageAdk,
+					Image:       "image:tag",
 					Description: "A test template agent",
 					Instruction: "You are a helpful assistant",
 					Model:       "gemini/gemini-2.5-flash",
@@ -926,7 +925,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Framework: "google-adk",
-					Image:     webhookv1alpha1.DefaultTemplateImageAdk,
+					Image:     "image:tag",
 					// All template fields are empty
 					Protocols: []runtimev1alpha1.AgentProtocol{
 						{
