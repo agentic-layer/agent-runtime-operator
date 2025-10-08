@@ -19,52 +19,47 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
-// updateCondition updates or adds a condition to the agent's status
-func (r *AgentReconciler) updateCondition(agent *runtimev1alpha1.Agent, conditionType string, status metav1.ConditionStatus, reason, message string) {
-	condition := metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
+// updateAgentStatusReady sets the agent status to Ready and updates the A2A URL
+func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *runtimev1alpha1.Agent) error {
+	// Compute the A2A URL if the agent has an A2A protocol
+	agent.Status.Url = r.buildA2AAgentCardUrl(agent)
+
+	// Set Ready condition to True
+	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionTrue,
+		Reason:             "Reconciled",
+		Message:            "Agent is ready",
+		ObservedGeneration: agent.Generation,
+	})
+
+	if err := r.Status().Update(ctx, agent); err != nil {
+		return fmt.Errorf("failed to update agent status: %w", err)
+	}
+
+	return nil
+}
+
+// updateAgentStatusNotReady sets the agent status to not Ready with a specific reason
+func (r *AgentReconciler) updateAgentStatusNotReady(ctx context.Context, agent *runtimev1alpha1.Agent, reason, message string) error {
+	// Update URL even when not ready
+	agent.Status.Url = r.buildA2AAgentCardUrl(agent)
+
+	// Set Ready condition to False with the provided reason
+	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionFalse,
 		Reason:             reason,
 		Message:            message,
 		ObservedGeneration: agent.Generation,
-	}
-
-	// Find existing condition
-	for i, existingCondition := range agent.Status.Conditions {
-		if existingCondition.Type == conditionType {
-			// Update existing condition
-			agent.Status.Conditions[i] = condition
-			agent.Status.Conditions[i].LastTransitionTime = metav1.Now()
-			return
-		}
-	}
-
-	// Add new condition
-	condition.LastTransitionTime = metav1.Now()
-	agent.Status.Conditions = append(agent.Status.Conditions, condition)
-}
-
-// updateAgentStatus updates the agent's status with computed fields like the A2A URL and subAgent resolution status
-func (r *AgentReconciler) updateAgentStatus(ctx context.Context, agent *runtimev1alpha1.Agent, subAgentErrors []string) error {
-	// Compute the A2A URL if the agent has an A2A protocol
-	newUrl := r.buildA2AAgentCardUrl(agent)
-	agent.Status.Url = newUrl
-
-	// Set SubAgentsResolved condition
-	if len(subAgentErrors) == 0 {
-		r.updateCondition(agent, "SubAgentsResolved", metav1.ConditionTrue,
-			"AllResolved", "All subAgents resolved successfully")
-	} else {
-		r.updateCondition(agent, "SubAgentsResolved", metav1.ConditionFalse,
-			"ResolutionFailed", fmt.Sprintf("Failed to resolve subAgents: %s", strings.Join(subAgentErrors, "; ")))
-	}
+	})
 
 	if err := r.Status().Update(ctx, agent); err != nil {
 		return fmt.Errorf("failed to update agent status: %w", err)
