@@ -26,20 +26,6 @@ import (
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
-// resolveSubAgents checks if all subAgents can be resolved and returns a list of errors
-func (r *AgentReconciler) resolveSubAgents(ctx context.Context, agent *runtimev1alpha1.Agent) []string {
-	var errorMessages []string
-
-	for _, subAgent := range agent.Spec.SubAgents {
-		_, err := r.resolveSubAgentUrl(ctx, subAgent, agent.Namespace)
-		if err != nil {
-			errorMessages = append(errorMessages, fmt.Sprintf("%s: %v", subAgent.Name, err))
-		}
-	}
-
-	return errorMessages
-}
-
 // updateCondition updates or adds a condition to the agent's status
 func (r *AgentReconciler) updateCondition(agent *runtimev1alpha1.Agent, conditionType string, status metav1.ConditionStatus, reason, message string) {
 	condition := metav1.Condition{
