@@ -100,7 +100,7 @@ var _ = Describe("Agent Webhook", func() {
 			By("setting up a google-adk agent with protocol but no port")
 			obj.Spec.Framework = googleAdkFramework
 			obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
-				{Type: "A2A"},
+				{Type: runtimev1alpha1.A2AProtocol},
 			}
 
 			By("calling the Default method")
@@ -132,7 +132,7 @@ var _ = Describe("Agent Webhook", func() {
 			By("setting up an agent with custom port")
 			obj.Spec.Framework = googleAdkFramework
 			obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
-				{Type: "A2A", Port: 9000},
+				{Type: runtimev1alpha1.A2AProtocol, Port: 9000},
 			}
 
 			By("calling the Default method")
@@ -146,7 +146,7 @@ var _ = Describe("Agent Webhook", func() {
 		It("Should set default protocol name when not specified", func() {
 			By("setting up a protocol without name")
 			obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
-				{Type: "A2A", Port: 8080},
+				{Type: runtimev1alpha1.A2AProtocol, Port: 8080},
 			}
 
 			By("calling the Default method")
@@ -160,7 +160,7 @@ var _ = Describe("Agent Webhook", func() {
 		It("Should not override existing protocol name", func() {
 			By("setting up a protocol with custom name")
 			obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
-				{Type: "A2A", Port: 8080, Name: "custom-name"},
+				{Type: runtimev1alpha1.A2AProtocol, Port: 8080, Name: "custom-name"},
 			}
 
 			By("calling the Default method")

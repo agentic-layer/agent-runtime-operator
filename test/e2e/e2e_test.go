@@ -681,13 +681,13 @@ spec:
 			}
 			Eventually(verifySUBAGENTSenv).Should(Succeed())
 
-			By("verifying parent agent status has SubAgentsResolved condition set to True")
+			By("verifying parent agent status has Ready condition set to True")
 			verifyStatusCondition := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "agent", parentAgentName, "-n", testNamespace,
-					"-o", "jsonpath={.status.conditions[?(@.type=='SubAgentsResolved')].status}")
+					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("True"), "SubAgentsResolved condition should be True")
+				g.Expect(output).To(Equal("True"), "Ready condition should be True")
 			}
 			Eventually(verifyStatusCondition).Should(Succeed())
 		})

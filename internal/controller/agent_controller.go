@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"strings"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -183,7 +182,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		maps.Copy(deployment.Labels, managedLabels)
 
 		// Update agent container fields
-		container := FindContainerByName(&deployment.Spec.Template.Spec, agentContainerName)
+		container := findContainerByName(&deployment.Spec.Template.Spec, agentContainerName)
 		if container == nil {
 			// Container doesn't exist, create and append it
 			newContainer := corev1.Container{
@@ -278,108 +277,6 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 	}
 
 	return nil
-}
-
-// resolveAllSubAgents resolves all subAgent URLs and returns a map of name to URL.
-// Collects all resolution errors and returns them together, allowing the caller to see
-// all missing subAgents at once rather than failing on the first error.
-func (r *AgentReconciler) resolveAllSubAgents(ctx context.Context, agent *runtimev1alpha1.Agent) (map[string]string, error) {
-	resolved := make(map[string]string)
-	var issues []string
-
-	for _, subAgent := range agent.Spec.SubAgents {
-		url, err := r.resolveSubAgentUrl(ctx, subAgent, agent.Namespace)
-		if err != nil {
-			issues = append(issues, fmt.Sprintf("subAgent %q: %v", subAgent.Name, err))
-		} else {
-			resolved[subAgent.Name] = url
-		}
-	}
-
-	if len(issues) > 0 {
-		return resolved, fmt.Errorf("failed to resolve %d subAgent(s): %s", len(issues), strings.Join(issues, "; "))
-	}
-
-	return resolved, nil
-}
-
-// findA2AProtocol returns the first A2A protocol configuration found
-func (r *AgentReconciler) findA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
-	for _, protocol := range agent.Spec.Protocols {
-		if protocol.Type == runtimev1alpha1.A2AProtocol {
-			return &protocol
-		}
-	}
-	return nil
-}
-
-// generateReadinessProbe generates appropriate readiness probe based on agent protocols
-func (r *AgentReconciler) generateReadinessProbe(agent *runtimev1alpha1.Agent) *corev1.Probe {
-	// Use A2A agent card endpoint for health check
-	protocol := r.findA2AProtocol(agent)
-	if protocol != nil {
-		return &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: protocol.Path + agentCardEndpoint,
-					Port: intstr.FromInt32(protocol.Port),
-				},
-			},
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       10,
-			TimeoutSeconds:      3,
-			SuccessThreshold:    1,
-			FailureThreshold:    10,
-		}
-	}
-	return nil
-}
-
-// findAgentsReferencingSubAgent finds all agents that reference a given agent as a subAgent
-func (r *AgentReconciler) findAgentsReferencingSubAgent(ctx context.Context, obj client.Object) []ctrl.Request {
-	updatedAgent, ok := obj.(*runtimev1alpha1.Agent)
-	if !ok {
-		return nil
-	}
-
-	// Find all agents that reference this agent as a subAgent
-	var agentList runtimev1alpha1.AgentList
-	if err := r.List(ctx, &agentList); err != nil {
-		logf.FromContext(ctx).Error(err, "Failed to list agents for subAgent watch")
-		return nil
-	}
-
-	var requests []ctrl.Request
-	// Enqueue agents that reference this agent
-	for _, agent := range agentList.Items {
-		for _, subAgent := range agent.Spec.SubAgents {
-			// Check if this is a cluster agent reference (using agentRef)
-			if subAgent.AgentRef != nil && subAgent.AgentRef.Name == updatedAgent.Name {
-				// Check namespace match (use namespace from ObjectReference)
-				subAgentNamespace := subAgent.AgentRef.Namespace
-				if subAgentNamespace == "" {
-					subAgentNamespace = agent.Namespace
-				}
-
-				if subAgentNamespace == updatedAgent.Namespace {
-					// This agent references the updated agent - enqueue it
-					requests = append(requests, ctrl.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      agent.Name,
-							Namespace: agent.Namespace,
-						},
-					})
-					logf.FromContext(ctx).Info("Enqueuing parent agent due to subAgent status change",
-						"parent", agent.Name,
-						"subAgent", updatedAgent.Name,
-						"updatedAgentURL", updatedAgent.Status.Url)
-					break // Found a match, no need to check other subAgents
-				}
-			}
-		}
-	}
-
-	return requests
 }
 
 // SetupWithManager sets up the controller with the Manager.
