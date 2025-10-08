@@ -1130,7 +1130,7 @@ var _ = Describe("Agent Controller", func() {
 					Spec: runtimev1alpha1.AgentSpec{},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
+				envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(envVars).To(HaveLen(6))
 
@@ -1180,7 +1180,11 @@ var _ = Describe("Agent Controller", func() {
 					},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
+				subAgents := map[string]string{
+					"sub1": "https://example.com/sub1.json",
+					"sub2": "https://example.com/sub2.json",
+				}
+				envVars, err := reconciler.buildTemplateEnvironmentVars(agent, subAgents)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(envVars).To(HaveLen(6))
 
@@ -1197,6 +1201,7 @@ var _ = Describe("Agent Controller", func() {
 				Expect(subAgentsVar.Value).To(ContainSubstring("sub1"))
 				Expect(subAgentsVar.Value).To(ContainSubstring("https://example.com/sub1.json"))
 				Expect(subAgentsVar.Value).To(ContainSubstring("sub2"))
+				Expect(subAgentsVar.Value).To(ContainSubstring("https://example.com/sub2.json"))
 
 				toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
 				Expect(toolsVar.Value).To(ContainSubstring("tool1"))
@@ -1219,7 +1224,10 @@ var _ = Describe("Agent Controller", func() {
 					},
 				}
 
-				envVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
+				subAgents := map[string]string{
+					"test_sub": "https://example.com/sub.json",
+				}
+				envVars, err := reconciler.buildTemplateEnvironmentVars(agent, subAgents)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify JSON structure is valid
@@ -1337,7 +1345,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
 			Expect(err).NotTo(HaveOccurred())
 
 			// Find the A2A_AGENT_CARD_URL variable
@@ -1357,7 +1365,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
 			Expect(err).NotTo(HaveOccurred())
 
 			// A2A_AGENT_CARD_URL should not be present
@@ -1376,7 +1384,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
 			Expect(err).NotTo(HaveOccurred())
 
 			// A2A_AGENT_CARD_URL should not be present
@@ -1408,7 +1416,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(context.Background(), agent)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should use the first A2A protocol
@@ -1857,7 +1865,10 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(ctx, parentAgent)
+			subAgents := map[string]string{
+				"sub-for-env": "http://sub-for-env.default.svc.cluster.local:8000/test-url",
+			}
+			envVars, err := reconciler.buildTemplateEnvironmentVars(parentAgent, subAgents)
 			Expect(err).NotTo(HaveOccurred())
 
 			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
@@ -1915,7 +1926,11 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(ctx, parentAgent)
+			subAgents := map[string]string{
+				"local-sub":  "http://local-sub.default.svc.cluster.local:8000/test-url",
+				"remote-sub": "https://external.com/.well-known/agent-card.json",
+			}
+			envVars, err := reconciler.buildTemplateEnvironmentVars(parentAgent, subAgents)
 			Expect(err).NotTo(HaveOccurred())
 
 			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
@@ -1929,7 +1944,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Delete(ctx, clusterAgent)).To(Succeed())
 		})
 
-		It("should continue processing when some subAgents fail to resolve", func() {
+		It("should collect all subAgent resolution errors", func() {
 			By("Creating one valid cluster agent")
 			validAgent := &runtimev1alpha1.Agent{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1949,7 +1964,7 @@ var _ = Describe("Agent Controller", func() {
 			validAgent.Status.Url = "http://valid-sub.default.svc.cluster.local:8000/test-url"
 			Expect(k8sClient.Status().Update(ctx, validAgent)).To(Succeed())
 
-			By("Building template vars with one valid and one invalid")
+			By("Attempting to resolve subAgents with one valid and multiple invalid")
 			reconciler := &AgentReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
@@ -1975,7 +1990,10 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(ctx, parentAgent)
+			subAgents := map[string]string{
+				"valid-sub": "http://valid-sub.default.svc.cluster.local:8000/test-url",
+			}
+			envVars, err := reconciler.buildTemplateEnvironmentVars(parentAgent, subAgents)
 			Expect(err).NotTo(HaveOccurred())
 
 			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
@@ -2014,7 +2032,7 @@ var _ = Describe("Agent Controller", func() {
 				Scheme: k8sClient.Scheme(),
 			}
 
-			err := reconciler.updateAgentStatus(ctx, agent, []string{})
+			err := reconciler.updateAgentStatusReady(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Verifying Status.Url was set")
@@ -2046,7 +2064,7 @@ var _ = Describe("Agent Controller", func() {
 				Scheme: k8sClient.Scheme(),
 			}
 
-			err := reconciler.updateAgentStatus(ctx, agent, []string{})
+			err := reconciler.updateAgentStatusReady(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Verifying condition")
@@ -2055,7 +2073,7 @@ var _ = Describe("Agent Controller", func() {
 
 			var condition *metav1.Condition
 			for i := range updatedAgent.Status.Conditions {
-				if updatedAgent.Status.Conditions[i].Type == "SubAgentsResolved" {
+				if updatedAgent.Status.Conditions[i].Type == "Ready" {
 					condition = &updatedAgent.Status.Conditions[i]
 					break
 				}
@@ -2063,7 +2081,7 @@ var _ = Describe("Agent Controller", func() {
 
 			Expect(condition).NotTo(BeNil())
 			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
-			Expect(condition.Reason).To(Equal("AllResolved"))
+			Expect(condition.Reason).To(Equal("Reconciled"))
 
 			By("Cleaning up")
 			Expect(k8sClient.Delete(ctx, agent)).To(Succeed())
@@ -2089,8 +2107,7 @@ var _ = Describe("Agent Controller", func() {
 				Scheme: k8sClient.Scheme(),
 			}
 
-			errors := []string{"subagent-1: not found", "subagent-2: status URL not available"}
-			err := reconciler.updateAgentStatus(ctx, agent, errors)
+			err := reconciler.updateAgentStatusNotReady(ctx, agent, "MissingSubAgents", "subagent-1, subagent-2")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Verifying condition")
@@ -2099,7 +2116,7 @@ var _ = Describe("Agent Controller", func() {
 
 			var condition *metav1.Condition
 			for i := range updatedAgent.Status.Conditions {
-				if updatedAgent.Status.Conditions[i].Type == "SubAgentsResolved" {
+				if updatedAgent.Status.Conditions[i].Type == "Ready" {
 					condition = &updatedAgent.Status.Conditions[i]
 					break
 				}
@@ -2107,7 +2124,7 @@ var _ = Describe("Agent Controller", func() {
 
 			Expect(condition).NotTo(BeNil())
 			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(condition.Reason).To(Equal("ResolutionFailed"))
+			Expect(condition.Reason).To(Equal("MissingSubAgents"))
 			Expect(condition.Message).To(ContainSubstring("subagent-1"))
 			Expect(condition.Message).To(ContainSubstring("subagent-2"))
 

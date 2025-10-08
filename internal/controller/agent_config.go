@@ -24,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
@@ -47,11 +46,12 @@ import (
 //
 // Parameters:
 //   - agent: The Agent resource to generate template variables for
+//   - resolvedSubAgents: Map of subAgent name to resolved URL (already validated)
 //
 // Returns:
 //   - []corev1.EnvVar: Slice of environment variables for template configuration
 //   - error: JSON marshaling error if SubAgents or Tools contain invalid data
-func (r *AgentReconciler) buildTemplateEnvironmentVars(ctx context.Context, agent *runtimev1alpha1.Agent) ([]corev1.EnvVar, error) {
+func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string) ([]corev1.EnvVar, error) {
 	var templateEnvVars []corev1.EnvVar
 
 	// Always set AGENT_NAME (sanitized to meet environment variable requirements)
@@ -90,18 +90,10 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(ctx context.Context, agen
 	// SUB_AGENTS - always set, with empty object if no subagents
 	var subAgentsJSON []byte
 	var err error
-	if len(agent.Spec.SubAgents) > 0 {
+	if len(resolvedSubAgents) > 0 {
 		subAgentsMap := make(map[string]map[string]string)
-		for _, subAgent := range agent.Spec.SubAgents {
-			url, err := r.resolveSubAgentUrl(ctx, subAgent, agent.Namespace)
-			if err != nil {
-				// Log error but continue processing other subAgents
-				// The controller will retry and status conditions will reflect the failure
-				logf.FromContext(ctx).Error(err, "Failed to resolve subAgent URL",
-					"subAgent", subAgent.Name, "agent", agent.Name)
-				continue
-			}
-			subAgentsMap[r.sanitizeAgentName(subAgent.Name)] = map[string]string{
+		for name, url := range resolvedSubAgents {
+			subAgentsMap[r.sanitizeAgentName(name)] = map[string]string{
 				"url": url,
 			}
 		}

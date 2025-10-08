@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strings"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -74,8 +75,19 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	log.Info("Reconciling Agent")
 
+	// Resolve subAgents early - fail fast if any cannot be resolved
+	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, &agent)
+	if err != nil {
+		log.Error(err, "Failed to resolve subAgents")
+		// Update status to reflect missing subAgents
+		if statusErr := r.updateAgentStatusNotReady(ctx, &agent, "MissingSubAgents", err.Error()); statusErr != nil {
+			log.Error(statusErr, "Failed to update status after subAgent resolution failure")
+		}
+		return ctrl.Result{}, err
+	}
+
 	// Ensure Deployment exists and is up to date
-	if err := r.ensureDeployment(ctx, &agent); err != nil {
+	if err := r.ensureDeployment(ctx, &agent, resolvedSubAgents); err != nil {
 		log.Error(err, "Failed to ensure Deployment")
 		return ctrl.Result{}, err
 	}
@@ -86,11 +98,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	// Check subAgent resolution and update status
-	subAgentResolutionErrors := r.resolveSubAgents(ctx, &agent)
-
-	// Update agent status with A2A URL and subAgent resolution status
-	if err := r.updateAgentStatus(ctx, &agent, subAgentResolutionErrors); err != nil {
+	// Update agent status to Ready
+	if err := r.updateAgentStatusReady(ctx, &agent); err != nil {
 		log.Error(err, "Failed to update agent status")
 		return ctrl.Result{}, err
 	}
@@ -99,7 +108,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
-func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent) error {
+func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string) error {
 	log := logf.FromContext(ctx)
 
 	deployment := &appsv1.Deployment{
@@ -139,7 +148,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		}
 
 		// Build template environment variables
-		templateEnvVars, err := r.buildTemplateEnvironmentVars(ctx, agent)
+		templateEnvVars, err := r.buildTemplateEnvironmentVars(agent, resolvedSubAgents)
 		if err != nil {
 			return fmt.Errorf("failed to build template environment variables: %w", err)
 		}
@@ -271,18 +280,27 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 	return nil
 }
 
-// resolveSubAgents checks if all subAgents can be resolved and returns a list of errors
-func (r *AgentReconciler) resolveSubAgents(ctx context.Context, agent *runtimev1alpha1.Agent) []string {
-	var errorMessages []string
+// resolveAllSubAgents resolves all subAgent URLs and returns a map of name to URL.
+// Collects all resolution errors and returns them together, allowing the caller to see
+// all missing subAgents at once rather than failing on the first error.
+func (r *AgentReconciler) resolveAllSubAgents(ctx context.Context, agent *runtimev1alpha1.Agent) (map[string]string, error) {
+	resolved := make(map[string]string)
+	var issues []string
 
 	for _, subAgent := range agent.Spec.SubAgents {
-		_, err := r.resolveSubAgentUrl(ctx, subAgent, agent.Namespace)
+		url, err := r.resolveSubAgentUrl(ctx, subAgent, agent.Namespace)
 		if err != nil {
-			errorMessages = append(errorMessages, fmt.Sprintf("%s: %v", subAgent.Name, err))
+			issues = append(issues, fmt.Sprintf("subAgent %q: %v", subAgent.Name, err))
+		} else {
+			resolved[subAgent.Name] = url
 		}
 	}
 
-	return errorMessages
+	if len(issues) > 0 {
+		return resolved, fmt.Errorf("failed to resolve %d subAgent(s): %s", len(issues), strings.Join(issues, "; "))
+	}
+
+	return resolved, nil
 }
 
 // findA2AProtocol returns the first A2A protocol configuration found
