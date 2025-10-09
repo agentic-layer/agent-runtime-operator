@@ -24,4 +24,9 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- controller: true
+  domain: agentic-layer.ai
+  group: runtime
+  kind: AgenticWorkforce
+  version: v1alpha1
 version: "3"

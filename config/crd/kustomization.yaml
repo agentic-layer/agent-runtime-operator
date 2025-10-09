@@ -5,6 +5,7 @@ resources:
 - bases/runtime.agentic-layer.ai_agents.yaml
 - bases/runtime.agentic-layer.ai_agentgateways.yaml
 - bases/runtime.agentic-layer.ai_agentgatewayclasses.yaml
+- bases/runtime.agentic-layer.ai_agenticworkforces.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

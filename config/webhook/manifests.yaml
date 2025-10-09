@@ -90,3 +90,23 @@ webhooks:
     resources:
     - agentgatewayclasses
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-runtime-agentic-layer-ai-v1alpha1-agenticworkforce
+  failurePolicy: Fail
+  name: vagenticworkforce-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - runtime.agentic-layer.ai
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - agenticworkforces
+  sideEffects: None
