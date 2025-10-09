@@ -102,6 +102,15 @@ func (v *AgenticWorkforceCustomValidator) validateAgenticWorkforce(ctx context.C
 	for i, agentRef := range workforce.Spec.EntryPointAgents {
 		agentPath := entryPointsPath.Index(i)
 
+		// Validate agent reference is not nil
+		if agentRef == nil {
+			allErrs = append(allErrs, field.Required(
+				agentPath,
+				"agent reference cannot be nil",
+			))
+			continue
+		}
+
 		// Validate agent name is not empty
 		if agentRef.Name == "" {
 			allErrs = append(allErrs, field.Required(

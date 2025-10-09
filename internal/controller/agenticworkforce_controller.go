@@ -109,6 +109,12 @@ func (r *AgenticWorkforceReconciler) validateEntryPointAgents(ctx context.Contex
 	var missingAgents []string
 
 	for _, agentRef := range workforce.Spec.EntryPointAgents {
+		// Skip nil references
+		if agentRef == nil {
+			log.Info("Skipping nil agent reference")
+			continue
+		}
+
 		namespace := agentRef.Namespace
 		if namespace == "" {
 			namespace = workforce.Namespace
@@ -145,6 +151,12 @@ func (r *AgenticWorkforceReconciler) collectTransitiveAgentsAndTools(ctx context
 
 	// Process each entry-point agent
 	for _, agentRef := range workforce.Spec.EntryPointAgents {
+		// Skip nil references
+		if agentRef == nil {
+			log.Info("Skipping nil agent reference during traversal")
+			continue
+		}
+
 		namespace := agentRef.Namespace
 		if namespace == "" {
 			namespace = workforce.Namespace
@@ -250,6 +262,11 @@ func (r *AgenticWorkforceReconciler) findWorkforcesReferencingAgent(ctx context.
 	for _, workforce := range workforceList.Items {
 		// Check if this agent is directly referenced as an entry point
 		for _, entryRef := range workforce.Spec.EntryPointAgents {
+			// Skip nil references
+			if entryRef == nil {
+				continue
+			}
+
 			entryNamespace := entryRef.Namespace
 			if entryNamespace == "" {
 				entryNamespace = workforce.Namespace
