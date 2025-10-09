@@ -79,7 +79,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: agentName},
 					},
 				},
@@ -133,7 +133,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "missing-agent"},
 					},
 				},
@@ -194,7 +194,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "valid-agent"},
 					},
 				},
@@ -211,7 +211,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "missing-agent"},
 					},
 				},
@@ -242,7 +242,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-no-ns"}, // No namespace specified
 					},
 				},
@@ -284,7 +284,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "cross-ns-agent", Namespace: testNamespace},
 					},
 				},
@@ -330,7 +330,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-with-tools"},
 					},
 				},
@@ -383,7 +383,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "parent-agent"},
 					},
 				},
@@ -419,7 +419,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-with-remote"},
 					},
 				},
@@ -497,7 +497,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-a"},
 					},
 				},
@@ -554,7 +554,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-circular-a"},
 					},
 				},
@@ -590,7 +590,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-with-missing-sub"},
 					},
 				},
@@ -657,7 +657,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "entry-1"},
 						{Name: "entry-2"},
 					},
@@ -715,7 +715,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Name:        "Watch Test Workforce",
 					Description: "Test workforce for watch mapper",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "direct-ref-agent"},
 					},
 				},
@@ -771,7 +771,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Name:        "Watch Test Workforce 2",
 					Description: "Test workforce with transitive reference",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "transitive-entry-agent"},
 					},
 				},
@@ -818,7 +818,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Name:        "Watch Test Workforce 3",
 					Description: "Test workforce with namespace defaulting",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "ns-default-agent"}, // No namespace specified
 					},
 				},
@@ -859,7 +859,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Name:        "Watch Test Workforce 4a",
 					Description: "First workforce referencing agent",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "multi-ref-agent"},
 					},
 				},
@@ -876,7 +876,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Name:        "Watch Test Workforce 4b",
 					Description: "Second workforce referencing agent",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "multi-ref-agent"},
 					},
 				},

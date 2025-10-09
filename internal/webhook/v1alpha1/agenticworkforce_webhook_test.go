@@ -93,7 +93,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-1"},
 						{Name: "agent-2"},
 					},
@@ -115,7 +115,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "non-existent-agent"},
 					},
 				},
@@ -137,7 +137,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:             "Test Workforce",
 					Description:      "A test workforce",
 					Owner:            "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{},
+					EntryPointAgents: []*corev1.ObjectReference{},
 				},
 			}
 
@@ -157,7 +157,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: ""},
 					},
 				},
@@ -192,7 +192,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "", // Empty name
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-1"},
 					},
 				},
@@ -227,7 +227,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "", // Empty description
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-1"},
 					},
 				},
@@ -262,7 +262,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "", // Empty owner
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-1"},
 					},
 				},
@@ -308,7 +308,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{
 							Name:      "cross-ns-agent",
 							Namespace: otherNamespace,
@@ -348,7 +348,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "valid-agent"},
 						{Name: "invalid-agent"},
 					},
@@ -385,7 +385,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Description: "A test workforce",
 					Owner:       "test@example.com",
 					Tags:        []string{"production", "customer-support"},
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-1"},
 					},
 				},
@@ -434,7 +434,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-1"},
 					},
 				},
@@ -442,7 +442,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 
 			// Updated workforce with additional agent
 			newWorkforce := oldWorkforce.DeepCopy()
-			newWorkforce.Spec.EntryPointAgents = []runtimev1alpha1.AgentReference{
+			newWorkforce.Spec.EntryPointAgents = []*corev1.ObjectReference{
 				{Name: "agent-1"},
 				{Name: "agent-2"},
 			}
@@ -476,7 +476,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "agent-1"},
 					},
 				},
@@ -484,7 +484,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 
 			// Updated workforce with invalid agent
 			newWorkforce := oldWorkforce.DeepCopy()
-			newWorkforce.Spec.EntryPointAgents = []runtimev1alpha1.AgentReference{
+			newWorkforce.Spec.EntryPointAgents = []*corev1.ObjectReference{
 				{Name: "agent-1"},
 				{Name: "non-existent-agent"},
 			}
@@ -507,7 +507,7 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 					Name:        "Test Workforce",
 					Description: "A test workforce",
 					Owner:       "test@example.com",
-					EntryPointAgents: []runtimev1alpha1.AgentReference{
+					EntryPointAgents: []*corev1.ObjectReference{
 						{Name: "any-agent"},
 					},
 				},

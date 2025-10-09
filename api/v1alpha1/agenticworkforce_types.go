@@ -17,18 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// AgentReference defines a reference to an entry-point agent
-type AgentReference struct {
-	// Name is the name of the Agent resource
-	Name string `json:"name"`
-
-	// Namespace is the namespace of the Agent resource (optional, defaults to same namespace as AgenticWorkforce)
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-}
 
 // AgenticWorkforceSpec defines the desired state of AgenticWorkforce
 type AgenticWorkforceSpec struct {
@@ -45,8 +36,10 @@ type AgenticWorkforceSpec struct {
 	// +optional
 	Tags []string `json:"tags,omitempty"`
 
-	// EntryPointAgents defines references to the entry-point agents for this workforce
-	EntryPointAgents []AgentReference `json:"entryPointAgents"`
+	// EntryPointAgents defines references to the entry-point agents for this workforce.
+	// Uses standard Kubernetes ObjectReference. Only Name and Namespace fields are used.
+	// Namespace defaults to the AgenticWorkforce's namespace if not specified.
+	EntryPointAgents []*corev1.ObjectReference `json:"entryPointAgents"`
 }
 
 // AgenticWorkforceStatus defines the observed state of AgenticWorkforce
