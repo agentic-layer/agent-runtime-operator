@@ -34,6 +34,13 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
   - TLS configuration and certificate management
   - Agent reference and selective exposure controls
 
+- **ToolServer CRD** (`api/v1alpha1/toolserver_types.go`): Defines the ToolServer custom resource for managing tool servers:
+  - Protocol specification (mcp for Model Context Protocol)
+  - Transport type configuration (stdio, http, sse)
+  - Container image and replica configuration (for http/sse)
+  - Environment variable configuration
+  - Status tracking with conditions and service URL
+
 - **Agent Controller** (`internal/controller/agent_controller.go`): Reconciles Agent resources by:
   - Creating Kubernetes Deployments for agent workloads
   - Managing Services for protocol exposure
@@ -44,7 +51,15 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
     - No protocols: No readiness probe
   - Handling framework-specific configurations
 
-- **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent resources
+- **ToolServer Controller** (`internal/controller/toolserver_controller.go`): Reconciles ToolServer resources by:
+  - **Transport-aware deployment**:
+    - stdio: Marks resource as ready for sidecar injection (no standalone deployment)
+    - http/sse: Creates Deployments and Services for standalone tool servers
+  - Managing TCP-based health probes for http/sse transports
+  - Populating status URL for service discovery
+  - Handling environment variable configuration
+
+- **Admission Webhooks** (`internal/webhook/v1alpha1/`): Provides validation and mutation for Agent and ToolServer resources
 
 ### Project Structure
 

@@ -1345,6 +1345,167 @@ spec:
 			Eventually(verifyDeduplication, 2*time.Minute).Should(Succeed())
 		})
 	})
+
+	Context("Sample ToolServer Deployment", func() {
+		const testNamespace = "default"
+		const httpToolServerName = "example-http-toolserver"
+		const stdioToolServerName = "example-stdio-toolserver"
+
+		BeforeAll(func() {
+			By("waiting for webhook service to be ready")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "service",
+					"agent-runtime-operator-webhook-service", "-n", "agent-runtime-operator-system")
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				cmd = exec.Command("kubectl", "get", "endpoints", "agent-runtime-operator-webhook-service",
+					"-n", "agent-runtime-operator-system", "-o", "jsonpath={.subsets[*].addresses[*].ip}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
+			}, 2*time.Minute, 5*time.Second).Should(Succeed(), "Webhook service should be ready")
+		})
+
+		AfterAll(func() {
+			By("cleaning up sample toolservers")
+			cmd := exec.Command("kubectl", "delete", "-f", "config/samples/runtime_v1alpha1_toolserver_http.yaml",
+				"-n", testNamespace, "--ignore-not-found=true")
+			_, _ = utils.Run(cmd)
+
+			cmd = exec.Command("kubectl", "delete", "-f",
+				"config/samples/runtime_v1alpha1_toolserver_stdio.yaml", "-n", testNamespace, "--ignore-not-found=true")
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should successfully deploy and manage http transport toolserver", func() {
+			By("applying the http toolserver sample")
+			cmd := exec.Command("kubectl", "apply", "-f",
+				"config/samples/runtime_v1alpha1_toolserver_http.yaml", "-n", testNamespace)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply http toolserver sample")
+
+			By("verifying the http toolserver resource is created")
+			verifyToolServerExists := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", httpToolServerName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			Eventually(verifyToolServerExists).Should(Succeed())
+
+			By("verifying the http toolserver deployment is created")
+			verifyDeploymentCreated := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", httpToolServerName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Verify deployment has correct replica count
+				cmd = exec.Command("kubectl", "get", "deployment", httpToolServerName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.replicas}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("2"), "Deployment should be configured with 2 replicas")
+			}
+			Eventually(verifyDeploymentCreated).Should(Succeed())
+
+			By("verifying the http toolserver service is created")
+			verifyServiceExists := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "service", httpToolServerName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				cmd = exec.Command("kubectl", "get", "service", httpToolServerName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.ports[0].port}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("8080"), "Service should expose port 8080")
+			}
+			Eventually(verifyServiceExists).Should(Succeed())
+
+			By("verifying the http toolserver status URL is set")
+			verifyStatusURL := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", httpToolServerName, "-n", testNamespace,
+					"-o", "jsonpath={.status.url}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				expectedURL := fmt.Sprintf("http://%s.%s.svc.cluster.local:8080/mcp", httpToolServerName, testNamespace)
+				g.Expect(output).To(Equal(expectedURL), "Status URL should be set correctly")
+			}
+			Eventually(verifyStatusURL, 1*time.Minute).Should(Succeed())
+
+			By("verifying the http toolserver has Ready condition")
+			verifyReadyCondition := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", httpToolServerName, "-n", testNamespace,
+					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("True"), "ToolServer should have Ready condition set to True")
+			}
+			Eventually(verifyReadyCondition, 1*time.Minute).Should(Succeed())
+
+			By("verifying deployment has correct environment variables")
+			verifyEnvironmentVariables := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", httpToolServerName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].env[*].name}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring("LOG_LEVEL"), "Should contain LOG_LEVEL env var")
+			}
+			Eventually(verifyEnvironmentVariables).Should(Succeed())
+		})
+
+		It("should successfully create stdio transport toolserver without deployment", func() {
+			By("applying the stdio toolserver sample")
+			cmd := exec.Command("kubectl", "apply", "-f",
+				"config/samples/runtime_v1alpha1_toolserver_stdio.yaml", "-n", testNamespace)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply stdio toolserver sample")
+
+			By("verifying the stdio toolserver resource is created")
+			verifyToolServerExists := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", stdioToolServerName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			Eventually(verifyToolServerExists).Should(Succeed())
+
+			By("verifying no deployment is created for stdio transport")
+			verifyNoDeployment := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "deployment", stdioToolServerName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).To(HaveOccurred(), "Deployment should not exist for stdio transport")
+			}
+			Consistently(verifyNoDeployment, 30*time.Second, 5*time.Second).Should(Succeed())
+
+			By("verifying no service is created for stdio transport")
+			verifyNoService := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "service", stdioToolServerName, "-n", testNamespace)
+				_, err := utils.Run(cmd)
+				g.Expect(err).To(HaveOccurred(), "Service should not exist for stdio transport")
+			}
+			Consistently(verifyNoService, 30*time.Second, 5*time.Second).Should(Succeed())
+
+			By("verifying the stdio toolserver has Ready condition")
+			verifyReadyCondition := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", stdioToolServerName, "-n", testNamespace,
+					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("True"), "ToolServer should have Ready condition set to True")
+			}
+			Eventually(verifyReadyCondition, 1*time.Minute).Should(Succeed())
+
+			By("verifying the stdio toolserver status URL is empty")
+			verifyStatusURL := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", stdioToolServerName, "-n", testNamespace,
+					"-o", "jsonpath={.status.url}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(BeEmpty(), "Status URL should be empty for stdio transport")
+			}
+			Eventually(verifyStatusURL, 1*time.Minute).Should(Succeed())
+		})
+	})
 })
 
 // serviceAccountToken returns a token for the specified service account in the given namespace.
