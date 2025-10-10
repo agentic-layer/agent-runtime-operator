@@ -40,6 +40,7 @@ rules:
   - runtime.agentic-layer.ai
   resources:
   - agents
+  - toolservers
   verbs:
   - create
   - delete
@@ -52,12 +53,14 @@ rules:
   - runtime.agentic-layer.ai
   resources:
   - agents/finalizers
+  - toolservers/finalizers
   verbs:
   - update
 - apiGroups:
   - runtime.agentic-layer.ai
   resources:
   - agents/status
+  - toolservers/status
   verbs:
   - get
   - patch
