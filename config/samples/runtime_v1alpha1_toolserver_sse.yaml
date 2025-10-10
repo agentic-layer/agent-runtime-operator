@@ -1,0 +1,20 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: example-sse-toolserver
+spec:
+  protocol: mcp
+  transportType: sse
+  image: ghcr.io/example/mcp-tool-sse:v1.0.0
+  port: 8080
+  # Optional: URL path for the SSE endpoint
+  # Defaults to "/sse" if not specified
+  # Customize this if your MCP server uses a different path
+  # path: /sse
+  replicas: 1
+  env:
+    - name: LOG_LEVEL
+      value: info
