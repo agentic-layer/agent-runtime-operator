@@ -1,0 +1,21 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: example-http-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  # Example MCP server image - replace with your actual MCP server
+  image: ghcr.io/example/mcp-http-server:v1.0.0
+  port: 8080
+  # Optional: URL path for the MCP endpoint
+  # Defaults to "/mcp" if not specified
+  # Customize this if your MCP server uses a different path (e.g., "/api/mcp", "/v1/tools")
+  # path: /mcp
+  replicas: 2
+  env:
+    - name: LOG_LEVEL
+      value: info

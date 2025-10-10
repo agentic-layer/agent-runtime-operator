@@ -22,7 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the agent-runtime-operator itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- toolserver_admin_role.yaml
+- toolserver_editor_role.yaml
+- toolserver_viewer_role.yaml
 - agent_admin_role.yaml
 - agent_editor_role.yaml
 - agent_viewer_role.yaml
-

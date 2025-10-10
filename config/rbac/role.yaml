@@ -33,6 +33,7 @@ rules:
   resources:
   - agenticworkforces
   - agents
+  - toolservers
   verbs:
   - create
   - delete
@@ -46,6 +47,7 @@ rules:
   resources:
   - agenticworkforces/finalizers
   - agents/finalizers
+  - toolservers/finalizers
   verbs:
   - update
 - apiGroups:
@@ -53,6 +55,7 @@ rules:
   resources:
   - agenticworkforces/status
   - agents/status
+  - toolservers/status
   verbs:
   - get
   - patch

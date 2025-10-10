@@ -4,4 +4,8 @@ resources:
 - runtime_v1alpha1_agent_template.yaml
 - runtime_v1alpha1_agenticworkforce.yaml
 - configmap.yaml
+- runtime_v1alpha1_toolserver.yaml
+- runtime_v1alpha1_toolserver_http.yaml
+- runtime_v1alpha1_toolserver_stdio.yaml
+- runtime_v1alpha1_toolserver_sse.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
