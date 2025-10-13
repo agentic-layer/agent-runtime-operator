@@ -152,7 +152,7 @@ var _ = Describe("Agent Config", func() {
 			Expect(toolsVar.Value).To(MatchJSON(`{"test-tool":{"url":"https://example.com/tool"}}`))
 		})
 
-		It("should generate A2A_AGENT_CARD_URL when A2A protocol is present", func() {
+		It("should generate AGENT_A2A_RPC_URL when A2A protocol is present", func() {
 			agent := &runtimev1alpha1.Agent{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "a2a-agent",
@@ -172,12 +172,12 @@ var _ = Describe("Agent Config", func() {
 			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
 			Expect(err).NotTo(HaveOccurred())
 
-			a2aUrlVar := findEnvVar(envVars, "A2A_AGENT_CARD_URL")
+			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
 			Expect(a2aUrlVar).NotTo(BeNil())
-			Expect(a2aUrlVar.Value).To(Equal("http://a2a-agent.test-ns.svc.cluster.local:8080/api/.well-known/agent-card.json"))
+			Expect(a2aUrlVar.Value).To(Equal("http://a2a-agent.test-ns.svc.cluster.local:8080/api"))
 		})
 
-		It("should not generate A2A_AGENT_CARD_URL when no A2A protocol is present", func() {
+		It("should not generate AGENT_A2A_RPC_URL when no A2A protocol is present", func() {
 			agent := &runtimev1alpha1.Agent{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "no-a2a-agent",
@@ -189,7 +189,7 @@ var _ = Describe("Agent Config", func() {
 			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
 			Expect(err).NotTo(HaveOccurred())
 
-			a2aUrlVar := findEnvVar(envVars, "A2A_AGENT_CARD_URL")
+			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
 			Expect(a2aUrlVar).To(BeNil())
 		})
 	})
