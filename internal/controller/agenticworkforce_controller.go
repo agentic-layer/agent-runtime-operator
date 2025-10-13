@@ -143,10 +143,10 @@ func (r *AgenticWorkforceReconciler) validateEntryPointAgents(ctx context.Contex
 }
 
 // collectTransitiveAgentsAndTools recursively collects all agents and tools from entry-point agents
-func (r *AgenticWorkforceReconciler) collectTransitiveAgentsAndTools(ctx context.Context, workforce *runtimev1alpha1.AgenticWorkforce) ([]string, []string) {
+func (r *AgenticWorkforceReconciler) collectTransitiveAgentsAndTools(ctx context.Context, workforce *runtimev1alpha1.AgenticWorkforce) ([]runtimev1alpha1.TransitiveAgent, []string) {
 	log := logf.FromContext(ctx)
 
-	visitedAgents := make(map[string]bool)
+	visitedAgents := make(map[string]runtimev1alpha1.TransitiveAgent)
 	allTools := make(map[string]bool)
 
 	// Process each entry-point agent
@@ -169,9 +169,9 @@ func (r *AgenticWorkforceReconciler) collectTransitiveAgentsAndTools(ctx context
 		}
 	}
 
-	// Convert maps to sorted slices for consistent output
-	agents := make([]string, 0, len(visitedAgents))
-	for agent := range visitedAgents {
+	// Convert map to slice for consistent output
+	agents := make([]runtimev1alpha1.TransitiveAgent, 0, len(visitedAgents))
+	for _, agent := range visitedAgents {
 		agents = append(agents, agent)
 	}
 
@@ -184,18 +184,21 @@ func (r *AgenticWorkforceReconciler) collectTransitiveAgentsAndTools(ctx context
 }
 
 // traverseAgent recursively traverses an agent and its sub-agents, collecting all agents and tools
-func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespace, name string, visitedAgents, allTools map[string]bool) error {
+func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespace, name string, visitedAgents map[string]runtimev1alpha1.TransitiveAgent, allTools map[string]bool) error {
 	log := logf.FromContext(ctx)
 
 	agentKey := fmt.Sprintf("%s/%s", namespace, name)
 
 	// Avoid infinite loops by checking if we've already visited this agent
-	if visitedAgents[agentKey] {
+	if _, exists := visitedAgents[agentKey]; exists {
 		return nil
 	}
 
 	// Mark this agent as visited
-	visitedAgents[agentKey] = true
+	visitedAgents[agentKey] = runtimev1alpha1.TransitiveAgent{
+		Name:      name,
+		Namespace: namespace,
+	}
 
 	// Fetch the agent
 	var agent runtimev1alpha1.Agent
@@ -232,9 +235,12 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 				// Continue with other sub-agents
 			}
 		} else if subAgent.Url != "" {
-			// Remote agent - just record the URL
-			remoteAgentKey := fmt.Sprintf("remote:%s", subAgent.Url)
-			visitedAgents[remoteAgentKey] = true
+			// Remote agent - record as remote agent with URL
+			remoteAgentKey := subAgent.Url
+			visitedAgents[remoteAgentKey] = runtimev1alpha1.TransitiveAgent{
+				Name: subAgent.Name,
+				Url:  subAgent.Url,
+			}
 		}
 	}
 
@@ -290,7 +296,8 @@ func (r *AgenticWorkforceReconciler) findWorkforcesReferencingAgent(ctx context.
 
 		// Also check transitive references (if the agent appears in status.transitiveAgents)
 		for _, transitiveAgent := range workforce.Status.TransitiveAgents {
-			if transitiveAgent == agentKey {
+			// Match cluster agents by name and namespace
+			if transitiveAgent.Name == agent.Name && transitiveAgent.Namespace == agent.Namespace {
 				requests = append(requests, ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      workforce.Name,

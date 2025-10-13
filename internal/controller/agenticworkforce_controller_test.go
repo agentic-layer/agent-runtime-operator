@@ -255,7 +255,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 
 		It("should find agent in different namespace when specified", func() {
 			// Use a unique namespace name to avoid conflicts with terminating namespaces
-			testNamespace := "test-ns-" + string(types.UID(metav1.Now().Time.Format("20060102-150405")))
+			testNamespace := "test-ns-" + string(types.UID(metav1.Now().Format("20060102-150405")))
 
 			// Create namespace
 			ns := &corev1.Namespace{
@@ -337,7 +337,10 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 			}
 
 			agents, tools := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
-			Expect(agents).To(ContainElement("default/agent-with-tools"))
+			Expect(agents).To(ContainElement(runtimev1alpha1.TransitiveAgent{
+				Name:      "agent-with-tools",
+				Namespace: "default",
+			}))
 			Expect(tools).To(HaveLen(2))
 			Expect(tools).To(ContainElements("https://tool1.example.com", "https://tool2.example.com"))
 		})
@@ -391,7 +394,10 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 
 			agents, _ := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
 			Expect(agents).To(HaveLen(2))
-			Expect(agents).To(ContainElements("default/parent-agent", "default/sub-agent"))
+			Expect(agents).To(ContainElements(
+				runtimev1alpha1.TransitiveAgent{Name: "parent-agent", Namespace: "default"},
+				runtimev1alpha1.TransitiveAgent{Name: "sub-agent", Namespace: "default"},
+			))
 		})
 
 		It("should collect remote sub-agent using Url", func() {
@@ -427,8 +433,10 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 
 			agents, _ := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
 			Expect(agents).To(HaveLen(2))
-			Expect(agents).To(ContainElement("default/agent-with-remote"))
-			Expect(agents).To(ContainElement("remote:https://remote-agent.example.com/.well-known/agent-card.json"))
+			Expect(agents).To(ContainElements(
+				runtimev1alpha1.TransitiveAgent{Name: "agent-with-remote", Namespace: "default"},
+				runtimev1alpha1.TransitiveAgent{Name: "remote-sub", Url: "https://remote-agent.example.com/.well-known/agent-card.json"},
+			))
 		})
 
 		It("should handle multi-level hierarchy", func() {
@@ -505,7 +513,11 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 
 			agents, tools := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
 			Expect(agents).To(HaveLen(3))
-			Expect(agents).To(ContainElements("default/agent-a", "default/agent-b", "default/agent-c"))
+			Expect(agents).To(ContainElements(
+				runtimev1alpha1.TransitiveAgent{Name: "agent-a", Namespace: "default"},
+				runtimev1alpha1.TransitiveAgent{Name: "agent-b", Namespace: "default"},
+				runtimev1alpha1.TransitiveAgent{Name: "agent-c", Namespace: "default"},
+			))
 			Expect(tools).To(HaveLen(3))
 			Expect(tools).To(ContainElements("https://tool-a.example.com", "https://tool-b.example.com", "https://tool-c.example.com"))
 		})
@@ -562,7 +574,10 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 
 			agents, _ := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
 			Expect(agents).To(HaveLen(2))
-			Expect(agents).To(ContainElements("default/agent-circular-a", "default/agent-circular-b"))
+			Expect(agents).To(ContainElements(
+				runtimev1alpha1.TransitiveAgent{Name: "agent-circular-a", Namespace: "default"},
+				runtimev1alpha1.TransitiveAgent{Name: "agent-circular-b", Namespace: "default"},
+			))
 		})
 
 		It("should continue when agent is missing during traversal", func() {
@@ -597,7 +612,10 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 			}
 
 			agents, _ := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
-			Expect(agents).To(ContainElement("default/agent-with-missing-sub"))
+			Expect(agents).To(ContainElement(runtimev1alpha1.TransitiveAgent{
+				Name:      "agent-with-missing-sub",
+				Namespace: "default",
+			}))
 		})
 
 		It("should deduplicate agents from multiple entry points", func() {
@@ -666,7 +684,11 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 
 			agents, _ := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
 			Expect(agents).To(HaveLen(3))
-			Expect(agents).To(ContainElements("default/entry-1", "default/entry-2", "default/shared-agent"))
+			Expect(agents).To(ContainElements(
+				runtimev1alpha1.TransitiveAgent{Name: "entry-1", Namespace: "default"},
+				runtimev1alpha1.TransitiveAgent{Name: "entry-2", Namespace: "default"},
+				runtimev1alpha1.TransitiveAgent{Name: "shared-agent", Namespace: "default"},
+			))
 		})
 	})
 
@@ -780,7 +802,10 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 			defer func() { _ = k8sClient.Delete(ctx, workforce) }()
 
 			// Update status separately (status is a subresource)
-			workforce.Status.TransitiveAgents = []string{"default/transitive-entry-agent", "default/transitive-ref-agent"}
+			workforce.Status.TransitiveAgents = []runtimev1alpha1.TransitiveAgent{
+				{Name: "transitive-entry-agent", Namespace: "default"},
+				{Name: "transitive-ref-agent", Namespace: "default"},
+			}
 			Expect(k8sClient.Status().Update(ctx, workforce)).To(Succeed())
 
 			reconciler := &AgenticWorkforceReconciler{

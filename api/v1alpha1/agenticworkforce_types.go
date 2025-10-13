@@ -21,6 +21,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TransitiveAgent defines configuration for connecting to either a cluster agent or remote agent
+type TransitiveAgent struct {
+	// Name is a descriptive identifier for this transitive agent connection
+	Name string `json:"name"`
+
+	// Namespace specifies the Kubernetes namespace where the agent resides.
+	// Only used for cluster agents (when Url is not specified).
+	// For remote agents accessed via Url, this field should be omitted.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// Url is the HTTP/HTTPS endpoint URL for a remote agent outside the cluster.
+	// It refers to the agent's well-known agent card URL, e.g. https://agent.example.com/.well-known/agent-card.json
+	// +optional
+	// +kubebuilder:validation:Format=uri
+	Url string `json:"url,omitempty"`
+}
+
 // AgenticWorkforceSpec defines the desired state of AgenticWorkforce
 type AgenticWorkforceSpec struct {
 	// Name is the human-readable name of the workforce
@@ -49,7 +67,7 @@ type AgenticWorkforceStatus struct {
 
 	// TransitiveAgents contains all agents (both cluster and remote) discovered from entry-point agents
 	// +optional
-	TransitiveAgents []string `json:"transitiveAgents,omitempty"`
+	TransitiveAgents []TransitiveAgent `json:"transitiveAgents,omitempty"`
 
 	// TransitiveTools contains all tools discovered from all transitive agents
 	// +optional

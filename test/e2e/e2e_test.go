@@ -941,7 +941,7 @@ spec:
 			By("verifying workforce status contains transitive agents")
 			verifyTransitiveAgents := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "agenticworkforce", testWorkforceName, "-n", testNamespace,
-					"-o", "jsonpath={.status.transitiveAgents}")
+					"-o", "jsonpath={.status.transitiveAgents[*].name}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(ContainSubstring("news-agent"), "TransitiveAgents should contain news-agent")
@@ -1143,7 +1143,7 @@ spec:
 			By("verifying all three agents are in transitive agents")
 			verifyAllAgents := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "agenticworkforce", testWorkforceName, "-n", testNamespace,
-					"-o", "jsonpath={.status.transitiveAgents}")
+					"-o", "jsonpath={.status.transitiveAgents[*].name}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(ContainSubstring("hierarchy-entry"), "Should contain entry agent")
@@ -1258,7 +1258,7 @@ spec:
 			By("verifying transitive agents includes the agent")
 			verifyTransitiveAgents := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "agenticworkforce", "dynamic-workforce", "-n", testNamespace,
-					"-o", "jsonpath={.status.transitiveAgents}")
+					"-o", "jsonpath={.status.transitiveAgents[*].name}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(ContainSubstring("missing-test-agent"))
@@ -1337,7 +1337,7 @@ spec:
 
 				// Verify shared-sub appears exactly once in transitiveAgents array
 				cmd = exec.Command("kubectl", "get", "agenticworkforce", "shared-deps-workforce", "-n", testNamespace,
-					"-o", "jsonpath={.status.transitiveAgents}")
+					"-o", "jsonpath={.status.transitiveAgents[*].name}")
 				transitiveAgents, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(transitiveAgents).To(ContainSubstring("shared-sub"), "Should contain shared agent")

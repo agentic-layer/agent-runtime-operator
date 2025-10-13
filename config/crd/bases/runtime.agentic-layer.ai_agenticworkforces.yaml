@@ -187,7 +187,28 @@ spec:
                 description: TransitiveAgents contains all agents (both cluster and
                   remote) discovered from entry-point agents
                 items:
-                  type: string
+                  description: TransitiveAgent defines configuration for connecting
+                    to either a cluster agent or remote agent
+                  properties:
+                    name:
+                      description: Name is a descriptive identifier for this transitive
+                        agent connection
+                      type: string
+                    namespace:
+                      description: |-
+                        Namespace specifies the Kubernetes namespace where the agent resides.
+                        Only used for cluster agents (when Url is not specified).
+                        For remote agents accessed via Url, this field should be omitted.
+                      type: string
+                    url:
+                      description: |-
+                        Url is the HTTP/HTTPS endpoint URL for a remote agent outside the cluster.
+                        It refers to the agent's well-known agent card URL, e.g. https://agent.example.com/.well-known/agent-card.json
+                      format: uri
+                      type: string
+                  required:
+                  - name
+                  type: object
                 type: array
               transitiveTools:
                 description: TransitiveTools contains all tools discovered from all
