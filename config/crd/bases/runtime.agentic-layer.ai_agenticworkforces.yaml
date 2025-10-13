@@ -52,6 +52,7 @@ spec:
               description:
                 description: Description provides details about the workforce's purpose
                   and capabilities
+                minLength: 1
                 type: string
               entryPointAgents:
                 description: |-
@@ -102,13 +103,16 @@ spec:
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
+                minItems: 1
                 type: array
               name:
                 description: Name is the human-readable name of the workforce
+                minLength: 1
                 type: string
               owner:
                 description: Owner is the email address or identifier of the workforce
                   owner
+                minLength: 1
                 type: string
               tags:
                 description: Tags is a list of labels for categorizing and organizing

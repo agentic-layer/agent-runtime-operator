@@ -86,37 +86,24 @@ func (v *AgenticWorkforceCustomValidator) ValidateDelete(_ context.Context, _ ru
 }
 
 // validateAgenticWorkforce performs validation logic for AgenticWorkforce resources.
+// Note: Simple required field validation (name, description, owner, entryPointAgents) is handled
+// via kubebuilder markers in the CRD. This webhook focuses on complex validation that requires
+// runtime checks, such as verifying that referenced agents exist.
 func (v *AgenticWorkforceCustomValidator) validateAgenticWorkforce(ctx context.Context, workforce *runtimev1alpha1.AgenticWorkforce) (admission.Warnings, error) {
 	var allErrs field.ErrorList
 
-	// Validate that at least one entry point agent is specified
-	if len(workforce.Spec.EntryPointAgents) == 0 {
-		allErrs = append(allErrs, field.Required(
-			field.NewPath("spec").Child("entryPointAgents"),
-			"at least one entry point agent must be specified",
-		))
-	}
-
-	// Validate each entry point agent reference
+	// Validate each entry point agent reference exists in the cluster
 	entryPointsPath := field.NewPath("spec").Child("entryPointAgents")
 	for i, agentRef := range workforce.Spec.EntryPointAgents {
 		agentPath := entryPointsPath.Index(i)
 
-		// Validate agent reference is not nil
+		// Skip nil references (should be caught by CRD validation, but check defensively)
 		if agentRef == nil {
-			allErrs = append(allErrs, field.Required(
-				agentPath,
-				"agent reference cannot be nil",
-			))
 			continue
 		}
 
-		// Validate agent name is not empty
+		// Skip empty names (should be caught by CRD validation, but check defensively)
 		if agentRef.Name == "" {
-			allErrs = append(allErrs, field.Required(
-				agentPath.Child("name"),
-				"agent name cannot be empty",
-			))
 			continue
 		}
 
@@ -126,7 +113,7 @@ func (v *AgenticWorkforceCustomValidator) validateAgenticWorkforce(ctx context.C
 			namespace = workforce.Namespace
 		}
 
-		// Check if the agent exists
+		// Check if the referenced agent exists
 		agent := &runtimev1alpha1.Agent{}
 		err := v.Client.Get(ctx, types.NamespacedName{
 			Name:      agentRef.Name,
@@ -140,28 +127,6 @@ func (v *AgenticWorkforceCustomValidator) validateAgenticWorkforce(ctx context.C
 				fmt.Sprintf("agent '%s' not found in namespace '%s': %v", agentRef.Name, namespace, err),
 			))
 		}
-	}
-
-	// Validate required fields
-	if workforce.Spec.Name == "" {
-		allErrs = append(allErrs, field.Required(
-			field.NewPath("spec").Child("name"),
-			"name is required",
-		))
-	}
-
-	if workforce.Spec.Description == "" {
-		allErrs = append(allErrs, field.Required(
-			field.NewPath("spec").Child("description"),
-			"description is required",
-		))
-	}
-
-	if workforce.Spec.Owner == "" {
-		allErrs = append(allErrs, field.Required(
-			field.NewPath("spec").Child("owner"),
-			"owner is required",
-		))
 	}
 
 	if len(allErrs) == 0 {

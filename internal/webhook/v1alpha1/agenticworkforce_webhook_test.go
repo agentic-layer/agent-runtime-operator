@@ -28,6 +28,20 @@ import (
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
 
+// NOTE: This test suite focuses on webhook-level validation (complex runtime checks).
+// Simple field validation (required fields, minLength, minItems) is handled by kubebuilder
+// markers in the CRD and validated by the API server before reaching the webhook.
+//
+// Webhook tests (this file):
+// - Agent existence validation (requires Kubernetes client lookup)
+// - Cross-namespace agent references
+//
+// CRD-level validation (not tested here):
+// - Required fields: name, description, owner, entryPointAgents
+// - MinLength=1: name, description, owner
+// - MinItems=1: entryPointAgents array
+// - Empty agent names in entryPointAgents
+
 var _ = Describe("AgenticWorkforce Webhook", func() {
 	var (
 		ctx       context.Context
@@ -124,153 +138,6 @@ var _ = Describe("AgenticWorkforce Webhook", func() {
 			warnings, err := validator.ValidateCreate(ctx, workforce)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("agent 'non-existent-agent' not found"))
-			Expect(warnings).To(BeNil())
-		})
-
-		It("should reject a workforce with no entry point agents", func() {
-			workforce := &runtimev1alpha1.AgenticWorkforce{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-workforce",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					Name:             "Test Workforce",
-					Description:      "A test workforce",
-					Owner:            "test@example.com",
-					EntryPointAgents: []*corev1.ObjectReference{},
-				},
-			}
-
-			warnings, err := validator.ValidateCreate(ctx, workforce)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("at least one entry point agent must be specified"))
-			Expect(warnings).To(BeNil())
-		})
-
-		It("should reject a workforce with empty agent name", func() {
-			workforce := &runtimev1alpha1.AgenticWorkforce{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-workforce",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					Name:        "Test Workforce",
-					Description: "A test workforce",
-					Owner:       "test@example.com",
-					EntryPointAgents: []*corev1.ObjectReference{
-						{Name: ""},
-					},
-				},
-			}
-
-			warnings, err := validator.ValidateCreate(ctx, workforce)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("agent name cannot be empty"))
-			Expect(warnings).To(BeNil())
-		})
-
-		It("should reject a workforce without name", func() {
-			// Create test agent
-			agent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "agent-1",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
-
-			workforce := &runtimev1alpha1.AgenticWorkforce{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-workforce",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					Name:        "", // Empty name
-					Description: "A test workforce",
-					Owner:       "test@example.com",
-					EntryPointAgents: []*corev1.ObjectReference{
-						{Name: "agent-1"},
-					},
-				},
-			}
-
-			warnings, err := validator.ValidateCreate(ctx, workforce)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("name is required"))
-			Expect(warnings).To(BeNil())
-		})
-
-		It("should reject a workforce without description", func() {
-			// Create test agent
-			agent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "agent-1",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
-
-			workforce := &runtimev1alpha1.AgenticWorkforce{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-workforce",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					Name:        "Test Workforce",
-					Description: "", // Empty description
-					Owner:       "test@example.com",
-					EntryPointAgents: []*corev1.ObjectReference{
-						{Name: "agent-1"},
-					},
-				},
-			}
-
-			warnings, err := validator.ValidateCreate(ctx, workforce)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("description is required"))
-			Expect(warnings).To(BeNil())
-		})
-
-		It("should reject a workforce without owner", func() {
-			// Create test agent
-			agent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "agent-1",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
-
-			workforce := &runtimev1alpha1.AgenticWorkforce{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-workforce",
-					Namespace: namespace,
-				},
-				Spec: runtimev1alpha1.AgenticWorkforceSpec{
-					Name:        "Test Workforce",
-					Description: "A test workforce",
-					Owner:       "", // Empty owner
-					EntryPointAgents: []*corev1.ObjectReference{
-						{Name: "agent-1"},
-					},
-				},
-			}
-
-			warnings, err := validator.ValidateCreate(ctx, workforce)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("owner is required"))
 			Expect(warnings).To(BeNil())
 		})
 

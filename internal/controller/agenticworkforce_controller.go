@@ -22,6 +22,7 @@ import (
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,24 +70,26 @@ func (r *AgenticWorkforceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// Collect transitive agents and tools
 	transitiveAgents, transitiveTools := r.collectTransitiveAgentsAndTools(ctx, &workforce)
 
-	// Update status conditions
-	condition := metav1.Condition{
-		Type:               "Ready",
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: workforce.Generation,
-		LastTransitionTime: metav1.Now(),
-		Reason:             "AllAgentsReady",
-		Message:            "All entry point agents are available",
+	// Update status condition based on validation
+	if allAgentsReady {
+		meta.SetStatusCondition(&workforce.Status.Conditions, metav1.Condition{
+			Type:               "Ready",
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: workforce.Generation,
+			Reason:             "AllAgentsReady",
+			Message:            "All entry point agents are available",
+		})
+	} else {
+		meta.SetStatusCondition(&workforce.Status.Conditions, metav1.Condition{
+			Type:               "Ready",
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: workforce.Generation,
+			Reason:             "AgentsMissing",
+			Message:            fmt.Sprintf("Missing agents: %v", missingAgents),
+		})
 	}
 
-	if !allAgentsReady {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = "AgentsMissing"
-		condition.Message = fmt.Sprintf("Missing agents: %v", missingAgents)
-	}
-
-	// Update the status
-	workforce.Status.Conditions = []metav1.Condition{condition}
+	// Update transitive agents and tools
 	workforce.Status.TransitiveAgents = transitiveAgents
 	workforce.Status.TransitiveTools = transitiveTools
 

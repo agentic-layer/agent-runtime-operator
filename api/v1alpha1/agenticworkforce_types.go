@@ -42,12 +42,18 @@ type TransitiveAgent struct {
 // AgenticWorkforceSpec defines the desired state of AgenticWorkforce
 type AgenticWorkforceSpec struct {
 	// Name is the human-readable name of the workforce
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Description provides details about the workforce's purpose and capabilities
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Description string `json:"description"`
 
 	// Owner is the email address or identifier of the workforce owner
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Owner string `json:"owner"`
 
 	// Tags is a list of labels for categorizing and organizing workforces
@@ -57,6 +63,8 @@ type AgenticWorkforceSpec struct {
 	// EntryPointAgents defines references to the entry-point agents for this workforce.
 	// Uses standard Kubernetes ObjectReference. Only Name and Namespace fields are used.
 	// Namespace defaults to the AgenticWorkforce's namespace if not specified.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
 	EntryPointAgents []*corev1.ObjectReference `json:"entryPointAgents"`
 }
 
