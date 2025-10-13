@@ -19,6 +19,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -181,6 +182,11 @@ func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars
 	for _, userEnv := range userEnvMap {
 		result = append(result, userEnv)
 	}
+
+	// Sort the environment variables by name for consistent ordering
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 
 	return result
 }
