@@ -85,7 +85,6 @@ type AgenticWorkforceStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Owner",type="string",JSONPath=".spec.owner"
-// +kubebuilder:printcolumn:name="Entry Points",type="integer",JSONPath=".spec.entryPointAgents[*]"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // AgenticWorkforce is the Schema for the agenticworkforces API

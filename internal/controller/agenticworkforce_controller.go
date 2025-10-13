@@ -265,10 +265,21 @@ func (r *AgenticWorkforceReconciler) findWorkforcesReferencingAgent(ctx context.
 	}
 
 	var requests []ctrl.Request
+	enqueued := make(map[types.NamespacedName]bool) // Track enqueued workforces to prevent duplicates
 	agentKey := fmt.Sprintf("%s/%s", agent.Namespace, agent.Name)
 
 	// Check each workforce to see if it references this agent
 	for _, workforce := range workforceList.Items {
+		workforceKey := types.NamespacedName{
+			Name:      workforce.Name,
+			Namespace: workforce.Namespace,
+		}
+
+		// Skip if already enqueued
+		if enqueued[workforceKey] {
+			continue
+		}
+
 		// Check if this agent is directly referenced as an entry point
 		for _, entryRef := range workforce.Spec.EntryPointAgents {
 			// Skip nil references
@@ -284,12 +295,8 @@ func (r *AgenticWorkforceReconciler) findWorkforcesReferencingAgent(ctx context.
 
 			if entryKey == agentKey {
 				// This workforce directly references the agent
-				requests = append(requests, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      workforce.Name,
-						Namespace: workforce.Namespace,
-					},
-				})
+				requests = append(requests, ctrl.Request{NamespacedName: workforceKey})
+				enqueued[workforceKey] = true
 				logf.FromContext(ctx).Info("Enqueuing workforce due to agent change",
 					"workforce", workforce.Name,
 					"agent", agentKey)
@@ -297,16 +304,17 @@ func (r *AgenticWorkforceReconciler) findWorkforcesReferencingAgent(ctx context.
 			}
 		}
 
+		// Skip if already enqueued (might have been enqueued above)
+		if enqueued[workforceKey] {
+			continue
+		}
+
 		// Also check transitive references (if the agent appears in status.transitiveAgents)
 		for _, transitiveAgent := range workforce.Status.TransitiveAgents {
 			// Match cluster agents by name and namespace
 			if transitiveAgent.Name == agent.Name && transitiveAgent.Namespace == agent.Namespace {
-				requests = append(requests, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      workforce.Name,
-						Namespace: workforce.Namespace,
-					},
-				})
+				requests = append(requests, ctrl.Request{NamespacedName: workforceKey})
+				enqueued[workforceKey] = true
 				logf.FromContext(ctx).Info("Enqueuing workforce due to transitive agent change",
 					"workforce", workforce.Name,
 					"agent", agentKey)

@@ -937,5 +937,60 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 			requests := reconciler.findWorkforcesReferencingAgent(ctx, ns)
 			Expect(requests).To(BeEmpty())
 		})
+
+		It("should deduplicate workforce when agent appears in both entry points and transitive agents", func() {
+			// Entry point agents always appear in TransitiveAgents, so without deduplication, the workforce would be
+			// enqueued twice when an entry point agent changes.
+
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "dedup-agent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, agent) }()
+
+			workforce := &runtimev1alpha1.AgenticWorkforce{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "watch-workforce-dedup",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgenticWorkforceSpec{
+					Name:        "Deduplication Test Workforce",
+					Description: "Test workforce for deduplication",
+					Owner:       "test@example.com",
+					EntryPointAgents: []*corev1.ObjectReference{
+						{Name: "dedup-agent"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, workforce)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, workforce) }()
+
+			// Update status to include the same agent in transitive agents
+			// (this is the typical scenario after reconciliation)
+			workforce.Status.TransitiveAgents = []runtimev1alpha1.TransitiveAgent{
+				{Name: "dedup-agent", Namespace: "default"},
+			}
+			Expect(k8sClient.Status().Update(ctx, workforce)).To(Succeed())
+
+			reconciler := &AgenticWorkforceReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			// The agent appears in BOTH EntryPointAgents and TransitiveAgents
+			// Without deduplication, this would return 2 requests
+			// With deduplication, it should return exactly 1 request
+			requests := reconciler.findWorkforcesReferencingAgent(ctx, agent)
+			Expect(requests).To(HaveLen(1), "Workforce should be enqueued exactly once, not twice")
+			Expect(requests[0].Name).To(Equal("watch-workforce-dedup"))
+			Expect(requests[0].Namespace).To(Equal("default"))
+		})
 	})
 })

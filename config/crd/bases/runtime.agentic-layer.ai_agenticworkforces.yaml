@@ -18,9 +18,6 @@ spec:
     - jsonPath: .spec.owner
       name: Owner
       type: string
-    - jsonPath: .spec.entryPointAgents[*]
-      name: Entry Points
-      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
