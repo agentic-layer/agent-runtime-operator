@@ -146,7 +146,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -185,14 +185,14 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
 			// Create initial deployment
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Update agent image
 			agent.Spec.Image = "test-image:v2"
 
 			// Update deployment
-			err = reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err = reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -216,7 +216,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -248,7 +248,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}

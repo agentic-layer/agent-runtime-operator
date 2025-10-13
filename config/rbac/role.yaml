@@ -43,6 +43,14 @@ rules:
   - update
   - watch
 - apiGroups:
+    - runtime.agentic-layer.ai
+  resources:
+    - aigateways
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
   - runtime.agentic-layer.ai
   resources:
   - agenticworkforces/finalizers

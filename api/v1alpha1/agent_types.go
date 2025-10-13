@@ -131,6 +131,13 @@ type AgentSpec struct {
 	// +kubebuilder:default=false
 	Exposed bool `json:"exposed,omitempty"`
 
+	// AiGatewayRef references an AiGateway resource that this agent should use for model routing.
+	// If not specified, the operator will attempt to find the default AiGateway in the cluster.
+	// If no default AiGateway exists, the agent will run without an AI Gateway.
+	// If Namespace is not specified, defaults to the same namespace as the Agent.
+	// +optional
+	AiGatewayRef *corev1.ObjectReference `json:"aiGatewayRef,omitempty"`
+
 	// Env defines additional environment variables to be injected into the agent container.
 	// These are take precedence over operator-managed environment variables.
 	// +optional

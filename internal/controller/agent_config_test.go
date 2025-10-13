@@ -42,7 +42,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(envVars).To(HaveLen(6))
 
@@ -97,7 +97,7 @@ var _ = Describe("Agent Config", func() {
 				"sub1": "https://example.com/sub1.json",
 				"sub2": "https://example.com/sub2.json",
 			}
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, subAgents)
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, subAgents, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(envVars).To(HaveLen(6))
 
@@ -141,7 +141,7 @@ var _ = Describe("Agent Config", func() {
 			subAgents := map[string]string{
 				"test_sub": "https://example.com/sub.json",
 			}
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, subAgents)
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, subAgents, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify JSON structure is valid
@@ -169,7 +169,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
@@ -186,7 +186,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string))
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")

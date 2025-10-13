@@ -327,6 +327,11 @@ func (in *AgentSpec) DeepCopyInto(out *AgentSpec) {
 		*out = make([]AgentProtocol, len(*in))
 		copy(*out, *in)
 	}
+	if in.AiGatewayRef != nil {
+		in, out := &in.AiGatewayRef, &out.AiGatewayRef
+		*out = new(v1.ObjectReference)
+		**out = **in
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]v1.EnvVar, len(*in))
