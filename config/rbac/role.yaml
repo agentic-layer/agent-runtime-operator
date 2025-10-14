@@ -31,6 +31,7 @@ rules:
 - apiGroups:
   - runtime.agentic-layer.ai
   resources:
+  - agenticworkforces
   - agents
   verbs:
   - create
