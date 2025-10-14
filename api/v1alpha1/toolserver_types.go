@@ -92,6 +92,7 @@ type ToolServerStatus struct {
 }
 
 // ToolServer is the Schema for the toolservers API.
+//
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 type ToolServer struct {
@@ -103,6 +104,7 @@ type ToolServer struct {
 }
 
 // ToolServerList contains a list of ToolServer.
+//
 // +kubebuilder:object:root=true
 type ToolServerList struct {
 	metav1.TypeMeta `json:",inline"`

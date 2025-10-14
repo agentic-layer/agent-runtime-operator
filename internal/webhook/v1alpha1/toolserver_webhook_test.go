@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	testImageToolServer = "fake-toolserver:v1.0.0"
-	testImageNode       = "fake-node-mcp:v1.0"
-	testImagePython     = "fake-python-mcp:v1.0"
+	testImageToolServer = "example.com/fake-toolserver:v1.0.0"
+	testImageNode       = "example.com/fake-node-mcp:v1.0"
+	testImagePython     = "example.com/fake-python-mcp:v1.0"
 )
 
 var _ = Describe("ToolServer Webhook", func() {
