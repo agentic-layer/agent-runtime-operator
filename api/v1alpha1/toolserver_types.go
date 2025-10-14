@@ -35,6 +35,7 @@ type ToolServerSpec struct {
 	TransportType string `json:"transportType"`
 
 	// Image is the container image for the tool server
+	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
 
 	// Command overrides the container's ENTRYPOINT.
@@ -90,10 +91,9 @@ type ToolServerStatus struct {
 	Url string `json:"url,omitempty"`
 }
 
+// ToolServer is the Schema for the toolservers API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-
-// ToolServer is the Schema for the toolservers API.
 type ToolServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -102,9 +102,8 @@ type ToolServer struct {
 	Status ToolServerStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-
 // ToolServerList contains a list of ToolServer.
+// +kubebuilder:object:root=true
 type ToolServerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

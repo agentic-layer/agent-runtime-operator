@@ -75,6 +75,7 @@ var _ = Describe("Manager", Ordered, func() {
 			"ghcr.io/agentic-layer/weather-agent:0.3.0",
 			webhookv1alpha1.DefaultTemplateImageAdk,
 			"mcp/context7:latest",
+			"mcp/sqlite:latest",
 		}
 
 		By("loading the sample images on Kind")
@@ -320,9 +321,7 @@ var _ = Describe("Manager", Ordered, func() {
 		const configMapName = "agent-config-map"
 
 		BeforeAll(func() {
-			By("waiting for webhook service to be ready")
-			Eventually(waitForWebhookServiceReady, 2*time.Minute, 5*time.Second).
-				Should(Succeed(), "Webhook service should be ready")
+			ensureWebhookServiceReady()
 
 			By("applying sample configmap")
 			cmd := exec.Command("kubectl", "apply", "-f", "config/samples/configmap.yaml",
@@ -1341,9 +1340,7 @@ spec:
 		const stdioToolServerName = "example-stdio-toolserver"
 
 		BeforeAll(func() {
-			By("waiting for webhook service to be ready")
-			Eventually(waitForWebhookServiceReady, 2*time.Minute, 5*time.Second).
-				Should(Succeed(), "Webhook service should be ready")
+			ensureWebhookServiceReady()
 		})
 
 		AfterAll(func() {
@@ -1552,6 +1549,13 @@ func waitForWebhookServiceReady(g Gomega) {
 	output, err := utils.Run(cmd)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
+}
+
+// ensureWebhookServiceReady is a helper function that waits for webhook service to be ready
+func ensureWebhookServiceReady() {
+	By("waiting for webhook service to be ready")
+	Eventually(waitForWebhookServiceReady, 2*time.Minute, 5*time.Second).
+		Should(Succeed(), "Webhook service should be ready")
 }
 
 // tokenRequest is a simplified representation of the Kubernetes TokenRequest API response,
