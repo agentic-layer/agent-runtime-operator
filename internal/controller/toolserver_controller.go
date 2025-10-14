@@ -103,12 +103,18 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Ensure Deployment exists and is up to date for http/sse transports
 	if err := r.ensureDeployment(ctx, &toolServer); err != nil {
 		log.Error(err, "Failed to ensure Deployment")
+		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "DeploymentFailed", err.Error()); statusErr != nil {
+			log.Error(statusErr, "Failed to update status after deployment failure")
+		}
 		return ctrl.Result{}, err
 	}
 
 	// Ensure Service exists and is up to date for http/sse transports
 	if err := r.ensureService(ctx, &toolServer); err != nil {
 		log.Error(err, "Failed to ensure Service")
+		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "ServiceFailed", err.Error()); statusErr != nil {
+			log.Error(statusErr, "Failed to update status after service failure")
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -140,14 +146,16 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 			Name:      toolServer.Name,
 			Namespace: toolServer.Namespace,
 		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{},
+				},
+			},
+		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
-		// Set controller reference
-		if err := ctrl.SetControllerReference(toolServer, deployment, r.Scheme); err != nil {
-			return err
-		}
-
+	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
 			"app":       toolServer.Name,
@@ -160,6 +168,15 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 			"app": toolServer.Name,
 		}
 
+		// Build container ports
+		containerPorts := []corev1.ContainerPort{
+			{
+				Name:          "toolserver",
+				ContainerPort: toolServer.Spec.Port,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		}
+
 		// Set immutable fields only on creation
 		if deployment.CreationTimestamp.IsZero() {
 			// Deployment selector is immutable so we set this value only if
@@ -168,12 +185,6 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 				MatchLabels: selectorLabels,
 			}
 		}
-
-		// Merge managed labels (preserving unmanaged labels)
-		if deployment.Labels == nil {
-			deployment.Labels = make(map[string]string)
-		}
-		maps.Copy(deployment.Labels, managedLabels)
 
 		// Set selector labels for the pod template
 		deployment.Spec.Template.Labels = selectorLabels
@@ -188,30 +199,23 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 			*deployment.Spec.Replicas = 1
 		}
 
-		// Build container ports
-		containerPorts := []corev1.ContainerPort{
-			{
-				Name:          "toolserver",
-				ContainerPort: toolServer.Spec.Port,
-				Protocol:      corev1.ProtocolTCP,
-			},
+		// Merge managed labels (preserving unmanaged labels)
+		if deployment.Labels == nil {
+			deployment.Labels = make(map[string]string)
 		}
+		maps.Copy(deployment.Labels, managedLabels)
 
-		// Update or create toolserver container
-		container := r.findToolServerContainer(&deployment.Spec.Template.Spec)
+		// Update toolserver container fields
+		container := findContainerByName(&deployment.Spec.Template.Spec, toolserverContainerName)
 		if container == nil {
 			// Container doesn't exist, create and append it
 			newContainer := corev1.Container{
 				Name: toolserverContainerName,
 			}
-			deployment.Spec.Template.Spec.Containers = append(
-				deployment.Spec.Template.Spec.Containers,
-				newContainer,
-			)
+			deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, newContainer)
+			// Get pointer to the newly added container
 			container = &deployment.Spec.Template.Spec.Containers[len(deployment.Spec.Template.Spec.Containers)-1]
 		}
-
-		// Set/update container fields
 		container.Image = toolServer.Spec.Image
 		container.Command = toolServer.Spec.Command
 		container.Args = toolServer.Spec.Args
@@ -220,14 +224,14 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 		container.EnvFrom = toolServer.Spec.EnvFrom
 		container.ReadinessProbe = r.buildReadinessProbe(toolServer.Spec.Port)
 
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to ensure deployment: %w", err)
+		// Set owner reference
+		return ctrl.SetControllerReference(toolServer, deployment, r.Scheme)
+	}); err != nil {
+		return err
+	} else if op != controllerutil.OperationResultNone {
+		log.Info("Deployment reconciled", "operation", op)
 	}
 
-	log.Info("Deployment reconciled", "operation", op)
 	return nil
 }
 
@@ -242,12 +246,7 @@ func (r *ToolServerReconciler) ensureService(ctx context.Context, toolServer *ru
 		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, func() error {
-		// Set controller reference
-		if err := ctrl.SetControllerReference(toolServer, service, r.Scheme); err != nil {
-			return err
-		}
-
+	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
 			"app":       toolServer.Name,
@@ -276,19 +275,19 @@ func (r *ToolServerReconciler) ensureService(ctx context.Context, toolServer *ru
 		}
 		maps.Copy(service.Labels, managedLabels)
 
-		// Set/update service fields
-		service.Spec.Selector = selectorLabels
+		// Update service spec
 		service.Spec.Ports = servicePorts
+		service.Spec.Selector = selectorLabels
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to ensure service: %w", err)
+		// Set owner reference
+		return ctrl.SetControllerReference(toolServer, service, r.Scheme)
+	}); err != nil {
+		return err
+	} else if op != controllerutil.OperationResultNone {
+		log.Info("Service reconciled", "operation", op)
 	}
 
-	log.Info("Service reconciled", "operation", op)
 	return nil
 }
 
@@ -340,16 +339,6 @@ func (r *ToolServerReconciler) ensureServiceDeleted(ctx context.Context, toolSer
 	return nil
 }
 
-// findToolServerContainer finds the toolserver container in a PodSpec
-func (r *ToolServerReconciler) findToolServerContainer(podSpec *corev1.PodSpec) *corev1.Container {
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].Name == toolserverContainerName {
-			return &podSpec.Containers[i]
-		}
-	}
-	return nil
-}
-
 // updateToolServerStatusReady sets the ToolServer status to Ready and updates the URL
 func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, toolServer *runtimev1alpha1.ToolServer) error {
 	// Build URL for http/sse transports
@@ -366,6 +355,24 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 		Status:             metav1.ConditionTrue,
 		Reason:             "Reconciled",
 		Message:            "ToolServer is ready",
+		ObservedGeneration: toolServer.Generation,
+	})
+
+	if err := r.Status().Update(ctx, toolServer); err != nil {
+		return fmt.Errorf("failed to update toolserver status: %w", err)
+	}
+
+	return nil
+}
+
+// updateToolServerStatusNotReady sets the ToolServer status to not Ready
+func (r *ToolServerReconciler) updateToolServerStatusNotReady(ctx context.Context, toolServer *runtimev1alpha1.ToolServer, reason, message string) error {
+	// Set Ready condition to False
+	meta.SetStatusCondition(&toolServer.Status.Conditions, metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionFalse,
+		Reason:             reason,
+		Message:            message,
 		ObservedGeneration: toolServer.Generation,
 	})
 

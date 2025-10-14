@@ -196,15 +196,6 @@ func (v *ToolServerCustomValidator) validateToolServer(toolserver *runtimev1alph
 			))
 		}
 
-		// Validate replicas if specified
-		if toolserver.Spec.Replicas != nil && *toolserver.Spec.Replicas < 0 {
-			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("spec", "replicas"),
-				*toolserver.Spec.Replicas,
-				"replicas cannot be negative",
-			))
-		}
-
 		// Validate path format if specified
 		if toolserver.Spec.Path != "" && toolserver.Spec.Path != "/" && !isValidPathFormat(toolserver.Spec.Path) {
 			allErrs = append(allErrs, field.Invalid(

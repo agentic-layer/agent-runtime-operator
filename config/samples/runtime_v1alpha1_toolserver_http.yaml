@@ -8,8 +8,9 @@ metadata:
 spec:
   protocol: mcp
   transportType: http
-  # Example MCP server image - replace with your actual MCP server
-  image: ghcr.io/example/mcp-http-server:v1.0.0
+  # Context7 MCP server with HTTP support
+  # This is a real MCP server from Docker's MCP catalog
+  image: mcp/context7:latest
   port: 8080
   # Optional: URL path for the MCP endpoint
   # Defaults to "/mcp" if not specified

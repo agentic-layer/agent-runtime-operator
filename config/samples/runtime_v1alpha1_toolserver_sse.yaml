@@ -8,7 +8,9 @@ metadata:
 spec:
   protocol: mcp
   transportType: sse
-  image: ghcr.io/example/mcp-tool-sse:v1.0.0
+  # Context7 MCP server with SSE support
+  # This is a real MCP server from Docker's MCP catalog
+  image: mcp/context7:latest
   port: 8080
   # Optional: URL path for the SSE endpoint
   # Defaults to "/sse" if not specified

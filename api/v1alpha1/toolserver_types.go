@@ -37,45 +37,45 @@ type ToolServerSpec struct {
 	// Image is the container image for the tool server
 	Image string `json:"image"`
 
-	// +optional
 	// Command overrides the container's ENTRYPOINT.
 	// If not specified, the container image's ENTRYPOINT is used.
 	// Follows the same semantics as Kubernetes Pod containers.
+	// +optional
 	Command []string `json:"command,omitempty"`
 
-	// +optional
 	// Args overrides the container's CMD.
 	// If not specified, the container image's CMD is used.
 	// Follows the same semantics as Kubernetes Pod containers.
+	// +optional
 	Args []string `json:"args,omitempty"`
 
-	// +optional
 	// Port is the port number for http/sse transports
 	// Required for http and sse transports, must not be set for stdio
+	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	Port int32 `json:"port,omitempty"`
 
-	// +optional
 	// Path is the URL path for http/sse transports
 	// Defaults to "/mcp" for http and "/sse" for sse if not specified
 	// Must start with "/" if specified
 	// Not applicable for stdio transport
+	// +optional
 	// +kubebuilder:validation:Pattern=`^/.*`
 	Path string `json:"path,omitempty"`
 
-	// +optional
 	// Replicas is the number of replicas for http/sse transports
 	// Only applicable for http and sse transports, ignored for stdio
+	// +optional
 	// +kubebuilder:validation:Minimum=0
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// +optional
 	// Env defines additional environment variables to be injected into the tool server container
+	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// +optional
 	// EnvFrom defines sources to populate environment variables from
+	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 

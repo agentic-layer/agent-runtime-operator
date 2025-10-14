@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	testImageV1     = "test:v1"
-	testImageNode   = "node:20"
-	testImagePython = "python:3.11"
+	testImageV1     = "fake-registry.example/fake-toolserver:v1.0.0"
+	testImageNode   = "fake-registry.example/fake-node-image:20"
+	testImagePython = "fake-registry.example/fake-python-image:3.11"
 )
 
 var _ = Describe("ToolServer Webhook", func() {
@@ -436,23 +436,6 @@ var _ = Describe("ToolServer Webhook", func() {
 	})
 
 	Context("When validating advanced constraints", func() {
-		It("Should deny creation if http transport has negative replicas", func() {
-			By("creating an http ToolServer with negative replicas")
-			replicas := int32(-1)
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImagePython
-			obj.Spec.Port = 8080
-			obj.Spec.Replicas = &replicas
-
-			By("validating the creation")
-			_, err := validator.ValidateCreate(ctx, obj)
-
-			By("expecting validation to fail")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("replicas cannot be negative"))
-		})
-
 		It("Should allow zero replicas for http transport", func() {
 			By("creating an http ToolServer with zero replicas")
 			replicas := int32(0)
