@@ -90,32 +90,24 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			log.Error(err, "Failed to delete Service")
 			return ctrl.Result{}, err
 		}
-
-		// Update status to indicate ready for sidecar injection
-		if err := r.updateToolServerStatusReady(ctx, &toolServer); err != nil {
-			log.Error(err, "Failed to update ToolServer status")
+	} else {
+		// Ensure Deployment exists and is up to date for http/sse transports
+		if err := r.ensureDeployment(ctx, &toolServer); err != nil {
+			log.Error(err, "Failed to ensure Deployment")
+			if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "DeploymentFailed", err.Error()); statusErr != nil {
+				log.Error(statusErr, "Failed to update status after deployment failure")
+			}
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{}, nil
-	}
-
-	// Ensure Deployment exists and is up to date for http/sse transports
-	if err := r.ensureDeployment(ctx, &toolServer); err != nil {
-		log.Error(err, "Failed to ensure Deployment")
-		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "DeploymentFailed", err.Error()); statusErr != nil {
-			log.Error(statusErr, "Failed to update status after deployment failure")
+		// Ensure Service exists and is up to date for http/sse transports
+		if err := r.ensureService(ctx, &toolServer); err != nil {
+			log.Error(err, "Failed to ensure Service")
+			if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "ServiceFailed", err.Error()); statusErr != nil {
+				log.Error(statusErr, "Failed to update status after service failure")
+			}
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
-	}
-
-	// Ensure Service exists and is up to date for http/sse transports
-	if err := r.ensureService(ctx, &toolServer); err != nil {
-		log.Error(err, "Failed to ensure Service")
-		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "ServiceFailed", err.Error()); statusErr != nil {
-			log.Error(statusErr, "Failed to update status after service failure")
-		}
-		return ctrl.Result{}, err
 	}
 
 	// Update ToolServer status to Ready (optimistic)
