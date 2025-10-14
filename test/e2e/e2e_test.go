@@ -74,6 +74,7 @@ var _ = Describe("Manager", Ordered, func() {
 		sampleImages := []string{
 			"ghcr.io/agentic-layer/weather-agent:0.3.0",
 			webhookv1alpha1.DefaultTemplateImageAdk,
+			"mcp/context7:latest",
 		}
 
 		By("loading the sample images on Kind")
@@ -320,20 +321,8 @@ var _ = Describe("Manager", Ordered, func() {
 
 		BeforeAll(func() {
 			By("waiting for webhook service to be ready")
-			Eventually(func(g Gomega) {
-				// Check that the webhook service exists and has endpoints
-				cmd := exec.Command("kubectl", "get", "service",
-					"agent-runtime-operator-webhook-service", "-n", "agent-runtime-operator-system")
-				_, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-
-				// Check that the webhook service has endpoints (meaning pods are ready)
-				cmd = exec.Command("kubectl", "get", "endpoints", "agent-runtime-operator-webhook-service",
-					"-n", "agent-runtime-operator-system", "-o", "jsonpath={.subsets[*].addresses[*].ip}")
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
-			}, 2*time.Minute, 5*time.Second).Should(Succeed(), "Webhook service should be ready")
+			Eventually(waitForWebhookServiceReady, 2*time.Minute, 5*time.Second).
+				Should(Succeed(), "Webhook service should be ready")
 
 			By("applying sample configmap")
 			cmd := exec.Command("kubectl", "apply", "-f", "config/samples/configmap.yaml",
@@ -1353,18 +1342,8 @@ spec:
 
 		BeforeAll(func() {
 			By("waiting for webhook service to be ready")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "service",
-					"agent-runtime-operator-webhook-service", "-n", "agent-runtime-operator-system")
-				_, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-
-				cmd = exec.Command("kubectl", "get", "endpoints", "agent-runtime-operator-webhook-service",
-					"-n", "agent-runtime-operator-system", "-o", "jsonpath={.subsets[*].addresses[*].ip}")
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
-			}, 2*time.Minute, 5*time.Second).Should(Succeed(), "Webhook service should be ready")
+			Eventually(waitForWebhookServiceReady, 2*time.Minute, 5*time.Second).
+				Should(Succeed(), "Webhook service should be ready")
 		})
 
 		AfterAll(func() {
@@ -1557,6 +1536,22 @@ func getMetricsOutput() string {
 	Expect(err).NotTo(HaveOccurred(), "Failed to retrieve logs from curl pod")
 	Expect(metricsOutput).To(ContainSubstring("< HTTP/1.1 200 OK"))
 	return metricsOutput
+}
+
+// waitForWebhookServiceReady waits for the webhook service to be ready with endpoints.
+func waitForWebhookServiceReady(g Gomega) {
+	// Check that the webhook service exists and has endpoints
+	cmd := exec.Command("kubectl", "get", "service",
+		"agent-runtime-operator-webhook-service", "-n", "agent-runtime-operator-system")
+	_, err := utils.Run(cmd)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// Check that the webhook service has endpoints (meaning pods are ready)
+	cmd = exec.Command("kubectl", "get", "endpoints", "agent-runtime-operator-webhook-service",
+		"-n", "agent-runtime-operator-system", "-o", "jsonpath={.subsets[*].addresses[*].ip}")
+	output, err := utils.Run(cmd)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
 }
 
 // tokenRequest is a simplified representation of the Kubernetes TokenRequest API response,
