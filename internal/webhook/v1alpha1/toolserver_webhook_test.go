@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	testImageV1     = "fake-registry.example/fake-toolserver:v1.0.0"
-	testImageNode   = "fake-registry.example/fake-node-image:20"
-	testImagePython = "fake-registry.example/fake-python-image:3.11"
+	testImageToolServer = "fake-toolserver:v1.0.0"
+	testImageNode       = "fake-node-mcp:v1.0"
+	testImagePython     = "fake-python-mcp:v1.0"
 )
 
 var _ = Describe("ToolServer Webhook", func() {
@@ -60,7 +60,7 @@ var _ = Describe("ToolServer Webhook", func() {
 		It("Should set default protocol when not specified", func() {
 			By("having no protocol set initially")
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			Expect(obj.Spec.Protocol).To(BeEmpty())
 
 			By("calling the Default method")
@@ -75,7 +75,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("setting a custom protocol")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 
 			By("calling the Default method")
 			err := defaulter.Default(ctx, obj)
@@ -89,7 +89,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having http transport without port")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			Expect(obj.Spec.Port).To(Equal(int32(0)))
 
 			By("calling the Default method")
@@ -104,7 +104,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having sse transport without port")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = sseTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			Expect(obj.Spec.Port).To(Equal(int32(0)))
 
 			By("calling the Default method")
@@ -119,7 +119,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having stdio transport")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 
 			By("calling the Default method")
 			err := defaulter.Default(ctx, obj)
@@ -133,7 +133,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("setting a custom port")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			obj.Spec.Port = 9090
 
 			By("calling the Default method")
@@ -148,7 +148,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having http transport without replicas")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			Expect(obj.Spec.Replicas).To(BeNil())
 
 			By("calling the Default method")
@@ -164,7 +164,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having sse transport without replicas")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = sseTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			Expect(obj.Spec.Replicas).To(BeNil())
 
 			By("calling the Default method")
@@ -180,7 +180,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having stdio transport")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 
 			By("calling the Default method")
 			err := defaulter.Default(ctx, obj)
@@ -195,7 +195,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			replicas := int32(3)
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			obj.Spec.Replicas = &replicas
 
 			By("calling the Default method")
@@ -210,7 +210,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having http transport without path")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			Expect(obj.Spec.Path).To(BeEmpty())
 
 			By("calling the Default method")
@@ -225,7 +225,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having sse transport without path")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = sseTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			Expect(obj.Spec.Path).To(BeEmpty())
 
 			By("calling the Default method")
@@ -240,7 +240,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("having stdio transport")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 
 			By("calling the Default method")
 			err := defaulter.Default(ctx, obj)
@@ -254,7 +254,7 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("setting a custom path")
 			obj.Spec.Protocol = mcpProtocol
 			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = testImageV1
+			obj.Spec.Image = testImageToolServer
 			obj.Spec.Path = "/api/mcp"
 
 			By("calling the Default method")
@@ -267,19 +267,6 @@ var _ = Describe("ToolServer Webhook", func() {
 	})
 
 	Context("When creating or updating ToolServer under Validating Webhook", func() {
-		It("Should deny creation if image is missing", func() {
-			By("creating a ToolServer without image")
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-
-			By("validating the creation")
-			_, err := validator.ValidateCreate(ctx, obj)
-
-			By("expecting validation to fail")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("image must be specified"))
-		})
-
 		It("Should admit creation if image is specified", func() {
 			By("creating a valid stdio ToolServer")
 			obj.Spec.Protocol = mcpProtocol
@@ -422,16 +409,16 @@ var _ = Describe("ToolServer Webhook", func() {
 			oldObj.Spec.Port = 8080
 
 			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = httpTransport
-			obj.Spec.Image = ""
-			obj.Spec.Port = 8080
+			obj.Spec.TransportType = stdioTransport
+			obj.Spec.Image = testImageNode
+			obj.Spec.Port = 8080 // Invalid for stdio
 
 			By("validating the update")
 			_, err := validator.ValidateUpdate(ctx, oldObj, obj)
 
 			By("expecting validation to fail")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("image must be specified"))
+			Expect(err.Error()).To(ContainSubstring("port must not be specified for stdio transport"))
 		})
 	})
 

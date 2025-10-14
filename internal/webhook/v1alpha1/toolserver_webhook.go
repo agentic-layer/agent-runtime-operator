@@ -156,14 +156,6 @@ func (v *ToolServerCustomValidator) validateToolServer(toolserver *runtimev1alph
 	var allErrs field.ErrorList
 	var warnings admission.Warnings
 
-	// Validate image is specified
-	if toolserver.Spec.Image == "" {
-		allErrs = append(allErrs, field.Required(
-			field.NewPath("spec", "image"),
-			"image must be specified",
-		))
-	}
-
 	// Validate transportType-specific requirements
 	switch toolserver.Spec.TransportType {
 	case stdioTransport:
