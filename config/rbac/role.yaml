@@ -31,6 +31,7 @@ rules:
 - apiGroups:
   - runtime.agentic-layer.ai
   resources:
+  - agenticworkforces
   - agents
   verbs:
   - create
@@ -43,12 +44,14 @@ rules:
 - apiGroups:
   - runtime.agentic-layer.ai
   resources:
+  - agenticworkforces/finalizers
   - agents/finalizers
   verbs:
   - update
 - apiGroups:
   - runtime.agentic-layer.ai
   resources:
+  - agenticworkforces/status
   - agents/status
   verbs:
   - get
