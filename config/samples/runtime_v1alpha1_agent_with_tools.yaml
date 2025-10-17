@@ -1,0 +1,57 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: research-agent
+spec:
+  framework: google-adk
+
+  # Agent configuration
+  description: "A research agent with access to context and data tools"
+  instruction: "You are a research assistant that can access context information and query databases to help users find information."
+  model: "gemini/gemini-2.5-flash"
+
+  # Tools - References to ToolServer resources in the cluster
+  # The operator automatically resolves ToolServer service URLs
+  tools:
+    # Reference to ToolServer in the same namespace (namespace field omitted)
+    - name: context-tool
+      toolServerRef:
+        name: example-http-toolserver
+
+    # Reference to ToolServer with explicit namespace (commented out example)
+    # - name: data-tool
+    #   toolServerRef:
+    #     name: example-sse-toolserver
+    #     namespace: tools
+
+  protocols:
+    - type: A2A
+
+  replicas: 1
+
+  env:
+    - name: LOG_LEVEL
+      value: "info"
+---
+# Minimal Agent configuration with tools
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: assistant-agent
+spec:
+  framework: google-adk
+  description: "A minimal assistant agent with one tool"
+  instruction: "You are a helpful assistant."
+  model: "gemini/gemini-2.5-flash"
+  tools:
+    - name: context
+      toolServerRef:
+        name: example-http-toolserver
+  protocols:
+    - type: A2A
