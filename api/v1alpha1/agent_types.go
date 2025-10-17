@@ -71,10 +71,11 @@ type AgentTool struct {
 	// Name is the unique identifier for this tool
 	Name string `json:"name"`
 
-	// Url is the HTTP/HTTPS endpoint URL for the MCP tool server.
-	// Supports both HTTP (for internal cluster URLs) and HTTPS schemes.
-	// +kubebuilder:validation:Format=uri
-	Url string `json:"url"`
+	// ToolServerRef references a ToolServer resource in the cluster.
+	// The operator will resolve the ToolServer's service URL automatically.
+	// Only Name and Namespace fields are used; other fields (Kind, APIVersion, etc.) are ignored.
+	// If Namespace is not specified, defaults to the same namespace as the current Agent.
+	ToolServerRef corev1.ObjectReference `json:"toolServerRef"`
 }
 
 // AgentSpec defines the desired state of Agent.

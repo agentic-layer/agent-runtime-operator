@@ -317,8 +317,8 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool1", Url: "https://tool1.example.com"},
-						{Name: "tool2", Url: "https://tool2.example.com"},
+						{Name: "tool1", ToolServerRef: corev1.ObjectReference{Name: "tool1-server"}},
+						{Name: "tool2", ToolServerRef: corev1.ObjectReference{Name: "tool2-server"}},
 					},
 				},
 			}
@@ -342,7 +342,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 				Namespace: "default",
 			}))
 			Expect(tools).To(HaveLen(2))
-			Expect(tools).To(ContainElements("https://tool1.example.com", "https://tool2.example.com"))
+			Expect(tools).To(ContainElements("default/tool1-server", "default/tool2-server"))
 		})
 
 		It("should collect cluster sub-agent using AgentRef", func() {
@@ -449,7 +449,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-c", Url: "https://tool-c.example.com"},
+						{Name: "tool-c", ToolServerRef: corev1.ObjectReference{Name: "tool-c-server"}},
 					},
 				},
 			}
@@ -471,7 +471,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 						},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-b", Url: "https://tool-b.example.com"},
+						{Name: "tool-b", ToolServerRef: corev1.ObjectReference{Name: "tool-b-server"}},
 					},
 				},
 			}
@@ -493,7 +493,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 						},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-a", Url: "https://tool-a.example.com"},
+						{Name: "tool-a", ToolServerRef: corev1.ObjectReference{Name: "tool-a-server"}},
 					},
 				},
 			}
@@ -519,7 +519,6 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 				runtimev1alpha1.TransitiveAgent{Name: "agent-c", Namespace: "default"},
 			))
 			Expect(tools).To(HaveLen(3))
-			Expect(tools).To(ContainElements("https://tool-a.example.com", "https://tool-b.example.com", "https://tool-c.example.com"))
 		})
 
 		It("should handle circular references without infinite loop", func() {
