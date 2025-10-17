@@ -220,7 +220,13 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 
 	// Collect tools from this agent
 	for _, tool := range agent.Spec.Tools {
-		allTools[tool.Url] = true
+		// Use namespace/name as the key for ToolServer references
+		toolNamespace := tool.ToolServerRef.Namespace
+		if toolNamespace == "" {
+			toolNamespace = agent.Namespace // Default to agent's namespace
+		}
+		toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolServerRef.Name)
+		allTools[toolKey] = true
 	}
 
 	// Recursively traverse sub-agents

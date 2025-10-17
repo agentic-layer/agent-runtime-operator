@@ -123,6 +123,32 @@ var _ = Describe("Agent Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve"))
 		})
+
+		It("should fail when toolserver cannot be resolved", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-missing-toolserver",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Tools: []runtimev1alpha1.AgentTool{
+						{Name: "missing-tool", ToolServerRef: corev1.ObjectReference{Name: "missing-toolserver"}},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-missing-toolserver",
+					Namespace: "default",
+				},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to resolve"))
+		})
 	})
 
 	Describe("ensureDeployment", func() {
@@ -146,7 +172,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, map[string]string{}, map[string]string{})
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -185,14 +211,14 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
 			// Create initial deployment
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, map[string]string{}, map[string]string{})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Update agent image
 			agent.Spec.Image = "test-image:v2"
 
 			// Update deployment
-			err = reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err = reconciler.ensureDeployment(ctx, agent, map[string]string{}, map[string]string{})
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -216,7 +242,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, map[string]string{}, map[string]string{})
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -248,7 +274,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, map[string]string{}, map[string]string{})
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}

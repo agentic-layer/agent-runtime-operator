@@ -50,6 +50,8 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents/finalizers,verbs=update
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/status,verbs=get
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
@@ -78,15 +80,18 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, &agent)
 	if err != nil {
 		log.Error(err, "Failed to resolve subAgents")
-		// Update status to reflect missing subAgents
-		if statusErr := r.updateAgentStatusNotReady(ctx, &agent, "MissingSubAgents", err.Error()); statusErr != nil {
-			log.Error(statusErr, "Failed to update status after subAgent resolution failure")
-		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to resolve subAgents: %w", err)
+	}
+
+	// Resolve Tools from ToolServer references early - fail fast if any cannot be resolved
+	resolvedTools, err := r.resolveAllTools(ctx, &agent)
+	if err != nil {
+		log.Error(err, "Failed to resolve tools")
+		return ctrl.Result{}, fmt.Errorf("failed to resolve tools: %w", err)
 	}
 
 	// Ensure Deployment exists and is up to date
-	if err := r.ensureDeployment(ctx, &agent, resolvedSubAgents); err != nil {
+	if err := r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools); err != nil {
 		log.Error(err, "Failed to ensure Deployment")
 		return ctrl.Result{}, err
 	}
@@ -107,7 +112,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
-func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string) error {
+func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent, resolvedSubAgents, resolvedTools map[string]string) error {
 	log := logf.FromContext(ctx)
 
 	deployment := &appsv1.Deployment{
@@ -147,7 +152,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		}
 
 		// Build template environment variables
-		templateEnvVars, err := r.buildTemplateEnvironmentVars(agent, resolvedSubAgents)
+		templateEnvVars, err := r.buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools)
 		if err != nil {
 			return fmt.Errorf("failed to build template environment variables: %w", err)
 		}
@@ -288,6 +293,10 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&runtimev1alpha1.Agent{},
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingSubAgent),
+		).
+		Watches(
+			&runtimev1alpha1.ToolServer{},
+			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingToolServer),
 		).
 		Named("agent").
 		Complete(r)

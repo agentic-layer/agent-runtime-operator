@@ -9,5 +9,7 @@ https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
 The following Custom Resource Definitions (CRDs) are provided by the Agent Runtime Operator:
 
 * *Agent*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agents.yaml
+* *AgenticWorkforce*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agenticworkforces.yaml
 * *AgentGateway*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgateways.yaml
 * *AgentGatewayClass*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgatewayclasses.yaml
+* *ToolServer*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_toolservers.yaml
