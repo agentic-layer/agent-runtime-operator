@@ -198,18 +198,13 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 		}
 	}
 
-	// Validate Tool URLs (only scheme validation, kubebuilder handles URI format)
-	for i, tool := range agent.Spec.Tools {
-		if tool.Url != "" {
-			if err := v.validateHTTPScheme(tool.Url); err != nil {
-				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spec", "tools").Index(i).Child("url"),
-					tool.Url,
-					fmt.Sprintf("Tool[%d].Url: %s", i, err.Error()),
-				))
-			}
-		}
-	}
+	// Todo: discuss with Nicolai: should we validate the tools here? Or leave it to the ToolServer reconciler?
+	//// Validate Tools
+	//for i, tool := range agent.Spec.Tools {
+	//	if errs := v.validateAgentTool(tool, i); len(errs) > 0 {
+	//		allErrs = append(allErrs, errs...)
+	//	}
+	//}
 
 	if len(allErrs) > 0 {
 		return nil, allErrs.ToAggregate()
@@ -266,6 +261,14 @@ func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgen
 
 	return errs
 }
+
+// Todo: discuss with Nicolai: should we validate the tools here? Or leave it to the ToolServer reconciler?
+// validateAgentTool validates an AgentTool configuration for business logic correctness.
+// This performs stateless validation only - no cluster state checks.
+//func (v *AgentCustomValidator) validateAgentTool(tool runtimev1alpha1.AgentTool, index int) []*field.Error {
+//	var errs []*field.Error
+//	return errs
+//}
 
 // validateHTTPScheme validates that a URL uses HTTP or HTTPS scheme.
 // URI format validation is handled by kubebuilder annotation.
