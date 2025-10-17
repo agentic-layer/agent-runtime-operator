@@ -96,10 +96,13 @@ spec:
 
   # External tools the agent can use
   tools:
+    # Reference to ToolServer in the same namespace (namespace field omitted)
     - name: news_fetcher
-      url: "https://news.mcpservers.org/fetch/mcp"
-    - name: web_fetch
-      url: "https://remote.mcpservers.org/fetch/mcp"
+      toolServerRef:
+        name: news_fetcher_toolserver
+    - name: web_fetcher
+      toolServerRef:
+        name: web_fetch_toolserver
 
   # Sub-agents this agent can delegate to
   subAgents:
