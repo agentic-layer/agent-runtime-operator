@@ -22,3 +22,13 @@ func findContainerByName(pod *corev1.PodSpec, name string) *corev1.Container {
 	}
 	return nil
 }
+
+// GetNamespaceWithDefault returns the namespace from an ObjectReference,
+// defaulting to the provided default namespace if not specified.
+// This is useful for resources that can reference objects in the same or different namespaces.
+func GetNamespaceWithDefault(objRef *corev1.ObjectReference, defaultNamespace string) string {
+	if objRef.Namespace != "" {
+		return objRef.Namespace
+	}
+	return defaultNamespace
+}

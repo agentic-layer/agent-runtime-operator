@@ -871,14 +871,24 @@ spec:
 			By("cleaning up test workforces")
 			testWorkforces := []string{testWorkforceName, testWorkforce2Name, "dynamic-workforce", "shared-deps-workforce"}
 			for _, wfName := range testWorkforces {
-				cmd := exec.Command("kubectl", "delete", "agenticworkforce", wfName, "-n", testNamespace, "--ignore-not-found=true")
+				cmd := exec.Command("kubectl", "delete", "agenticworkforce", wfName, "-n",
+					testNamespace, "--ignore-not-found=true")
 				_, _ = utils.Run(cmd)
 			}
 
 			By("cleaning up test agents created for workforce tests")
 			testAgents := []string{"hierarchy-leaf", "hierarchy-mid", "hierarchy-entry", "missing-test-agent", "shared-sub"}
 			for _, agentName := range testAgents {
-				cmd := exec.Command("kubectl", "delete", "agent", agentName, "-n", testNamespace, "--ignore-not-found=true")
+				cmd := exec.Command("kubectl", "delete", "agent", agentName, "-n",
+					testNamespace, "--ignore-not-found=true")
+				_, _ = utils.Run(cmd)
+			}
+
+			By("cleaning up test ToolServers created for workforce tests")
+			testToolServers := []string{"weather-tool-server", "news-tool-server"}
+			for _, toolServerName := range testToolServers {
+				cmd := exec.Command("kubectl", "delete", "toolserver", toolServerName, "-n",
+					testNamespace, "--ignore-not-found=true")
 				_, _ = utils.Run(cmd)
 			}
 		})
@@ -1023,6 +1033,68 @@ spec:
 		})
 
 		It("should collect transitive agents and tools from hierarchy", func() {
+			By("creating ToolServer resources for the leaf agent")
+			weatherToolServerYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: weather-tool-server
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  path: /weather
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(weatherToolServerYAML))
+			}()
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create weather-tool-server")
+
+			newsToolServerYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: news-tool-server
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  path: /news
+`
+			cmd = exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err = cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(newsToolServerYAML))
+			}()
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create news-tool-server")
+
+			By("waiting for ToolServers to be ready")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", "weather-tool-server", "-n", testNamespace,
+					"-o", "jsonpath={.status.url}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).NotTo(BeEmpty(), "weather-tool-server status URL should be set")
+			}, 1*time.Minute).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "toolserver", "news-tool-server", "-n", testNamespace,
+					"-o", "jsonpath={.status.url}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).NotTo(BeEmpty(), "news-tool-server status URL should be set")
+			}, 1*time.Minute).Should(Succeed())
+
 			By("creating a leaf agent with tools")
 			leafAgentYAML := `
 apiVersion: runtime.agentic-layer.ai/v1alpha1
@@ -1034,15 +1106,17 @@ spec:
   image: ghcr.io/agentic-layer/template-agent-adk:0.3.0
   tools:
     - name: weather-tool
-      url: https://weather.example.com/mcp
+      toolServerRef:
+        name: weather-tool-server
     - name: news-tool
-      url: https://news.example.com/mcp
+      toolServerRef:
+        name: news-tool-server
   protocols:
     - type: A2A
       port: 8000
 `
-			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
-			stdin, err := cmd.StdinPipe()
+			cmd = exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err = cmd.StdinPipe()
 			Expect(err).NotTo(HaveOccurred())
 			go func() {
 				defer func() { _ = stdin.Close() }()
@@ -1146,8 +1220,8 @@ spec:
 					"-o", "jsonpath={.status.transitiveTools}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(ContainSubstring("https://weather.example.com/mcp"), "Should contain weather tool")
-				g.Expect(output).To(ContainSubstring("https://news.example.com/mcp"), "Should contain news tool")
+				g.Expect(output).To(ContainSubstring("weather-tool"), "Should contain weather-tool")
+				g.Expect(output).To(ContainSubstring("news-tool"), "Should contain news-tool")
 			}
 			Eventually(verifyTransitiveTools, 2*time.Minute).Should(Succeed())
 		})

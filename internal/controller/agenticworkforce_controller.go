@@ -118,10 +118,7 @@ func (r *AgenticWorkforceReconciler) validateEntryPointAgents(ctx context.Contex
 			continue
 		}
 
-		namespace := agentRef.Namespace
-		if namespace == "" {
-			namespace = workforce.Namespace
-		}
+		namespace := GetNamespaceWithDefault(agentRef, workforce.Namespace)
 
 		var agent runtimev1alpha1.Agent
 		err := r.Get(ctx, types.NamespacedName{
@@ -160,10 +157,7 @@ func (r *AgenticWorkforceReconciler) collectTransitiveAgentsAndTools(ctx context
 			continue
 		}
 
-		namespace := agentRef.Namespace
-		if namespace == "" {
-			namespace = workforce.Namespace
-		}
+		namespace := GetNamespaceWithDefault(agentRef, workforce.Namespace)
 
 		agentKey := fmt.Sprintf("%s/%s", namespace, agentRef.Name)
 		if err := r.traverseAgent(ctx, namespace, agentRef.Name, visitedAgents, allTools); err != nil {
@@ -220,17 +214,17 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 
 	// Collect tools from this agent
 	for _, tool := range agent.Spec.Tools {
-		allTools[tool.Url] = true
+		// Use namespace/name as the key for ToolServer references
+		toolNamespace := GetNamespaceWithDefault(&tool.ToolServerRef, agent.Namespace)
+		toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolServerRef.Name)
+		allTools[toolKey] = true
 	}
 
 	// Recursively traverse sub-agents
 	for _, subAgent := range agent.Spec.SubAgents {
 		if subAgent.AgentRef != nil {
 			// Cluster agent reference
-			subNamespace := subAgent.AgentRef.Namespace
-			if subNamespace == "" {
-				subNamespace = agent.Namespace // Use parent agent's namespace as default
-			}
+			subNamespace := GetNamespaceWithDefault(subAgent.AgentRef, agent.Namespace)
 			subName := subAgent.AgentRef.Name
 
 			if err := r.traverseAgent(ctx, subNamespace, subName, visitedAgents, allTools); err != nil {
@@ -287,10 +281,7 @@ func (r *AgenticWorkforceReconciler) findWorkforcesReferencingAgent(ctx context.
 				continue
 			}
 
-			entryNamespace := entryRef.Namespace
-			if entryNamespace == "" {
-				entryNamespace = workforce.Namespace
-			}
+			entryNamespace := GetNamespaceWithDefault(entryRef, workforce.Namespace)
 			entryKey := fmt.Sprintf("%s/%s", entryNamespace, entryRef.Name)
 
 			if entryKey == agentKey {

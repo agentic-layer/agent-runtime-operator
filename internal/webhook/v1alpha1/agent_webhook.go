@@ -198,19 +198,6 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 		}
 	}
 
-	// Validate Tool URLs (only scheme validation, kubebuilder handles URI format)
-	for i, tool := range agent.Spec.Tools {
-		if tool.Url != "" {
-			if err := v.validateHTTPScheme(tool.Url); err != nil {
-				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spec", "tools").Index(i).Child("url"),
-					tool.Url,
-					fmt.Sprintf("Tool[%d].Url: %s", i, err.Error()),
-				))
-			}
-		}
-	}
-
 	if len(allErrs) > 0 {
 		return nil, allErrs.ToAggregate()
 	}

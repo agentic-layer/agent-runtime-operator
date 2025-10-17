@@ -67,11 +67,7 @@ func (r *AgentReconciler) resolveSubAgentUrl(ctx context.Context, subAgent runti
 	}
 
 	// Use namespace from ObjectReference, or default to parent namespace
-	namespace := subAgent.AgentRef.Namespace
-	if namespace == "" {
-		// Default to parent agent's namespace (following Kubernetes conventions)
-		namespace = parentNamespace
-	}
+	namespace := GetNamespaceWithDefault(subAgent.AgentRef, parentNamespace)
 
 	var referencedAgent runtimev1alpha1.Agent
 	err := r.Get(ctx, types.NamespacedName{
@@ -112,10 +108,7 @@ func (r *AgentReconciler) findAgentsReferencingSubAgent(ctx context.Context, obj
 			// Check if this is a cluster agent reference (using agentRef)
 			if subAgent.AgentRef != nil && subAgent.AgentRef.Name == updatedAgent.Name {
 				// Check namespace match (use namespace from ObjectReference)
-				subAgentNamespace := subAgent.AgentRef.Namespace
-				if subAgentNamespace == "" {
-					subAgentNamespace = agent.Namespace
-				}
+				subAgentNamespace := GetNamespaceWithDefault(subAgent.AgentRef, agent.Namespace)
 
 				if subAgentNamespace == updatedAgent.Namespace {
 					// This agent references the updated agent - enqueue it
