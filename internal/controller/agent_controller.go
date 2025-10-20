@@ -224,7 +224,11 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		container.Ports = containerPorts
 		container.Env = allEnvVars
 		container.EnvFrom = agent.Spec.EnvFrom
+		container.VolumeMounts = agent.Spec.VolumeMounts
 		container.ReadinessProbe = r.generateReadinessProbe(agent)
+
+		// Update pod volumes
+		deployment.Spec.Template.Spec.Volumes = agent.Spec.Volumes
 
 		// Set owner reference
 		return ctrl.SetControllerReference(agent, deployment, r.Scheme)

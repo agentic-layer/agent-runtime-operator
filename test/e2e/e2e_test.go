@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	webhookv1alpha1 "github.com/agentic-layer/agent-runtime-operator/internal/webhook/v1alpha1"
@@ -408,6 +409,42 @@ var _ = Describe("Manager", Ordered, func() {
 				g.Expect(output).To(ContainSubstring("LOG_LEVEL"), "Should contain user-defined LOG_LEVEL env var")
 			}
 			Eventually(verifyEnvironmentVariables).Should(Succeed())
+
+			By("verifying deployment has correct volume mounts")
+			verifyVolumeMounts := func(g Gomega) {
+				// Get volumeMounts from deployment
+				cmd := exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].volumeMounts[*].name}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring("config-volume"), "Should contain config-volume volumeMount")
+
+				// Verify volumeMount path
+				cmd = exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.containers[0].volumeMounts[?(@.name=='config-volume')].mountPath}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("/etc/agent-config"), "Volume should be mounted at /etc/agent-config")
+			}
+			Eventually(verifyVolumeMounts).Should(Succeed())
+
+			By("verifying deployment has correct volumes")
+			verifyVolumes := func(g Gomega) {
+				// Get volumes from deployment
+				cmd := exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.volumes[*].name}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring("config-volume"), "Should contain config-volume")
+
+				// Verify volume references correct ConfigMap
+				cmd = exec.Command("kubectl", "get", "deployment", weatherAgentName, "-n", testNamespace,
+					"-o", "jsonpath={.spec.template.spec.volumes[?(@.name=='config-volume')].configMap.name}")
+				output, err = utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal(configMapName), "Volume should reference correct ConfigMap")
+			}
+			Eventually(verifyVolumes).Should(Succeed())
 		})
 
 		It("should successfully deploy and manage the news agent (template)", func() {
@@ -759,6 +796,241 @@ spec:
 				g.Expect(newSubAgentsValue).NotTo(Equal(initialSubAgentsValue),
 					"SUB_AGENTS value should have changed")
 			}, 2*time.Minute).Should(Succeed())
+		})
+	})
+
+	Context("Agent Volume Validation", func() {
+		const testNamespace = "default"
+
+		It("should reject agent with volumeMount referencing non-existent volume", func() {
+			By("attempting to create agent with invalid volumeMount")
+			invalidYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: invalid-mount-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  volumeMounts:
+    - name: non-existent
+      mountPath: /data
+  protocols:
+    - type: A2A
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(invalidYAML))
+			}()
+			output, err := utils.Run(cmd)
+			Expect(err).To(HaveOccurred(), "Should reject volumeMount without volume")
+			Expect(output).To(ContainSubstring("does not exist in spec.volumes"))
+		})
+
+		It("should reject agent with overlapping mount paths", func() {
+			By("attempting to create agent with nested mount paths")
+			overlappingYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: overlapping-mount-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  volumeMounts:
+    - name: vol1
+      mountPath: /etc/config
+    - name: vol2
+      mountPath: /etc/config/subdir
+  volumes:
+    - name: vol1
+      emptyDir: {}
+    - name: vol2
+      emptyDir: {}
+  protocols:
+    - type: A2A
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(overlappingYAML))
+			}()
+			output, err := utils.Run(cmd)
+			Expect(err).To(HaveOccurred(), "Should reject overlapping paths")
+			Expect(output).To(ContainSubstring("overlaps"))
+		})
+
+		It("should reject agent with hostPath volume by default", func() {
+			By("attempting to create agent with hostPath volume")
+			hostPathYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: hostpath-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  volumeMounts:
+    - name: host
+      mountPath: /host-root
+  volumes:
+    - name: host
+      hostPath:
+        path: /
+        type: Directory
+  protocols:
+    - type: A2A
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(hostPathYAML))
+			}()
+			output, err := utils.Run(cmd)
+			Expect(err).To(HaveOccurred(), "Should reject hostPath")
+			Expect(output).To(ContainSubstring("hostPath volumes are not allowed"))
+		})
+
+		It("should reject agent with empty configMap name", func() {
+			By("attempting to create agent with empty configMap name")
+			emptyNameYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: empty-configmap-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  volumeMounts:
+    - name: config
+      mountPath: /config
+  volumes:
+    - name: config
+      configMap:
+        name: ""
+  protocols:
+    - type: A2A
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(emptyNameYAML))
+			}()
+			output, err := utils.Run(cmd)
+			Expect(err).To(HaveOccurred(), "Should reject empty configMap name")
+			Expect(output).To(ContainSubstring("configMap name must be specified"))
+		})
+
+		It("should reject agent with duplicate volume names", func() {
+			By("attempting to create agent with duplicate volume names")
+			duplicateVolumeYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: duplicate-volume-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  volumeMounts:
+    - name: data
+      mountPath: /data1
+    - name: data
+      mountPath: /data2
+  volumes:
+    - name: data
+      emptyDir: {}
+    - name: data
+      emptyDir: {}
+  protocols:
+    - type: A2A
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(duplicateVolumeYAML))
+			}()
+			output, err := utils.Run(cmd)
+			Expect(err).To(HaveOccurred(), "Should reject duplicate volume names")
+			// Kubernetes itself validates and rejects duplicate volume names in PodSpec
+			// Our webhook also validates this, but K8s validation may run first
+			Expect(strings.ToLower(output)).To(ContainSubstring("duplicate"))
+		})
+
+		It("should reject agent with duplicate mount paths", func() {
+			By("attempting to create agent with duplicate mount paths")
+			duplicateMountYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: duplicate-mount-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  volumeMounts:
+    - name: vol1
+      mountPath: /etc/config
+    - name: vol2
+      mountPath: /etc/config
+  volumes:
+    - name: vol1
+      emptyDir: {}
+    - name: vol2
+      emptyDir: {}
+  protocols:
+    - type: A2A
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(duplicateMountYAML))
+			}()
+			output, err := utils.Run(cmd)
+			Expect(err).To(HaveOccurred(), "Should reject duplicate mount paths")
+			Expect(strings.ToLower(output)).To(ContainSubstring("duplicate"))
+		})
+
+		It("should reject agent with reserved volume name prefix", func() {
+			By("attempting to create agent with reserved volume name")
+			reservedNameYAML := `
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: reserved-volume-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  volumeMounts:
+    - name: agent-operator-config
+      mountPath: /config
+  volumes:
+    - name: agent-operator-config
+      emptyDir: {}
+  protocols:
+    - type: A2A
+`
+			cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+			stdin, err := cmd.StdinPipe()
+			Expect(err).NotTo(HaveOccurred())
+			go func() {
+				defer func() { _ = stdin.Close() }()
+				_, _ = stdin.Write([]byte(reservedNameYAML))
+			}()
+			output, err := utils.Run(cmd)
+			Expect(err).To(HaveOccurred(), "Should reject reserved volume names")
+			Expect(output).To(ContainSubstring("reserved for operator use"))
 		})
 	})
 
