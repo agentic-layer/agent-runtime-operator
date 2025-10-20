@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
@@ -37,13 +39,21 @@ const (
 	googleAdkFramework           = "google-adk"
 	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.4.0"
 	defaultTemplateImageFallback = "invalid"
+	operatorVolumePrefix         = "agent-operator-"
 )
 
 // agentlog is for logging in this package.
 var agentlog = logf.Log.WithName("agent-resource")
 
+// AgentWebhookConfig contains configuration for the Agent webhook.
+type AgentWebhookConfig struct {
+	// AllowHostPath controls whether hostPath volumes are allowed in Agent resources.
+	// When false (default), hostPath volumes will be rejected for security reasons.
+	AllowHostPath bool
+}
+
 // SetupAgentWebhookWithManager registers the webhook for Agent in the manager.
-func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
+func SetupAgentWebhookWithManager(mgr ctrl.Manager, config AgentWebhookConfig) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.Agent{}).
 		WithDefaulter(&AgentCustomDefaulter{
 			DefaultFramework:     googleAdkFramework,
@@ -52,7 +62,9 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 			DefaultPortGoogleAdk: 8000,
 			Recorder:             mgr.GetEventRecorderFor("agent-defaulter-webhook"),
 		}).
-		WithValidator(&AgentCustomValidator{}).
+		WithValidator(&AgentCustomValidator{
+			AllowHostPath: config.AllowHostPath,
+		}).
 		Complete()
 }
 
@@ -148,7 +160,10 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 //
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
-type AgentCustomValidator struct{}
+type AgentCustomValidator struct {
+	// AllowHostPath controls whether hostPath volumes are allowed.
+	AllowHostPath bool
+}
 
 var _ webhook.CustomValidator = &AgentCustomValidator{}
 
@@ -194,6 +209,31 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 	// Validate SubAgents
 	for i, subAgent := range agent.Spec.SubAgents {
 		if errs := v.validateSubAgent(subAgent, i); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+
+	// Validate Tool URLs (only scheme validation, kubebuilder handles URI format)
+	for i, tool := range agent.Spec.Tools {
+		if tool.Url != "" {
+			if err := v.validateHTTPScheme(tool.Url); err != nil {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "tools").Index(i).Child("url"),
+					tool.Url,
+					fmt.Sprintf("Tool[%d].Url: %s", i, err.Error()),
+				))
+			}
+		}
+	}
+
+	// Validate VolumeMounts reference existing Volumes
+	if errs := v.validateVolumeMounts(agent); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+
+	// Validate Volume sources
+	for i, volume := range agent.Spec.Volumes {
+		if errs := v.validateVolumeSource(volume, i); len(errs) > 0 {
 			allErrs = append(allErrs, errs...)
 		}
 	}
@@ -306,4 +346,140 @@ func sanitizeForPortName(name string) string {
 	}
 
 	return result
+}
+
+// validateVolumeMounts validates that all volumeMounts reference volumes that exist in the volumes list.
+func (v *AgentCustomValidator) validateVolumeMounts(agent *runtimev1alpha1.Agent) []*field.Error {
+	var errs []*field.Error
+
+	// Build a set of available volume names and check for duplicates
+	volumeNames := make(map[string]bool)
+	for i, volume := range agent.Spec.Volumes {
+		if volume.Name == "" {
+			errs = append(errs, field.Required(
+				field.NewPath("spec", "volumes").Index(i).Child("name"),
+				"volume must have a name"))
+		} else if strings.HasPrefix(volume.Name, operatorVolumePrefix) {
+			// Reject reserved volume names
+			errs = append(errs, field.Forbidden(
+				field.NewPath("spec", "volumes").Index(i).Child("name"),
+				fmt.Sprintf("volume names starting with %q are reserved for operator use", operatorVolumePrefix)))
+		} else if volumeNames[volume.Name] {
+			// Check for duplicate volume names
+			errs = append(errs, field.Duplicate(
+				field.NewPath("spec", "volumes").Index(i).Child("name"),
+				volume.Name))
+			// Already in map, don't re-add
+		} else {
+			// Valid, unique volume name - add to tracking map
+			volumeNames[volume.Name] = true
+		}
+	}
+
+	// Track seen mount paths to detect duplicates
+	seenMountPaths := make(map[string]bool)
+
+	// Check each volumeMount references an existing volume
+	for i, volumeMount := range agent.Spec.VolumeMounts {
+		if volumeMount.Name == "" {
+			errs = append(errs, field.Required(
+				field.NewPath("spec", "volumeMounts").Index(i).Child("name"),
+				"volumeMount must have a name"))
+			continue
+		}
+
+		if !volumeNames[volumeMount.Name] {
+			errs = append(errs, field.Invalid(
+				field.NewPath("spec", "volumeMounts").Index(i).Child("name"),
+				volumeMount.Name,
+				fmt.Sprintf("volumeMount references volume %q which does not exist in spec.volumes", volumeMount.Name)))
+		}
+
+		// Validate mountPath
+		if volumeMount.MountPath == "" {
+			errs = append(errs, field.Required(
+				field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
+				"mountPath is required"))
+			continue
+		}
+
+		// Check mountPath does not contain ':' (Kubernetes requirement)
+		if strings.Contains(volumeMount.MountPath, ":") {
+			errs = append(errs, field.Invalid(
+				field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
+				volumeMount.MountPath,
+				"mountPath must not contain ':'"))
+		}
+
+		// Check for duplicate mount paths
+		if seenMountPaths[volumeMount.MountPath] {
+			errs = append(errs, field.Duplicate(
+				field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
+				volumeMount.MountPath))
+		}
+		seenMountPaths[volumeMount.MountPath] = true
+
+		// Check for overlapping/nested mount paths
+		for j := i + 1; j < len(agent.Spec.VolumeMounts); j++ {
+			if agent.Spec.VolumeMounts[j].MountPath == "" {
+				continue // Skip if mountPath is empty (will be caught by validation above)
+			}
+
+			path1 := filepath.Clean(volumeMount.MountPath)
+			path2 := filepath.Clean(agent.Spec.VolumeMounts[j].MountPath)
+
+			// Check if one path is a parent of the other
+			// We need to add trailing slash to prevent false positives like /data and /data-backup
+			if strings.HasPrefix(path2+"/", path1+"/") {
+				errs = append(errs, field.Invalid(
+					field.NewPath("spec", "volumeMounts").Index(j).Child("mountPath"),
+					path2,
+					fmt.Sprintf("mountPath %q overlaps with volumeMount at index %d (%q). Kubernetes does not allow nested mount paths", path2, i, path1)))
+			} else if strings.HasPrefix(path1+"/", path2+"/") {
+				errs = append(errs, field.Invalid(
+					field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
+					path1,
+					fmt.Sprintf("mountPath %q overlaps with volumeMount at index %d (%q). Kubernetes does not allow nested mount paths", path1, j, path2)))
+			}
+		}
+	}
+
+	return errs
+}
+
+// validateVolumeSource validates volume source configurations.
+func (v *AgentCustomValidator) validateVolumeSource(volume corev1.Volume, index int) []*field.Error {
+	var errs []*field.Error
+	basePath := field.NewPath("spec", "volumes").Index(index)
+
+	// Block hostPath unless explicitly allowed
+	if volume.HostPath != nil && !v.AllowHostPath {
+		errs = append(errs, field.Forbidden(
+			basePath.Child("hostPath"),
+			"hostPath volumes are not allowed for security reasons. "+
+				"Contact your cluster administrator if you need this feature."))
+	}
+
+	// Validate ConfigMap
+	if volume.ConfigMap != nil && volume.ConfigMap.Name == "" {
+		errs = append(errs, field.Required(
+			basePath.Child("configMap", "name"),
+			"configMap name must be specified"))
+	}
+
+	// Validate Secret
+	if volume.Secret != nil && volume.Secret.SecretName == "" {
+		errs = append(errs, field.Required(
+			basePath.Child("secret", "secretName"),
+			"secret name must be specified"))
+	}
+
+	// Validate PersistentVolumeClaim
+	if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == "" {
+		errs = append(errs, field.Required(
+			basePath.Child("persistentVolumeClaim", "claimName"),
+			"persistentVolumeClaim claimName must be specified"))
+	}
+
+	return errs
 }
