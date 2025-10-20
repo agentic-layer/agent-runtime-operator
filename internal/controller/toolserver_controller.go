@@ -76,9 +76,9 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	log.Info("Reconciling ToolServer")
 
-	// Handle stdio transport (sidecar mode - no deployment/service)
+	// Handle stdio transport (sidecar injection - no deployment/service)
 	if toolServer.Spec.TransportType == stdioTransport {
-		log.Info("ToolServer configured as stdio (sidecar mode), ensuring no deployment/service exists")
+		log.Info("ToolServer configured as stdio (sidecar injection), ensuring no deployment/service exists")
 
 		// Clean up any existing deployment/service if switching from http/sse
 		if err := r.ensureDeploymentDeleted(ctx, &toolServer); err != nil {
@@ -305,7 +305,7 @@ func (r *ToolServerReconciler) ensureDeploymentDeleted(ctx context.Context, tool
 
 	deployment := &appsv1.Deployment{}
 	if err := r.Get(ctx, types.NamespacedName{Name: toolServer.Name, Namespace: toolServer.Namespace}, deployment); err == nil {
-		log.Info("Deleting Deployment as transport is stdio (sidecar mode)")
+		log.Info("Deleting Deployment as transport is stdio (sidecar injection)")
 		if err := r.Delete(ctx, deployment); err != nil {
 			return fmt.Errorf("failed to delete Deployment: %w", err)
 		}
@@ -321,7 +321,7 @@ func (r *ToolServerReconciler) ensureServiceDeleted(ctx context.Context, toolSer
 
 	service := &corev1.Service{}
 	if err := r.Get(ctx, types.NamespacedName{Name: toolServer.Name, Namespace: toolServer.Namespace}, service); err == nil {
-		log.Info("Deleting Service as transport is stdio (sidecar mode)")
+		log.Info("Deleting Service as transport is stdio (sidecar injection)")
 		if err := r.Delete(ctx, service); err != nil {
 			return fmt.Errorf("failed to delete Service: %w", err)
 		}

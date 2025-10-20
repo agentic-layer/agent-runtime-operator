@@ -1,0 +1,558 @@
+= Create a Tool Server
+
+This guide walks you through creating and deploying tool servers using the Agent Runtime Operator. Tool servers extend your agents' capabilities by providing external tools and functionality through the Model Context Protocol (MCP).
+
+IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Install the Agent Runtime Operator] for installation instructions.
+
+== What is a Tool Server?
+
+Tool servers are specialized services that provide tools to agents through the Model Context Protocol (MCP). They enable agents to:
+
+* Access external APIs and services
+* Query databases
+* Fetch web content
+* Process files
+* Perform specialized computations
+
+The Agent Runtime Operator supports deploying tool servers in different modes depending on your use case.
+
+NOTE: The ToolServer CRD is designed to support multiple protocols, but currently only the Model Context Protocol (MCP) is implemented. Additional protocols may be supported in future releases.
+
+== Transport Types
+
+The Model Context Protocol (MCP) defines two standard transport mechanisms. The Agent Runtime Operator supports both, plus legacy SSE support:
+
+=== stdio Transport (Not Yet Implemented)
+* *Sidecar injection* - injected into agent pods (planned feature)
+* Direct process-to-process communication via standard input/output
+* Best for: Tools that need direct file system access or lowest latency
+* No standalone deployment created
+* **MCP standard transport**
+* **Status: Sidecar injection not yet available - use HTTP transport for production**
+
+=== HTTP Transport (Streamable HTTP)
+* *Standalone deployment* with its own pods and service
+* Accessible over HTTP from any agent in the cluster
+* Supports both simple request/response and streaming via Server-Sent Events
+* Best for: Shared tools used by multiple agents
+* Load balancing and horizontal scaling supported
+* **MCP standard transport**
+
+=== SSE Transport (Deprecated)
+IMPORTANT: SSE as a standalone transport type is **deprecated** in MCP protocol version 2025-06-18. It is only supported for backwards compatibility with older MCP servers. New deployments should use HTTP transport (which includes SSE streaming capabilities) or stdio transport instead.
+
+== Quick Start: HTTP Tool Server
+
+Get your first tool server running in under 5 minutes.
+
+=== Deploy your first tool server
+
+[source,bash]
+----
+# Create a simple HTTP-based tool server using Context7 MCP server
+cat <<EOF | kubectl apply -f -
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: my-first-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  replicas: 2
+  env:
+    - name: LOG_LEVEL
+      value: info
+EOF
+----
+
+=== Verify your tool server is running
+
+[source,bash]
+----
+# Check the tool server resource
+kubectl get toolserver my-first-toolserver
+
+# Check the deployment (for http/sse transports)
+kubectl get deployment my-first-toolserver
+
+# Check the service (for http/sse transports)
+kubectl get service my-first-toolserver
+
+# Get the service URL
+kubectl get toolserver my-first-toolserver -o jsonpath='{.status.url}'
+----
+
+=== Check the logs
+
+[source,bash]
+----
+# View tool server logs
+kubectl logs -l app=my-first-toolserver
+----
+
+🎉 *Congratulations!* You've successfully deployed your first tool server.
+
+== Step-by-Step: HTTP Tool Server
+
+HTTP transport tool servers run as standalone deployments and are accessible via Kubernetes services.
+
+=== When to use HTTP transport
+
+* You have multiple agents that need to share the same tools
+* You want to scale tool servers independently
+* Your tools don't require file system access
+* You prefer network-based communication
+
+=== Basic HTTP Tool Server
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: context7-http
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  path: /mcp
+  replicas: 2
+  env:
+    - name: LOG_LEVEL
+      value: info
+----
+
+=== Configuration Options
+
+* *port*: Port number where the tool server listens (defaults to 8080)
+* *path*: URL path for the MCP endpoint (defaults to `/mcp`)
+* *replicas*: Number of replicas for load balancing and high availability (defaults to 1)
+* *env*: Environment variables for configuration
+* *envFrom*: Load environment variables from ConfigMaps or Secrets
+
+=== Using the HTTP Tool Server
+
+Once deployed, the tool server's URL is available in the status:
+
+[source,bash]
+----
+kubectl get toolserver context7-http -o jsonpath='{.status.url}'
+# Output: http://context7-http.default.svc.cluster.local:8080/mcp
+----
+
+Use this URL in your Agent's `tools` configuration:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: my-agent
+spec:
+  framework: google-adk
+  description: "Agent with tool server access"
+  instruction: "You can use external tools to help users."
+  model: "gemini/gemini-2.5-flash"
+  tools:
+    - name: context7_tools
+      url: "http://context7-http.default.svc.cluster.local:8080/mcp"
+  protocols:
+    - type: A2A
+----
+
+== Step-by-Step: SSE Tool Server (Deprecated)
+
+WARNING: SSE as a standalone transport is **deprecated** as of MCP protocol version 2025-06-18. This transport is maintained only for backwards compatibility with older MCP servers. For new deployments, use **HTTP transport** (which supports SSE streaming natively) or **stdio transport** instead.
+
+SSE (Server-Sent Events) transport was previously used for streaming communication between tool servers and agents. Modern MCP servers should use HTTP transport with SSE capabilities built-in.
+
+=== When to use SSE transport
+
+Only use this transport type if:
+
+* You have an existing MCP server that only supports the old SSE-only transport
+* You need to maintain compatibility with legacy tool servers
+
+=== Basic SSE Tool Server
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: context7-sse
+spec:
+  protocol: mcp
+  transportType: sse
+  image: mcp/context7:latest
+  port: 8080
+  path: /sse  # Optional: defaults to /sse
+  replicas: 1
+  env:
+    - name: LOG_LEVEL
+      value: debug
+----
+
+The configuration is similar to HTTP, but with `transportType: sse` and a different default path.
+
+== Step-by-Step: stdio Tool Server
+
+[WARNING]
+====
+**stdio transport sidecar injection is not yet fully implemented.**
+
+While you can create ToolServer resources with `transportType: stdio` and they will be marked as Ready, the sidecar injection mechanism that would inject these tool servers into agent pods is not yet available. This means:
+
+* ✓ You can define stdio ToolServers (they will show as Ready)
+* ✗ Agents cannot use them yet (no injection mechanism)
+* ⚠️ This feature is planned for a future release
+
+**For production use, please use HTTP transport instead.**
+====
+
+stdio transport tool servers are designed to be injected as sidecars within agent pods, enabling direct process communication.
+
+=== When to use stdio transport
+
+Once implemented, stdio transport will be ideal when:
+
+* Your tool needs access to the same file system as the agent
+* You need the lowest possible latency
+* The tool is specific to one agent
+* You want to avoid network overhead
+
+**Current Status:** You can define stdio ToolServers and they will be marked as Ready, but they cannot yet be used by agents.
+
+=== Basic stdio Tool Server
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: sqlite-stdio
+spec:
+  protocol: mcp
+  transportType: stdio
+  image: mcp/sqlite:latest
+  args:
+    - "--db-path"
+    - "/mcp/test.db"
+  env:
+    - name: LOG_LEVEL
+      value: info
+----
+
+=== Configuration Options for stdio
+
+* *image*: Container image for the tool server (required)
+* *command*: Override the container ENTRYPOINT (optional)
+* *args*: Override the container CMD (optional)
+* *env*: Environment variables
+* *envFrom*: Load environment variables from ConfigMaps or Secrets
+
+Note: `port`, `path`, and `replicas` are not applicable for stdio transport.
+
+== Advanced Configuration
+
+=== Using ConfigMaps for Configuration
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: toolserver-config
+data:
+  LOG_LEVEL: debug
+  MAX_CONNECTIONS: "100"
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: configured-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  replicas: 2
+  envFrom:
+    - configMapRef:
+        name: toolserver-config
+----
+
+=== Using Secrets for Sensitive Data
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: toolserver-secrets
+type: Opaque
+stringData:
+  API_KEY: your-secret-api-key
+  DATABASE_PASSWORD: your-database-password
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: secure-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  replicas: 2
+  envFrom:
+    - secretRef:
+        name: toolserver-secrets
+----
+
+=== Custom Command and Args
+
+Override the container's default command and arguments:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: custom-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  command: ["/app/custom-entrypoint.sh"]
+  args:
+    - "--config"
+    - "/etc/config/app.yaml"
+    - "--verbose"
+  port: 8080
+  replicas: 1
+----
+
+== Transport Type Comparison
+
+[cols="1,2,2,2"]
+|===
+|Feature |HTTP (Streamable) |SSE (Deprecated) |stdio
+
+|MCP Standard
+|✓ Standard transport
+|✗ Deprecated
+|✓ Standard transport
+
+|Deployment Type
+|Standalone pods + service
+|Standalone pods + service
+|Sidecar in agent pod
+
+|Scalability
+|Horizontal scaling with replicas
+|Horizontal scaling with replicas
+|Scales with agent
+
+|Communication
+|Request/response + SSE streaming
+|SSE streaming only
+|stdin/stdout communication
+
+|Use Case
+|Shared tools, multiple agents
+|Legacy MCP servers only
+|Low-latency, file system access
+
+|Network Overhead
+|Medium
+|Medium
+|None (same pod)
+
+|Isolation
+|High (separate pods)
+|High (separate pods)
+|Low (same pod)
+
+|Recommended
+|✓ Yes
+|✗ Use HTTP instead
+|⚠️ Sidecar injection not available
+|===
+
+NOTE: stdio transport is not yet fully implemented. Sidecar injection is planned for a future release. Use HTTP transport for production deployments.
+
+== Understanding ToolServer Status
+
+After deploying a ToolServer, the operator populates status information that helps you verify deployment success and troubleshoot issues.
+
+=== Status Fields
+
+The ToolServer status contains the following fields:
+
+==== .status.url
+
+For HTTP and SSE transports, this field contains the cluster-local URL where the tool server can be accessed.
+
+[source,bash]
+----
+kubectl get toolserver my-toolserver -o jsonpath='{.status.url}'
+# Example output: http://my-toolserver.default.svc.cluster.local:8080/mcp
+----
+
+This URL can be used directly in Agent `tools` configurations. For stdio transports, this field remains empty as they use sidecar injection instead.
+
+==== .status.conditions
+
+ToolServer resources use standard Kubernetes conditions to report their operational state. The primary condition is `Ready`.
+
+**Ready Condition Values:**
+
+* *Status: True* - ToolServer is successfully deployed and operational
+  - *Reason: Reconciled* - All resources created successfully
+
+* *Status: False* - ToolServer deployment failed or has issues
+  - *Reason: DeploymentFailed* - Failed to create or update the Deployment
+  - *Reason: ServiceFailed* - Failed to create or update the Service
+
+**Checking Conditions:**
+
+[source,bash]
+----
+# Check if a ToolServer is ready
+kubectl get toolserver my-toolserver -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+# Output: True or False
+
+# Get the reason for the current state
+kubectl get toolserver my-toolserver -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}'
+# Output: Reconciled, DeploymentFailed, or ServiceFailed
+
+# Get the full condition message
+kubectl get toolserver my-toolserver -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}'
+----
+
+**View all conditions:**
+
+[source,bash]
+----
+kubectl get toolserver my-toolserver -o yaml | grep -A 10 "^status:"
+----
+
+=== Transport-Specific Status Behavior
+
+**HTTP and SSE Transports:**
+- `.status.url` is populated with the service URL
+- `Ready` condition becomes True after Deployment and Service are created
+- ⚠️ **Important**: The condition turns True *optimistically* - it doesn't wait for pods to be running
+  * A Ready status means resources were created successfully, not that pods are healthy
+  * Always verify pod status separately for production deployments (see <<_tool_server_not_ready,Troubleshooting>> for details)
+  * Check: `kubectl get pods -l app=<toolserver-name>` to confirm pods are actually running
+
+**stdio Transport:**
+- `.status.url` remains empty (no service created)
+- `Ready` condition becomes True immediately after reconciliation
+- No Deployment or Service resources are created
+
+== Finding Tool Server Images
+
+Tool server images can be found in various locations:
+
+* *Docker Hub MCP Catalog*: https://hub.docker.com/u/mcp
+* *Custom images*: Build your own MCP-compliant tool servers
+* *Community repositories*: Check GitHub for MCP server implementations
+
+== Troubleshooting
+
+=== Tool Server Not Ready
+
+When a ToolServer is not ready, use the following diagnostic steps:
+
+**Step 1: Check the Ready condition**
+
+[source,bash]
+----
+# Check if the ToolServer is ready
+kubectl get toolserver <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+
+# Get the failure reason
+kubectl get toolserver <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}'
+
+# Get the detailed error message
+kubectl get toolserver <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}'
+----
+
+**Step 2: Inspect the full resource status**
+
+[source,bash]
+----
+kubectl describe toolserver <name>
+----
+
+Look for conditions and events that indicate what's wrong.
+
+**Step 3: Check related resources (for HTTP/SSE transports)**
+
+[source,bash]
+----
+# Check if deployment was created
+kubectl get deployment <name>
+
+# Check deployment status
+kubectl describe deployment <name>
+
+# Check if service was created
+kubectl get service <name>
+
+# Check pod status
+kubectl get pods -l app=<name>
+----
+
+**Common Issues:**
+
+* *Reason: DeploymentFailed* - Check that the image exists and is accessible. Verify environment variables and configuration.
+* *Reason: ServiceFailed* - Verify port configuration is valid. Check for port conflicts.
+* Pods not starting - Check pod logs and events for image pull errors or startup failures.
+
+=== Deployment Not Created (stdio)
+
+This is expected behavior! stdio tool servers don't create standalone deployments. Verify the tool server is marked as Ready:
+
+[source,bash]
+----
+kubectl get toolserver <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+----
+
+=== Connection Issues from Agents
+
+For HTTP/SSE tool servers, verify the service URL is correct:
+
+[source,bash]
+----
+kubectl get toolserver <name> -o jsonpath='{.status.url}'
+----
+
+Test connectivity from within the cluster:
+
+[source,bash]
+----
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl http://<toolserver-name>.<namespace>.svc.cluster.local:<port><path>
+----
+
+=== View Logs
+
+[source,bash]
+----
+# For HTTP/SSE tool servers
+kubectl logs -l app=<toolserver-name>
+
+# For stdio tool servers (once injected as sidecar)
+kubectl logs <agent-pod-name> -c <toolserver-name>
+----
+
+'''
+
+Happy tool server building! 🔧

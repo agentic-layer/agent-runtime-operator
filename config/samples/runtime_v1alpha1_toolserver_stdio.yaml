@@ -1,4 +1,4 @@
-# Example ToolServer using stdio transport (sidecar mode)
+# Example ToolServer using stdio transport (sidecar injection)
 # This creates a ToolServer resource that can be injected as a sidecar container into agent pods.
 # No standalone deployment or service is created for stdio transport.
 #

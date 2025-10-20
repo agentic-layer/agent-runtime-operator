@@ -163,19 +163,19 @@ func (v *ToolServerCustomValidator) validateToolServer(toolserver *runtimev1alph
 		if toolserver.Spec.Port != 0 {
 			allErrs = append(allErrs, field.Forbidden(
 				field.NewPath("spec", "port"),
-				"port must not be specified for stdio transport (sidecar mode)",
+				"port must not be specified for stdio transport (sidecar injection)",
 			))
 		}
 		if toolserver.Spec.Path != "" {
 			allErrs = append(allErrs, field.Forbidden(
 				field.NewPath("spec", "path"),
-				"path must not be specified for stdio transport (sidecar mode)",
+				"path must not be specified for stdio transport (sidecar injection)",
 			))
 		}
 		if toolserver.Spec.Replicas != nil {
 			allErrs = append(allErrs, field.Forbidden(
 				field.NewPath("spec", "replicas"),
-				"replicas must not be specified for stdio transport (sidecar mode)",
+				"replicas must not be specified for stdio transport (sidecar injection)",
 			))
 		}
 
