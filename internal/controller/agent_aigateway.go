@@ -33,17 +33,17 @@ const (
 	defaultAiGatewayNamespace = "ai-gateway"
 )
 
-// resolveAiGateway resolves the AiGateway resource for an agent and returns its service URL.
+// resolveAiGateway resolves the AiGateway resource for an agent and returns the AiGateway object.
 // The method follows this resolution strategy:
 //  1. If agent.Spec.AiGatewayRef is specified, looks up that specific AiGateway resource
 //  2. If agent.Spec.AiGatewayRef is not specified, searches for any AiGateway in the "ai-gateway" namespace
 //  3. Returns nil (with no error) if no AiGateway is found - this is a valid scenario
 //
 // Returns:
-//   - Service URL string if an AiGateway is found
+//   - AiGateway object if an AiGateway is found
 //   - nil if no AiGateway is found (not an error condition)
 //   - error only for unexpected failures (e.g., API errors)
-func (r *AgentReconciler) resolveAiGateway(ctx context.Context, agent *runtimev1alpha1.Agent) (*string, error) {
+func (r *AgentReconciler) resolveAiGateway(ctx context.Context, agent *runtimev1alpha1.Agent) (*aigatewayv1alpha1.AiGateway, error) {
 	// Case 1: Explicit AiGatewayRef is specified
 	if agent.Spec.AiGatewayRef != nil {
 		return r.resolveExplicitAiGateway(ctx, agent.Spec.AiGatewayRef, agent.Namespace)
@@ -54,7 +54,7 @@ func (r *AgentReconciler) resolveAiGateway(ctx context.Context, agent *runtimev1
 }
 
 // resolveExplicitAiGateway resolves a specific AiGateway referenced by the agent
-func (r *AgentReconciler) resolveExplicitAiGateway(ctx context.Context, ref *corev1.ObjectReference, agentNamespace string) (*string, error) {
+func (r *AgentReconciler) resolveExplicitAiGateway(ctx context.Context, ref *corev1.ObjectReference, agentNamespace string) (*aigatewayv1alpha1.AiGateway, error) {
 	// Use namespace from ObjectReference, or default to agent's namespace
 	namespace := ref.Namespace
 	if namespace == "" {
@@ -75,13 +75,11 @@ func (r *AgentReconciler) resolveExplicitAiGateway(ctx context.Context, ref *cor
 		return nil, fmt.Errorf("failed to resolve AiGateway %s/%s: %w", namespace, ref.Name, err)
 	}
 
-	// Construct the service URL for the AiGateway
-	serviceURL := r.buildAiGatewayServiceUrl(aiGateway)
-	return &serviceURL, nil
+	return &aiGateway, nil
 }
 
 // resolveDefaultAiGateway searches for any AiGateway in the default ai-gateway namespace
-func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*string, error) {
+func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*aigatewayv1alpha1.AiGateway, error) {
 	log := logf.FromContext(ctx)
 
 	var aiGatewayList aigatewayv1alpha1.AiGatewayList
@@ -107,9 +105,7 @@ func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*string,
 
 	// Return the first AiGateway found
 	aiGateway := aiGatewayList.Items[0]
-	// Construct the service URL for the AiGateway
-	serviceURL := r.buildAiGatewayServiceUrl(aiGateway)
-	return &serviceURL, nil
+	return &aiGateway, nil
 }
 
 func (r *AgentReconciler) buildAiGatewayServiceUrl(aiGateway aigatewayv1alpha1.AiGateway) string {

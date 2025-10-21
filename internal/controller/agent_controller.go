@@ -22,6 +22,7 @@ import (
 	"maps"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
+	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -52,7 +53,7 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=aigateways,verbs=get;list;watch
+// +kubebuilder:rbac:groups=agentic-layer.ai,resources=aigateways,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -87,7 +88,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	// Resolve AiGateway (optional - returns nil if not found)
-	aiGatewayUrl, err := r.resolveAiGateway(ctx, &agent)
+	aiGateway, err := r.resolveAiGateway(ctx, &agent)
 	if err != nil {
 		log.Error(err, "Failed to resolve AiGateway")
 		// Update status to reflect missing AiGateway
@@ -96,12 +97,13 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 		return ctrl.Result{}, err
 	}
-	if aiGatewayUrl != nil {
-		log.Info("Resolved AiGateway", "url", *aiGatewayUrl)
+	if aiGateway != nil {
+		aiGatewayUrl := r.buildAiGatewayServiceUrl(*aiGateway)
+		log.Info("Resolved AiGateway", "url", aiGatewayUrl)
 	}
 
 	// Ensure Deployment exists and is up to date
-	if err := r.ensureDeployment(ctx, &agent, resolvedSubAgents, aiGatewayUrl); err != nil {
+	if err := r.ensureDeployment(ctx, &agent, resolvedSubAgents, aiGateway); err != nil {
 		log.Error(err, "Failed to ensure Deployment")
 		return ctrl.Result{}, err
 	}
@@ -113,7 +115,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	// Update agent status to Ready
-	if err := r.updateAgentStatusReady(ctx, &agent); err != nil {
+	if err := r.updateAgentStatusReady(ctx, &agent, aiGateway); err != nil {
 		log.Error(err, "Failed to update agent status")
 		return ctrl.Result{}, err
 	}
@@ -122,7 +124,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
-func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string, aiGatewayUrl *string) error {
+func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string, aiGateway *aigatewayv1alpha1.AiGateway) error {
 	log := logf.FromContext(ctx)
 
 	deployment := &appsv1.Deployment{
@@ -162,6 +164,11 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		}
 
 		// Build template environment variables
+		var aiGatewayUrl *string
+		if aiGateway != nil {
+			url := r.buildAiGatewayServiceUrl(*aiGateway)
+			aiGatewayUrl = &url
+		}
 		templateEnvVars, err := r.buildTemplateEnvironmentVars(agent, resolvedSubAgents, aiGatewayUrl)
 		if err != nil {
 			return fmt.Errorf("failed to build template environment variables: %w", err)

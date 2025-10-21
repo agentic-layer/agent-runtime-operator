@@ -121,10 +121,11 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 				},
 			}
 
-			url, err := reconciler.resolveAiGateway(ctx, agent)
+			gateway, err := reconciler.resolveAiGateway(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).NotTo(BeNil())
-			Expect(*url).To(Equal("http://my-ai-gateway.ai-gateway.svc.cluster.local:4000"))
+			Expect(gateway).NotTo(BeNil())
+			Expect(gateway.Name).To(Equal("my-ai-gateway"))
+			Expect(gateway.Namespace).To(Equal("ai-gateway"))
 		})
 
 		It("should default to agent's namespace when AiGatewayRef namespace is not specified", func() {
@@ -154,10 +155,11 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 				},
 			}
 
-			url, err := reconciler.resolveAiGateway(ctx, agent)
+			gateway, err := reconciler.resolveAiGateway(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).NotTo(BeNil())
-			Expect(*url).To(Equal("http://default-ai-gateway.default.svc.cluster.local:4000"))
+			Expect(gateway).NotTo(BeNil())
+			Expect(gateway.Name).To(Equal("default-ai-gateway"))
+			Expect(gateway.Namespace).To(Equal("default"))
 		})
 
 		It("should find default AiGateway in ai-gateway namespace when no ref is specified", func() {
@@ -187,10 +189,11 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 				},
 			}
 
-			url, err := reconciler.resolveAiGateway(ctx, agent)
+			gateway, err := reconciler.resolveAiGateway(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).NotTo(BeNil())
-			Expect(*url).To(Equal("http://default-gateway.ai-gateway.svc.cluster.local:4000"))
+			Expect(gateway).NotTo(BeNil())
+			Expect(gateway.Name).To(Equal("default-gateway"))
+			Expect(gateway.Namespace).To(Equal("ai-gateway"))
 		})
 
 		It("should return nil when no AiGateway exists and no ref is specified", func() {
@@ -207,9 +210,9 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 				},
 			}
 
-			url, err := reconciler.resolveAiGateway(ctx, agent)
+			gateway, err := reconciler.resolveAiGateway(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(BeNil())
+			Expect(gateway).To(BeNil())
 		})
 
 		It("should return error when explicit AiGatewayRef points to non-existent gateway", func() {
@@ -270,11 +273,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 				},
 			}
 
-			url, err := reconciler.resolveAiGateway(ctx, agent)
+			gateway, err := reconciler.resolveAiGateway(ctx, agent)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).NotTo(BeNil())
+			Expect(gateway).NotTo(BeNil())
 			// Should return one of the gateways (deterministic based on API list order)
-			Expect(*url).To(MatchRegexp(`http://(gateway-1|gateway-2)\.ai-gateway\.svc\.cluster\.local`))
+			Expect(gateway.Name).To(MatchRegexp(`gateway-[12]`))
+			Expect(gateway.Namespace).To(Equal("ai-gateway"))
 		})
 	})
 
@@ -298,10 +302,11 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 				Namespace: "ai-gateway",
 			}
 
-			url, err := reconciler.resolveExplicitAiGateway(ctx, ref, "default")
+			gateway, err := reconciler.resolveExplicitAiGateway(ctx, ref, "default")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).NotTo(BeNil())
-			Expect(*url).To(Equal("http://test-gateway.ai-gateway.svc.cluster.local:4000"))
+			Expect(gateway).NotTo(BeNil())
+			Expect(gateway.Name).To(Equal("test-gateway"))
+			Expect(gateway.Namespace).To(Equal("ai-gateway"))
 		})
 	})
 
@@ -310,9 +315,9 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			// Create empty ai-gateway namespace
 			createNamespaceIfNotExists("ai-gateway")
 
-			url, err := reconciler.resolveDefaultAiGateway(ctx)
+			gateway, err := reconciler.resolveDefaultAiGateway(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(BeNil())
+			Expect(gateway).To(BeNil())
 		})
 	})
 })

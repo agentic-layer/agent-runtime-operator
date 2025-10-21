@@ -157,6 +157,12 @@ type AgentStatus struct {
 	// Format: http://{name}.{namespace}.svc.cluster.local:{port}/.well-known/agent-card.json
 	// +optional
 	Url string `json:"url,omitempty"`
+
+	// AiGatewayRef indicates which AiGateway this agent is using for model routing.
+	// This is automatically populated by the controller based on the agent's AiGatewayRef spec
+	// or default gateway resolution. Will be nil if no gateway is being used.
+	// +optional
+	AiGatewayRef *corev1.ObjectReference `json:"aiGatewayRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true
