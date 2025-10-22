@@ -87,6 +87,7 @@ func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*aigatew
 	if err != nil {
 		// If the AiGateway CRD is not installed, treat it as "no gateway found"
 		if meta.IsNoMatchError(err) {
+			log.Info("AiGateway CRD is not installed, skipping default gateway resolution")
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to list AiGateways in namespace %s: %w", defaultAiGatewayNamespace, err)

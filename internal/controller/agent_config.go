@@ -95,7 +95,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 		})
 		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 			Name:  "LITELLM_PROXY_API_KEY",
-			Value: "NOT_USED_BY_GATEWAY", // Placeholder, the api key is required by the python adk but not used when connecting to the ai-gateway
+			Value: "NOT_USED_BY_GATEWAY", // API key required by ADK but unused when connecting to AI Gateway
 		})
 		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 			Name:  "USE_LITELLM_PROXY",

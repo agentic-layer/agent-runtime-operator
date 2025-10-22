@@ -178,7 +178,7 @@ var _ = Describe("Agent Status", func() {
 
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-without-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
-			Expect(updatedAgent.Status.AiGatewayConnection).To(Equal("Not Connected"))
+			Expect(updatedAgent.Status.AiGatewayConnection).To(Equal(AiGatewayNotConnected))
 		})
 	})
 

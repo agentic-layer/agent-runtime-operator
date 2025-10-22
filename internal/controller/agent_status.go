@@ -27,6 +27,10 @@ import (
 	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
 
+const (
+	AiGatewayNotConnected = "Not Connected"
+)
+
 // updateAgentStatusReady sets the agent status to Ready and updates the A2A URL and AiGatewayRef
 func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *runtimev1alpha1.Agent, aiGateway *aigatewayv1alpha1.AiGateway) error {
 	// Compute the A2A URL if the agent has an A2A protocol
@@ -36,7 +40,7 @@ func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *run
 	if aiGateway != nil {
 		agent.Status.AiGatewayConnection = fmt.Sprintf("%s.%s", aiGateway.Name, aiGateway.Namespace)
 	} else {
-		agent.Status.AiGatewayConnection = "Not Connected"
+		agent.Status.AiGatewayConnection = AiGatewayNotConnected
 	}
 
 	// Set Ready condition to True
