@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -33,16 +32,11 @@ func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *run
 	// Compute the A2A URL if the agent has an A2A protocol
 	agent.Status.Url = r.buildA2AAgentCardUrl(agent)
 
-	// Set AiGatewayRef if an AI Gateway is being used
+	// Set AiGatewayConnection if an AI Gateway is being used
 	if aiGateway != nil {
-		agent.Status.AiGatewayRef = &corev1.ObjectReference{
-			Kind:       aiGateway.Kind,
-			Name:       aiGateway.Name,
-			Namespace:  aiGateway.Namespace,
-			APIVersion: aiGateway.APIVersion,
-		}
+		agent.Status.AiGatewayConnection = fmt.Sprintf("%s.%s", aiGateway.Name, aiGateway.Namespace)
 	} else {
-		agent.Status.AiGatewayRef = nil
+		agent.Status.AiGatewayConnection = "Not Connected"
 	}
 
 	// Set Ready condition to True
@@ -66,8 +60,8 @@ func (r *AgentReconciler) updateAgentStatusNotReady(ctx context.Context, agent *
 	// Clear the A2A URL since the agent is not ready
 	agent.Status.Url = ""
 
-	// Clear the AiGatewayRef since the agent is not ready
-	agent.Status.AiGatewayRef = nil
+	// Clear the AiGatewayConnection since the agent is not ready
+	agent.Status.AiGatewayConnection = ""
 
 	// Set Ready condition to False with the provided reason
 	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{

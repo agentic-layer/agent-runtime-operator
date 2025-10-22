@@ -158,15 +158,16 @@ type AgentStatus struct {
 	// +optional
 	Url string `json:"url,omitempty"`
 
-	// AiGatewayRef indicates which AiGateway this agent is using for model routing.
-	// This is automatically populated by the controller based on the agent's AiGatewayRef spec
-	// or default gateway resolution. Will be nil if no gateway is being used.
+	// AiGatewayConnection displays the AI Gateway connection status for this agent.
+	// Format: "gateway-name.namespace" when connected, "Not Connected" when no gateway is used.
+	// This field is automatically populated by the controller.
 	// +optional
-	AiGatewayRef *corev1.ObjectReference `json:"aiGatewayRef,omitempty"`
+	AiGatewayConnection string `json:"aiGatewayConnection,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="AI Gateway",type=string,JSONPath=".status.aiGatewayConnection"
 
 // Agent is the Schema for the agents API.
 type Agent struct {
