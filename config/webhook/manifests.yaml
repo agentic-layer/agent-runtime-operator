@@ -96,26 +96,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-runtime-agentic-layer-ai-v1alpha1-agentgatewayclass
-  failurePolicy: Fail
-  name: vagentgatewayclass-v1alpha1.kb.io
-  rules:
-  - apiGroups:
-    - runtime.agentic-layer.ai
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - agentgatewayclasses
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /validate-runtime-agentic-layer-ai-v1alpha1-toolserver
   failurePolicy: Fail
   name: vtoolserver-v1alpha1.kb.io
