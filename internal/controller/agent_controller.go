@@ -303,18 +303,34 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	log := logf.FromContext(context.Background())
+
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&runtimev1alpha1.Agent{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Watches(
 			&runtimev1alpha1.Agent{},
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingSubAgent),
-		).
-		Watches(
+		)
+
+	// Only watch AiGateway if the CRD is installed
+	if isAiGatewayCRDInstalled(mgr) {
+		log.Info("AiGateway CRD detected, enabling watch")
+		builder = builder.Watches(
 			&aigatewayv1alpha1.AiGateway{},
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingAiGateway),
-		).
-		Named("agent").
-		Complete(r)
+		)
+	} else {
+		log.Info("AiGateway CRD not installed, skipping watch (agent will work without AI Gateway integration)")
+	}
+
+	return builder.Named("agent").Complete(r)
+}
+
+// isAiGatewayCRDInstalled checks if the AiGateway CRD is installed in the cluster
+func isAiGatewayCRDInstalled(mgr ctrl.Manager) bool {
+	gvk := aigatewayv1alpha1.GroupVersion.WithKind("AiGateway")
+	_, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
+	return err == nil
 }
