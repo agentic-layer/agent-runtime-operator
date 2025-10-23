@@ -19,14 +19,15 @@ package controller
 import (
 	"context"
 	"fmt"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -111,4 +112,72 @@ func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*aigatew
 
 func (r *AgentReconciler) buildAiGatewayServiceUrl(aiGateway aigatewayv1alpha1.AiGateway) string {
 	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", aiGateway.Name, aiGateway.Namespace, aiGateway.Spec.Port)
+}
+
+// findAgentsReferencingAiGateway finds all agents that reference or would resolve to a given AiGateway.
+// This includes:
+//  1. Agents with explicit AiGatewayRef matching this gateway
+//  2. Agents without explicit AiGatewayRef that would resolve to this gateway as the default
+func (r *AgentReconciler) findAgentsReferencingAiGateway(ctx context.Context, obj client.Object) []ctrl.Request {
+	updatedGateway, ok := obj.(*aigatewayv1alpha1.AiGateway)
+	if !ok {
+		return nil
+	}
+
+	log := logf.FromContext(ctx)
+
+	// Find all agents in the cluster
+	var agentList runtimev1alpha1.AgentList
+	if err := r.List(ctx, &agentList); err != nil {
+		log.Error(err, "Failed to list agents for AiGateway watch")
+		return nil
+	}
+
+	var requests []ctrl.Request
+
+	// Check each agent to see if it references this gateway
+	for _, agent := range agentList.Items {
+		shouldReconcile := false
+
+		// Case 1: Agent has explicit AiGatewayRef
+		if agent.Spec.AiGatewayRef != nil {
+			// Resolve namespace (default to agent's namespace if not specified)
+			gatewayNamespace := agent.Spec.AiGatewayRef.Namespace
+			if gatewayNamespace == "" {
+				gatewayNamespace = agent.Namespace
+			}
+
+			// Check if this agent references the updated gateway
+			if agent.Spec.AiGatewayRef.Name == updatedGateway.Name && gatewayNamespace == updatedGateway.Namespace {
+				shouldReconcile = true
+				log.Info("Enqueuing agent due to explicit AiGatewayRef change",
+					"agent", agent.Name,
+					"namespace", agent.Namespace,
+					"gateway", updatedGateway.Name,
+					"gatewayNamespace", updatedGateway.Namespace)
+			}
+		} else {
+			// Case 2: Agent has no explicit reference - would use default gateway resolution
+			// Default resolution looks for any AiGateway in the "ai-gateway" namespace
+			if updatedGateway.Namespace == defaultAiGatewayNamespace {
+				shouldReconcile = true
+				log.Info("Enqueuing agent due to default AiGateway change",
+					"agent", agent.Name,
+					"namespace", agent.Namespace,
+					"gateway", updatedGateway.Name,
+					"gatewayNamespace", updatedGateway.Namespace)
+			}
+		}
+
+		if shouldReconcile {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      agent.Name,
+					Namespace: agent.Namespace,
+				},
+			})
+		}
+	}
+
+	return requests
 }

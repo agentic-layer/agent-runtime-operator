@@ -311,6 +311,10 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&runtimev1alpha1.Agent{},
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingSubAgent),
 		).
+		Watches(
+			&aigatewayv1alpha1.AiGateway{},
+			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingAiGateway),
+		).
 		Named("agent").
 		Complete(r)
 }

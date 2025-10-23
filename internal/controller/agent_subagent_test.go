@@ -40,23 +40,19 @@ var _ = Describe("Agent SubAgent", func() {
 	})
 
 	AfterEach(func() {
-		// Clean up all agents and namespaces after each test
+		// Clean up all agents in default namespace
 		agentList := &runtimev1alpha1.AgentList{}
 		Expect(k8sClient.List(ctx, agentList, &client.ListOptions{Namespace: "default"})).To(Succeed())
 		for i := range agentList.Items {
 			_ = k8sClient.Delete(ctx, &agentList.Items[i])
 		}
 
-		// Clean up other-namespace if it exists
+		// Clean up agents in other-namespace (don't delete namespace to avoid termination issues)
 		otherNsAgentList := &runtimev1alpha1.AgentList{}
 		_ = k8sClient.List(ctx, otherNsAgentList, &client.ListOptions{Namespace: "other-namespace"})
 		for i := range otherNsAgentList.Items {
 			_ = k8sClient.Delete(ctx, &otherNsAgentList.Items[i])
 		}
-
-		// Clean up namespace
-		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other-namespace"}}
-		_ = k8sClient.Delete(ctx, ns)
 	})
 
 	Describe("resolveSubAgentUrl", func() {

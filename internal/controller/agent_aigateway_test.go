@@ -71,7 +71,7 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			_ = k8sClient.Delete(ctx, &aiGatewayList.Items[i])
 		}
 
-		// Clean up other-namespace resources
+		// Clean up resources in other-namespace (don't delete namespace to avoid termination issues)
 		otherNsAgentList := &runtimev1alpha1.AgentList{}
 		_ = k8sClient.List(ctx, otherNsAgentList, &client.ListOptions{Namespace: "other-namespace"})
 		for i := range otherNsAgentList.Items {
@@ -84,10 +84,6 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 		for i := range otherNsAiGatewayList.Items {
 			_ = k8sClient.Delete(ctx, &otherNsAiGatewayList.Items[i])
 		}
-
-		// Clean up other-namespace only (keep ai-gateway namespace to avoid termination issues)
-		otherNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other-namespace"}}
-		_ = k8sClient.Delete(ctx, otherNs)
 	})
 
 	Describe("resolveAiGateway", func() {
@@ -318,6 +314,281 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			gateway, err := reconciler.resolveDefaultAiGateway(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(gateway).To(BeNil())
+		})
+	})
+
+	Describe("findAgentsReferencingAiGateway", func() {
+		It("should identify agents with explicit AiGatewayRef", func() {
+			// Create ai-gateway namespace
+			createNamespaceIfNotExists("ai-gateway")
+
+			// Create AiGateway
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "referenced-gateway",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
+
+			// Create agent with explicit reference
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-with-ref",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					AiGatewayRef: &corev1.ObjectReference{
+						Name:      "referenced-gateway",
+						Namespace: "ai-gateway",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			requests := reconciler.findAgentsReferencingAiGateway(ctx, aiGateway)
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("agent-with-ref"))
+			Expect(requests[0].Namespace).To(Equal("default"))
+		})
+
+		It("should match with namespace defaulting in AiGatewayRef", func() {
+			// Create AiGateway in default namespace
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway-with-defaulting",
+					Namespace: "default",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
+
+			// Create agent with AiGatewayRef without namespace (defaults to agent's namespace)
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-with-defaulting",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					AiGatewayRef: &corev1.ObjectReference{
+						Name: "gateway-with-defaulting",
+						// Namespace omitted - defaults to agent's namespace
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			requests := reconciler.findAgentsReferencingAiGateway(ctx, aiGateway)
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("agent-with-defaulting"))
+		})
+
+		It("should identify agents without explicit ref when gateway is in default namespace", func() {
+			// Create ai-gateway namespace
+			createNamespaceIfNotExists("ai-gateway")
+
+			// Create AiGateway in default ai-gateway namespace
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-gateway",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
+
+			// Create agent without AiGatewayRef
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-without-ref",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					// No AiGatewayRef - would use default resolution
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			requests := reconciler.findAgentsReferencingAiGateway(ctx, aiGateway)
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("agent-without-ref"))
+		})
+
+		It("should not match agents without ref when gateway is NOT in default namespace", func() {
+			// Create other-namespace
+			createNamespaceIfNotExists("other-namespace")
+
+			// Create AiGateway in non-default namespace
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "other-gateway",
+					Namespace: "other-namespace",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
+
+			// Create agent without AiGatewayRef
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-no-match",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					// No AiGatewayRef - would not match non-default gateway
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			requests := reconciler.findAgentsReferencingAiGateway(ctx, aiGateway)
+			Expect(requests).To(BeEmpty())
+		})
+
+		It("should handle multiple agents referencing same gateway", func() {
+			// Create ai-gateway namespace
+			createNamespaceIfNotExists("ai-gateway")
+
+			// Create shared AiGateway
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "shared-gateway",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
+
+			// Create first agent with explicit ref
+			agent1 := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent1",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					AiGatewayRef: &corev1.ObjectReference{
+						Name:      "shared-gateway",
+						Namespace: "ai-gateway",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent1)).To(Succeed())
+
+			// Create second agent without ref (uses default)
+			agent2 := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent2",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					// No AiGatewayRef
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent2)).To(Succeed())
+
+			requests := reconciler.findAgentsReferencingAiGateway(ctx, aiGateway)
+			Expect(requests).To(HaveLen(2))
+
+			// Check that both agents are in the requests
+			agentNames := make(map[string]bool)
+			for _, req := range requests {
+				agentNames[req.Name] = true
+			}
+			Expect(agentNames).To(HaveKey("agent1"))
+			Expect(agentNames).To(HaveKey("agent2"))
+		})
+
+		It("should not match agents with different explicit references", func() {
+			// Create ai-gateway namespace
+			createNamespaceIfNotExists("ai-gateway")
+
+			// Create first AiGateway
+			aiGateway1 := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway1",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway1)).To(Succeed())
+
+			// Create second AiGateway (this is the one we'll watch)
+			aiGateway2 := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway2",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4001,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway2)).To(Succeed())
+
+			// Create agent referencing gateway1
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-with-gateway1",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					AiGatewayRef: &corev1.ObjectReference{
+						Name:      "gateway1",
+						Namespace: "ai-gateway",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			// Watch gateway2 - should not find agent referencing gateway1
+			requests := reconciler.findAgentsReferencingAiGateway(ctx, aiGateway2)
+			Expect(requests).To(BeEmpty())
+		})
+
+		It("should return empty list when no agents exist", func() {
+			// Create ai-gateway namespace
+			createNamespaceIfNotExists("ai-gateway")
+
+			// Create AiGateway
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "lonely-gateway",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
+
+			// No agents created
+			requests := reconciler.findAgentsReferencingAiGateway(ctx, aiGateway)
+			Expect(requests).To(BeEmpty())
 		})
 	})
 })
