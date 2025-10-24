@@ -157,10 +157,12 @@ var _ = Describe("Agent Status", func() {
 
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-with-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
-			Expect(updatedAgent.Status.AiGatewayConnection).To(Equal("test-gateway.ai-gateway"))
+			Expect(updatedAgent.Status.AiGatewayRef).NotTo(BeNil())
+			Expect(updatedAgent.Status.AiGatewayRef.Name).To(Equal("test-gateway"))
+			Expect(updatedAgent.Status.AiGatewayRef.Namespace).To(Equal("ai-gateway"))
 		})
 
-		It("should set 'Not Connected' when no AiGateway is provided", func() {
+		It("should set AiGatewayRef to nil when no AiGateway is provided", func() {
 			agent := &runtimev1alpha1.Agent{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "agent-without-gateway",
@@ -178,7 +180,7 @@ var _ = Describe("Agent Status", func() {
 
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-without-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
-			Expect(updatedAgent.Status.AiGatewayConnection).To(Equal(AiGatewayNotConnected))
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 	})
 
@@ -240,7 +242,7 @@ var _ = Describe("Agent Status", func() {
 			Expect(updatedAgent.Status.Url).To(Equal(""))
 		})
 
-		It("should clear Status.AiGatewayConnection when agent is not ready", func() {
+		It("should clear Status.AiGatewayRef when agent is not ready", func() {
 			agent := &runtimev1alpha1.Agent{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "agent-not-ready-gateway",
@@ -258,7 +260,7 @@ var _ = Describe("Agent Status", func() {
 
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-not-ready-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
-			Expect(updatedAgent.Status.AiGatewayConnection).To(Equal(""))
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 	})
 })
