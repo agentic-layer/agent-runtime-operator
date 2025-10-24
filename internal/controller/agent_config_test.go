@@ -194,6 +194,96 @@ var _ = Describe("Agent Config", func() {
 		})
 	})
 
+	Context("when aiGatewayUrl is provided", func() {
+		It("should set LiteLLM proxy environment variables", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway-agent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{},
+			}
+
+			gatewayUrl := "http://ai-gateway.ai-gateway-ns.svc.cluster.local:4000"
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string), &gatewayUrl)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Should have base variables (6) + LiteLLM variables (3) = 9 total
+			Expect(envVars).To(HaveLen(9))
+
+			// Verify LITELLM_PROXY_API_BASE is set
+			proxyBaseVar := findEnvVar(envVars, "LITELLM_PROXY_API_BASE")
+			Expect(proxyBaseVar).NotTo(BeNil())
+			Expect(proxyBaseVar.Value).To(Equal("http://ai-gateway.ai-gateway-ns.svc.cluster.local:4000"))
+
+			// Verify LITELLM_PROXY_API_KEY is set
+			proxyKeyVar := findEnvVar(envVars, "LITELLM_PROXY_API_KEY")
+			Expect(proxyKeyVar).NotTo(BeNil())
+			Expect(proxyKeyVar.Value).To(Equal("NOT_USED_BY_GATEWAY"))
+
+			// Verify USE_LITELLM_PROXY is set
+			useLiteLLMVar := findEnvVar(envVars, "USE_LITELLM_PROXY")
+			Expect(useLiteLLMVar).NotTo(BeNil())
+			Expect(useLiteLLMVar.Value).To(Equal("True"))
+		})
+
+		It("should not set LiteLLM proxy variables when aiGatewayUrl is nil", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "no-gateway-agent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{},
+			}
+
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string), nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Should only have base variables (6), no LiteLLM variables
+			Expect(envVars).To(HaveLen(6))
+
+			// Verify LiteLLM variables are NOT present
+			Expect(findEnvVar(envVars, "LITELLM_PROXY_API_BASE")).To(BeNil())
+			Expect(findEnvVar(envVars, "LITELLM_PROXY_API_KEY")).To(BeNil())
+			Expect(findEnvVar(envVars, "USE_LITELLM_PROXY")).To(BeNil())
+		})
+
+		It("should allow user to override LiteLLM proxy variables", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "override-agent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{},
+			}
+
+			gatewayUrl := "http://ai-gateway.default.svc.cluster.local:4000"
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, make(map[string]string), &gatewayUrl)
+			Expect(err).NotTo(HaveOccurred())
+
+			userVars := []corev1.EnvVar{
+				{Name: "LITELLM_PROXY_API_KEY", Value: "custom-api-key"},
+				{Name: "USE_LITELLM_PROXY", Value: "False"},
+			}
+
+			result := reconciler.mergeEnvironmentVariables(templateVars, userVars)
+
+			// User overrides should take precedence
+			proxyKeyVar := findEnvVar(result, "LITELLM_PROXY_API_KEY")
+			Expect(proxyKeyVar).NotTo(BeNil())
+			Expect(proxyKeyVar.Value).To(Equal("custom-api-key"))
+
+			useLiteLLMVar := findEnvVar(result, "USE_LITELLM_PROXY")
+			Expect(useLiteLLMVar).NotTo(BeNil())
+			Expect(useLiteLLMVar.Value).To(Equal("False"))
+
+			// Template variable that wasn't overridden should remain
+			proxyBaseVar := findEnvVar(result, "LITELLM_PROXY_API_BASE")
+			Expect(proxyBaseVar).NotTo(BeNil())
+			Expect(proxyBaseVar.Value).To(Equal("http://ai-gateway.default.svc.cluster.local:4000"))
+		})
+	})
+
 	Describe("mergeEnvironmentVariables", func() {
 		It("should merge template and user variables with user precedence", func() {
 			templateVars := []corev1.EnvVar{

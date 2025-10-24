@@ -111,7 +111,7 @@ func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*aigatew
 }
 
 func (r *AgentReconciler) buildAiGatewayServiceUrl(aiGateway aigatewayv1alpha1.AiGateway) string {
-	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", aiGateway.Name, aiGateway.Namespace, aiGateway.Spec.Port)
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local.:%d", aiGateway.Name, aiGateway.Namespace, aiGateway.Spec.Port)
 }
 
 // findAgentsReferencingAiGateway finds all agents that reference or would resolve to a given AiGateway.
