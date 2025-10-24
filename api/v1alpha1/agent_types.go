@@ -146,6 +146,14 @@ type AgentSpec struct {
 	// EnvFrom defines sources to populate environment variables from.
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// VolumeMounts defines volume mounts to be added to the agent container.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// Volumes defines volumes to be added to the agent pod.
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent.
