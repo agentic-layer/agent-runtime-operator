@@ -20,16 +20,30 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
+	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
 
-// updateAgentStatusReady sets the agent status to Ready and updates the A2A URL
-func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *runtimev1alpha1.Agent) error {
+// updateAgentStatusReady sets the agent status to Ready and updates the A2A URL and AiGatewayRef
+func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *runtimev1alpha1.Agent, aiGateway *aigatewayv1alpha1.AiGateway) error {
 	// Compute the A2A URL if the agent has an A2A protocol
 	agent.Status.Url = r.buildA2AAgentCardUrl(agent)
+
+	// Set AiGatewayRef if an AI Gateway is being used
+	if aiGateway != nil {
+		agent.Status.AiGatewayRef = &corev1.ObjectReference{
+			APIVersion: aiGateway.APIVersion,
+			Kind:       aiGateway.Kind,
+			Name:       aiGateway.Name,
+			Namespace:  aiGateway.Namespace,
+		}
+	} else {
+		agent.Status.AiGatewayRef = nil
+	}
 
 	// Set Ready condition to True
 	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{
@@ -51,6 +65,9 @@ func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *run
 func (r *AgentReconciler) updateAgentStatusNotReady(ctx context.Context, agent *runtimev1alpha1.Agent, reason, message string) error {
 	// Clear the A2A URL since the agent is not ready
 	agent.Status.Url = ""
+
+	// Clear the AiGatewayRef since the agent is not ready
+	agent.Status.AiGatewayRef = nil
 
 	// Set Ready condition to False with the provided reason
 	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{

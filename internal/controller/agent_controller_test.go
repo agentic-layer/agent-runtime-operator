@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
+	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
 
 var _ = Describe("Agent Controller", func() {
@@ -123,6 +124,78 @@ var _ = Describe("Agent Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve"))
 		})
+
+		It("should reconcile successfully with AiGateway and update status", func() {
+			// Create AiGateway in ai-gateway namespace
+			aiGatewayNs := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ai-gateway",
+				},
+			}
+			err := k8sClient.Create(ctx, aiGatewayNs)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				Fail("Failed to create ai-gateway namespace: " + err.Error())
+			}
+
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-reconcile-gateway",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
+
+			// Create agent with explicit AiGateway reference
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-with-gateway",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					AiGatewayRef: &corev1.ObjectReference{
+						Name:      "test-reconcile-gateway",
+						Namespace: "ai-gateway",
+					},
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			// Reconcile the agent
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-agent-with-gateway",
+					Namespace: "default",
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify agent status has AiGatewayRef populated
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-with-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
+			Expect(updatedAgent.Status.AiGatewayRef).NotTo(BeNil())
+			Expect(updatedAgent.Status.AiGatewayRef.Name).To(Equal("test-reconcile-gateway"))
+			Expect(updatedAgent.Status.AiGatewayRef.Namespace).To(Equal("ai-gateway"))
+
+			// Verify deployment has LiteLLM environment variables
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-with-gateway", Namespace: "default"}, deployment)).To(Succeed())
+
+			container := deployment.Spec.Template.Spec.Containers[0]
+			proxyBaseVar := findEnvVar(container.Env, "LITELLM_PROXY_API_BASE")
+			Expect(proxyBaseVar).NotTo(BeNil())
+			Expect(proxyBaseVar.Value).To(Equal("http://test-reconcile-gateway.ai-gateway.svc.cluster.local.:4000"))
+
+			// Clean up ai-gateway namespace resources
+			Expect(k8sClient.Delete(ctx, aiGateway)).To(Succeed())
+		})
 	})
 
 	Describe("ensureDeployment", func() {
@@ -146,7 +219,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -185,19 +258,78 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
 			// Create initial deployment
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Update agent image
 			agent.Spec.Image = "test-image:v2"
 
 			// Update deployment
-			err = reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err = reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-update-deployment", Namespace: "default"}, deployment)).To(Succeed())
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("test-image:v2"))
+		})
+
+		It("should add LiteLLM environment variables when AiGateway is connected", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-gateway-env-vars",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			// Create deployment without AiGateway
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-gateway-env-vars", Namespace: "default"}, deployment)).To(Succeed())
+
+			// Verify LiteLLM vars are NOT present initially
+			container := deployment.Spec.Template.Spec.Containers[0]
+			Expect(findEnvVar(container.Env, "LITELLM_PROXY_API_BASE")).To(BeNil())
+
+			// Now create an AiGateway and update deployment
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-gateway",
+					Namespace: "ai-gateway-ns",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+
+			err = reconciler.ensureDeployment(ctx, agent, make(map[string]string), aiGateway)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Get updated deployment
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-gateway-env-vars", Namespace: "default"}, deployment)).To(Succeed())
+			container = deployment.Spec.Template.Spec.Containers[0]
+
+			// Verify LiteLLM environment variables are now present
+			proxyBaseVar := findEnvVar(container.Env, "LITELLM_PROXY_API_BASE")
+			Expect(proxyBaseVar).NotTo(BeNil())
+			Expect(proxyBaseVar.Value).To(Equal("http://test-gateway.ai-gateway-ns.svc.cluster.local.:4000"))
+
+			proxyKeyVar := findEnvVar(container.Env, "LITELLM_PROXY_API_KEY")
+			Expect(proxyKeyVar).NotTo(BeNil())
+			Expect(proxyKeyVar.Value).To(Equal("NOT_USED_BY_GATEWAY"))
+
+			useLiteLLMVar := findEnvVar(container.Env, "USE_LITELLM_PROXY")
+			Expect(useLiteLLMVar).NotTo(BeNil())
+			Expect(useLiteLLMVar.Value).To(Equal("True"))
 		})
 
 		It("should set readiness probe for A2A agents", func() {
@@ -216,7 +348,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -248,7 +380,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string))
+			err := reconciler.ensureDeployment(ctx, agent, make(map[string]string), nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}

@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
+	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
 
 var _ = Describe("Agent Status", func() {
@@ -65,7 +66,7 @@ var _ = Describe("Agent Status", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.updateAgentStatusReady(ctx, agent)
+			err := reconciler.updateAgentStatusReady(ctx, agent, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			updatedAgent := &runtimev1alpha1.Agent{}
@@ -86,7 +87,7 @@ var _ = Describe("Agent Status", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.updateAgentStatusReady(ctx, agent)
+			err := reconciler.updateAgentStatusReady(ctx, agent, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			updatedAgent := &runtimev1alpha1.Agent{}
@@ -120,12 +121,66 @@ var _ = Describe("Agent Status", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.updateAgentStatusReady(ctx, agent)
+			err := reconciler.updateAgentStatusReady(ctx, agent, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-no-protocol", Namespace: "default"}, updatedAgent)).To(Succeed())
 			Expect(updatedAgent.Status.Url).To(Equal(""))
+		})
+
+		It("should set Status.AiGatewayRef when AiGateway is provided", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-with-gateway",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			aiGateway := &aigatewayv1alpha1.AiGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-gateway",
+					Namespace: "ai-gateway",
+				},
+				Spec: aigatewayv1alpha1.AiGatewaySpec{
+					Port: 4000,
+				},
+			}
+
+			err := reconciler.updateAgentStatusReady(ctx, agent, aiGateway)
+			Expect(err).NotTo(HaveOccurred())
+
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-with-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
+			Expect(updatedAgent.Status.AiGatewayRef).NotTo(BeNil())
+			Expect(updatedAgent.Status.AiGatewayRef.Name).To(Equal("test-gateway"))
+			Expect(updatedAgent.Status.AiGatewayRef.Namespace).To(Equal("ai-gateway"))
+		})
+
+		It("should set AiGatewayRef to nil when no AiGateway is provided", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-without-gateway",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			err := reconciler.updateAgentStatusReady(ctx, agent, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-without-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 	})
 
@@ -185,6 +240,27 @@ var _ = Describe("Agent Status", func() {
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-not-ready-url", Namespace: "default"}, updatedAgent)).To(Succeed())
 			Expect(updatedAgent.Status.Url).To(Equal(""))
+		})
+
+		It("should clear Status.AiGatewayRef when agent is not ready", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-not-ready-gateway",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			err := reconciler.updateAgentStatusNotReady(ctx, agent, "TestReason", "Test message")
+			Expect(err).NotTo(HaveOccurred())
+
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-not-ready-gateway", Namespace: "default"}, updatedAgent)).To(Succeed())
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 	})
 })

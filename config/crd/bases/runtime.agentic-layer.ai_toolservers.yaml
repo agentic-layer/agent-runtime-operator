@@ -263,6 +263,7 @@ spec:
                 type: array
               image:
                 description: Image is the container image for the tool server
+                minLength: 1
                 type: string
               path:
                 description: |-

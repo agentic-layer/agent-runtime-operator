@@ -46,11 +46,12 @@ import (
 // Parameters:
 //   - agent: The Agent resource to generate template variables for
 //   - resolvedSubAgents: Map of subAgent name to resolved URL (already validated)
+//   - aiGatewayUrl: URL of the resolved AiGateway (nil if not found)
 //
 // Returns:
 //   - []corev1.EnvVar: Slice of environment variables for template configuration
 //   - error: JSON marshaling error if SubAgents or Tools contain invalid data
-func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string) ([]corev1.EnvVar, error) {
+func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar, error) {
 	var templateEnvVars []corev1.EnvVar
 
 	// Always set AGENT_NAME (sanitized to meet environment variable requirements)
@@ -83,6 +84,22 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 			Name:  "AGENT_A2A_RPC_URL",
 			Value: a2aUrl,
+		})
+	}
+
+	// AI_GATEWAY_URL - set if AiGateway was resolved
+	if aiGatewayUrl != nil {
+		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+			Name:  "LITELLM_PROXY_API_BASE",
+			Value: *aiGatewayUrl,
+		})
+		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+			Name:  "LITELLM_PROXY_API_KEY",
+			Value: "NOT_USED_BY_GATEWAY", // API key required by ADK but unused when connecting to AI Gateway
+		})
+		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+			Name:  "USE_LITELLM_PROXY",
+			Value: "True",
 		})
 	}
 

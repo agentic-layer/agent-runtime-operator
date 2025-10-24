@@ -131,6 +131,13 @@ type AgentSpec struct {
 	// +kubebuilder:default=false
 	Exposed bool `json:"exposed,omitempty"`
 
+	// AiGatewayRef references an AiGateway resource that this agent should use for model routing.
+	// If not specified, the operator will attempt to find the default AiGateway in the cluster.
+	// If no default AiGateway exists, the agent will run without an AI Gateway.
+	// If Namespace is not specified, defaults to the same namespace as the Agent.
+	// +optional
+	AiGatewayRef *corev1.ObjectReference `json:"aiGatewayRef,omitempty"`
+
 	// Env defines additional environment variables to be injected into the agent container.
 	// These are take precedence over operator-managed environment variables.
 	// +optional
@@ -150,10 +157,17 @@ type AgentStatus struct {
 	// Format: http://{name}.{namespace}.svc.cluster.local:{port}/.well-known/agent-card.json
 	// +optional
 	Url string `json:"url,omitempty"`
+
+	// AiGatewayRef references the AiGateway resource that this agent is connected to.
+	// This field is automatically populated by the controller when an AI Gateway is being used.
+	// If nil, the agent is not connected to any AI Gateway.
+	// +optional
+	AiGatewayRef *corev1.ObjectReference `json:"aiGatewayRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="AI Gateway",type=string,JSONPath=".status.aiGatewayRef.name"
 
 // Agent is the Schema for the agents API.
 type Agent struct {
