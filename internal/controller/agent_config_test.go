@@ -43,7 +43,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{},
-			nil)
+				nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(envVars).To(HaveLen(6))
 
@@ -202,7 +202,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{},
-			nil)
+				nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
@@ -220,7 +220,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{},
-			nil)
+				nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
