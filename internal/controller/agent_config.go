@@ -51,8 +51,11 @@ import (
 // Returns:
 //   - []corev1.EnvVar: Slice of environment variables for template configuration
 //   - error: JSON marshaling error if SubAgents or Tools contain invalid data
-func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar, error) {
+func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent,
+	resolvedSubAgents map[string]string, resolvedTools map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar,
+	error) {
 	var templateEnvVars []corev1.EnvVar
+	var err error
 
 	// Always set AGENT_NAME (sanitized to meet environment variable requirements)
 	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
@@ -105,7 +108,6 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 
 	// SUB_AGENTS - always set, with empty object if no subagents
 	var subAgentsJSON []byte
-	var err error
 	if len(resolvedSubAgents) > 0 {
 		subAgentsMap := make(map[string]map[string]string)
 		for name, url := range resolvedSubAgents {
@@ -128,11 +130,11 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 
 	// AGENT_TOOLS - always set, with empty object if no tools
 	var toolsJSON []byte
-	if len(agent.Spec.Tools) > 0 {
+	if len(resolvedTools) > 0 {
 		toolsMap := make(map[string]map[string]string)
-		for _, tool := range agent.Spec.Tools {
-			toolsMap[tool.Name] = map[string]string{
-				"url": tool.Url,
+		for name, url := range resolvedTools {
+			toolsMap[name] = map[string]string{
+				"url": url,
 			}
 		}
 		toolsJSON, err = json.Marshal(toolsMap)

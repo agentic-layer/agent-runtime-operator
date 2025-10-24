@@ -434,7 +434,7 @@ var _ = Describe("Agent Webhook", func() {
 					{Name: "summarizer", Url: "https://example.com/summarizer.json"},
 				}
 				obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-					{Name: "news_fetcher", Url: "https://news.mcpservers.org/mcp"},
+					{Name: "news_fetcher", ToolServerRef: corev1.ObjectReference{Name: "news-fetcher-tool"}},
 				}
 
 				By("calling the Default method")
@@ -450,7 +450,7 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.SubAgents[0].Url).To(Equal("https://example.com/summarizer.json"))
 				Expect(obj.Spec.Tools).To(HaveLen(1))
 				Expect(obj.Spec.Tools[0].Name).To(Equal("news_fetcher"))
-				Expect(obj.Spec.Tools[0].Url).To(Equal("https://news.mcpservers.org/mcp"))
+				Expect(obj.Spec.Tools[0].ToolServerRef.Name).To(Equal("news-fetcher-tool"))
 
 				By("verifying that template image is still set")
 				Expect(obj.Spec.Image).To(Equal(DefaultTemplateImageAdk))
@@ -592,76 +592,6 @@ var _ = Describe("Agent Webhook", func() {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("spec.subAgents[1].url"))
 					Expect(err.Error()).To(ContainSubstring("SubAgent[1].Url"))
-					Expect(warnings).To(BeEmpty())
-				})
-			})
-
-			Describe("Tool URL validation", func() {
-				It("should accept valid HTTP and HTTPS URLs", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "external-search", Url: "https://api.example.com/search"},
-						{Name: "internal-calc", Url: "http://calculator-service:8080/api"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should accept empty URLs", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "test", Url: ""}, // Empty URL should be allowed
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should provide clear error messages with field paths", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "valid", Url: "https://example.com/valid"},
-						{Name: "invalid", Url: "ftp://example.com/invalid"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("spec.tools[1].url"))
-					Expect(err.Error()).To(ContainSubstring("Tool[1].Url"))
-					Expect(warnings).To(BeEmpty())
-				})
-			})
-
-			Describe("Combined validation", func() {
-				It("should handle multiple URL validation errors", func() {
-					obj.Spec.SubAgents = []runtimev1alpha1.SubAgent{
-						{Name: "sub1", Url: "ftp://invalid-sub.com"},
-					}
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "tool1", Url: "file://invalid-tool.local"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("SubAgent[0].Url"))
-					Expect(err.Error()).To(ContainSubstring("Tool[0].Url"))
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should work with valid URLs and valid framework combination", func() {
-					obj.Spec.Framework = googleAdkFramework
-					obj.Spec.Image = "" // Should trigger template image assignment
-					obj.Spec.SubAgents = []runtimev1alpha1.SubAgent{
-						{Name: "external", Url: "https://example.com/sub"},
-						{Name: "internal", Url: "http://sub-agent:8080/config"},
-					}
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "external-tool", Url: "https://example.com/tool"},
-						{Name: "internal-tool", Url: "http://tool-service:9090/api"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).NotTo(HaveOccurred())
 					Expect(warnings).To(BeEmpty())
 				})
 			})
