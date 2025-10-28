@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -76,20 +77,20 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Reconciling Agent")
+	log.V(1).Info("Reconciling Agent")
 
 	// Resolve subAgents early - fail fast if any cannot be resolved
 	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, &agent)
 	if err != nil {
 		log.Error(err, "Failed to resolve subAgents")
-		return ctrl.Result{}, fmt.Errorf("failed to resolve subAgents: %w", err)
+		return ctrl.Result{}, err
 	}
 
 	// Resolve Tools from ToolServer references early - fail fast if any cannot be resolved
 	resolvedTools, err := r.resolveAllTools(ctx, &agent)
 	if err != nil {
 		log.Error(err, "Failed to resolve tools")
-		return ctrl.Result{}, fmt.Errorf("failed to resolve tools: %w", err)
+		return ctrl.Result{}, err
 	}
 
 	// Resolve AiGateway (optional - returns nil if not found)
@@ -102,28 +103,26 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 		return ctrl.Result{}, err
 	}
-	if aiGateway != nil {
-		aiGatewayUrl := r.buildAiGatewayServiceUrl(*aiGateway)
-		log.Info("Resolved AiGateway", "url", aiGatewayUrl)
-	}
 
-	// Ensure Deployment exists and is up to date
-	if err := r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway); err != nil {
-		log.Error(err, "Failed to ensure Deployment")
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway)
+	}); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Ensure Service exists and is up to date (or deleted if no protocols)
-	if err := r.ensureService(ctx, &agent); err != nil {
-		log.Error(err, "Failed to ensure Service")
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.ensureService(ctx, &agent)
+	}); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Update agent status to Ready
-	if err := r.updateAgentStatusReady(ctx, &agent, aiGateway); err != nil {
-		log.Error(err, "Failed to update agent status")
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.updateAgentStatusReady(ctx, &agent, aiGateway)
+	}); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	log.V(1).Info("Reconciled Agent")
 
 	return ctrl.Result{}, nil
 }
@@ -132,6 +131,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent,
 	resolvedSubAgents map[string]string, resolvedTools map[string]string, aiGateway *aigatewayv1alpha1.AiGateway) error {
 	log := logf.FromContext(ctx)
+
+	log.V(1).Info("Ensuring Deployment for Agent")
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -231,7 +232,9 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 	}); err != nil {
 		return err
 	} else if op != controllerutil.OperationResultNone {
-		log.Info("Deployment reconciled", "operation", op)
+		log.Info("Deployment reconciled", "operation", op, "obj", *deployment)
+	} else {
+		log.V(1).Info("Deployment up to date")
 	}
 
 	return nil
@@ -240,6 +243,8 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 // ensureService ensures the Service for the Agent exists and is up to date, or is deleted if no protocols are defined
 func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alpha1.Agent) error {
 	log := logf.FromContext(ctx)
+
+	log.V(1).Info("Ensuring Service for Agent")
 
 	if len(agent.Spec.Protocols) == 0 {
 		// No protocols defined, ensure service is deleted if it exists
@@ -301,7 +306,9 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 	}); err != nil {
 		return err
 	} else if op != controllerutil.OperationResultNone {
-		log.Info("Service reconciled", "operation", op)
+		log.Info("Service reconciled", "operation", op, "obj", *service)
+	} else {
+		log.V(1).Info("Service up to date")
 	}
 
 	return nil
