@@ -124,8 +124,7 @@ type AgentSpec struct {
 	// Protocols defines the protocols supported by the agent
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=name
+	// +listType=atomic
 	Protocols []AgentProtocol `json:"protocols,omitempty"`
 
 	// Exposed indicates whether this agent should be exposed via the AgentGateway
