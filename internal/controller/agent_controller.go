@@ -22,7 +22,6 @@ import (
 	"maps"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -54,9 +53,9 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents/finalizers,verbs=update
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/status,verbs=get
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=aigateways,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=agentic-layer.ai,resources=aigateways,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -129,7 +128,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
 func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent,
-	resolvedSubAgents map[string]string, resolvedTools map[string]string, aiGateway *aigatewayv1alpha1.AiGateway) error {
+	resolvedSubAgents map[string]string, resolvedTools map[string]string, aiGateway *runtimev1alpha1.AiGateway) error {
 	log := logf.FromContext(ctx)
 
 	log.V(1).Info("Ensuring Deployment for Agent")
@@ -335,7 +334,7 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if isAiGatewayCRDInstalled(mgr) {
 		log.Info("AiGateway CRD detected, enabling watch")
 		builder = builder.Watches(
-			&aigatewayv1alpha1.AiGateway{},
+			&runtimev1alpha1.AiGateway{},
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingAiGateway),
 		)
 	} else {
@@ -347,7 +346,7 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // isAiGatewayCRDInstalled checks if the AiGateway CRD is installed in the cluster
 func isAiGatewayCRDInstalled(mgr ctrl.Manager) bool {
-	gvk := aigatewayv1alpha1.GroupVersion.WithKind("AiGateway")
+	gvk := runtimev1alpha1.GroupVersion.WithKind("AiGateway")
 	_, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
 	return err == nil
 }

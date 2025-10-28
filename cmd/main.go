@@ -40,7 +40,6 @@ import (
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	"github.com/agentic-layer/agent-runtime-operator/internal/controller"
 	webhookv1alpha1 "github.com/agentic-layer/agent-runtime-operator/internal/webhook/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,7 +52,6 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(runtimev1alpha1.AddToScheme(scheme))
-	utilruntime.Must(aigatewayv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -158,7 +156,6 @@ func main() {
 	// generate self-signed certificates for the metrics server. While convenient for development and testing,
 	// this setup is not recommended for production.
 	//
-	// TODO(user): If you enable certManager, uncomment the following lines:
 	// - [METRICS-WITH-CERTS] at config/default/kustomization.yaml to generate and use certificates
 	// managed by cert-manager for the metrics server.
 	// - [PROMETHEUS-WITH-CERTS] at config/prometheus/kustomization.yaml for TLS certification.

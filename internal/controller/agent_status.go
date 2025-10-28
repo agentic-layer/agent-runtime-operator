@@ -26,14 +26,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
 
 // updateAgentStatusReady sets the agent status to Ready and updates the A2A URL and AiGatewayRef
-func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *runtimev1alpha1.Agent, aiGateway *aigatewayv1alpha1.AiGateway) error {
+func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *runtimev1alpha1.Agent, aiGateway *runtimev1alpha1.AiGateway) error {
 	log := logf.FromContext(ctx)
 	log.V(1).Info("Updating agent status to Ready")
-
 	// Compute the A2A URL if the agent has an A2A protocol
 	agent.Status.Url = r.buildA2AAgentCardUrl(agent)
 

@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
 
 var _ = Describe("Agent Controller", func() {
@@ -163,13 +162,18 @@ var _ = Describe("Agent Controller", func() {
 				Fail("Failed to create ai-gateway namespace: " + err.Error())
 			}
 
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-reconcile-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
+				Spec: runtimev1alpha1.AiGatewaySpec{
+					AiModels: []runtimev1alpha1.AiModel{
+						{
+							Name:     "gpt-4",
+							Provider: "openai",
+						},
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
@@ -327,12 +331,12 @@ var _ = Describe("Agent Controller", func() {
 			Expect(findEnvVar(container.Env, "LITELLM_PROXY_API_BASE")).To(BeNil())
 
 			// Now create an AiGateway and update deployment
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "ai-gateway-ns",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
+				Spec: runtimev1alpha1.AiGatewaySpec{
 					Port: 4000,
 				},
 			}

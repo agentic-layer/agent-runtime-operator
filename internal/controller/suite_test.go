@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -63,16 +62,13 @@ var _ = BeforeSuite(func() {
 	err = runtimev1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = aigatewayv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
-			filepath.Join("..", "..", "config", "crd", "test")},
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 

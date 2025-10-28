@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
 
 var _ = Describe("Agent Status", func() {
@@ -142,12 +141,12 @@ var _ = Describe("Agent Status", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
+				Spec: runtimev1alpha1.AiGatewaySpec{
 					Port: 4000,
 				},
 			}
