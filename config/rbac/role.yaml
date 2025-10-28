@@ -17,14 +17,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - agentic-layer.ai
-  resources:
-  - aigateways
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - apps
   resources:
   - deployments
@@ -68,3 +60,11 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - runtime.agentic-layer.ai
+  resources:
+  - aigateways
+  verbs:
+  - get
+  - list
+  - watch

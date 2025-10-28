@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +43,7 @@ const (
 //   - AiGateway object if an AiGateway is found
 //   - nil if no AiGateway is found (not an error condition)
 //   - error only for unexpected failures (e.g., API errors)
-func (r *AgentReconciler) resolveAiGateway(ctx context.Context, agent *runtimev1alpha1.Agent) (*aigatewayv1alpha1.AiGateway, error) {
+func (r *AgentReconciler) resolveAiGateway(ctx context.Context, agent *runtimev1alpha1.Agent) (*runtimev1alpha1.AiGateway, error) {
 	// Case 1: Explicit AiGatewayRef is specified
 	if agent.Spec.AiGatewayRef != nil {
 		return r.resolveExplicitAiGateway(ctx, agent.Spec.AiGatewayRef, agent.Namespace)
@@ -55,14 +54,14 @@ func (r *AgentReconciler) resolveAiGateway(ctx context.Context, agent *runtimev1
 }
 
 // resolveExplicitAiGateway resolves a specific AiGateway referenced by the agent
-func (r *AgentReconciler) resolveExplicitAiGateway(ctx context.Context, ref *corev1.ObjectReference, agentNamespace string) (*aigatewayv1alpha1.AiGateway, error) {
+func (r *AgentReconciler) resolveExplicitAiGateway(ctx context.Context, ref *corev1.ObjectReference, agentNamespace string) (*runtimev1alpha1.AiGateway, error) {
 	// Use namespace from ObjectReference, or default to agent's namespace
 	namespace := ref.Namespace
 	if namespace == "" {
 		namespace = agentNamespace
 	}
 
-	var aiGateway aigatewayv1alpha1.AiGateway
+	var aiGateway runtimev1alpha1.AiGateway
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      ref.Name,
 		Namespace: namespace,
@@ -80,10 +79,10 @@ func (r *AgentReconciler) resolveExplicitAiGateway(ctx context.Context, ref *cor
 }
 
 // resolveDefaultAiGateway searches for any AiGateway in the default ai-gateway namespace
-func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*aigatewayv1alpha1.AiGateway, error) {
+func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*runtimev1alpha1.AiGateway, error) {
 	log := logf.FromContext(ctx)
 
-	var aiGatewayList aigatewayv1alpha1.AiGatewayList
+	var aiGatewayList runtimev1alpha1.AiGatewayList
 	err := r.List(ctx, &aiGatewayList, client.InNamespace(defaultAiGatewayNamespace))
 	if err != nil {
 		// If the AiGateway CRD is not installed, treat it as "no gateway found"
@@ -110,7 +109,7 @@ func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*aigatew
 	return &aiGateway, nil
 }
 
-func (r *AgentReconciler) buildAiGatewayServiceUrl(aiGateway aigatewayv1alpha1.AiGateway) string {
+func (r *AgentReconciler) buildAiGatewayServiceUrl(aiGateway runtimev1alpha1.AiGateway) string {
 	return fmt.Sprintf("http://%s.%s.svc.cluster.local.:%d", aiGateway.Name, aiGateway.Namespace, aiGateway.Spec.Port)
 }
 
@@ -119,7 +118,7 @@ func (r *AgentReconciler) buildAiGatewayServiceUrl(aiGateway aigatewayv1alpha1.A
 //  1. Agents with explicit AiGatewayRef matching this gateway
 //  2. Agents without explicit AiGatewayRef that would resolve to this gateway as the default
 func (r *AgentReconciler) findAgentsReferencingAiGateway(ctx context.Context, obj client.Object) []ctrl.Request {
-	updatedGateway, ok := obj.(*aigatewayv1alpha1.AiGateway)
+	updatedGateway, ok := obj.(*runtimev1alpha1.AiGateway)
 	if !ok {
 		return nil
 	}

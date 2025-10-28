@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: aigateways.agentic-layer.ai
+  name: aigatewayclasses.runtime.agentic-layer.ai
 spec:
-  group: agentic-layer.ai
+  group: runtime.agentic-layer.ai
   names:
-    kind: AiGateway
-    listKind: AiGatewayList
-    plural: aigateways
-    singular: aigateway
+    kind: AiGatewayClass
+    listKind: AiGatewayClassList
+    plural: aigatewayclasses
+    singular: aigatewayclass
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AiGateway is the Schema for the AI gateways API.
+        description: AiGatewayClass is the Schema for the aigatewayclasses API.
         properties:
           apiVersion:
             description: |-
@@ -37,40 +37,17 @@ spec:
           metadata:
             type: object
           spec:
-            description: AiGatewaySpec defines the desired state of AiGateway.
+            description: AiGatewayClassSpec defines the desired state of AiGatewayClass.
             properties:
-              aiGatewayClassName:
-                description: |-
-                  AiGatewayClassName specifies which AiGatewayClass to use for this AI gateway instance.
-                  This is only needed if multiple AI gateway classes are defined in the cluster.
+              controller:
+                description: Controller is the name of the controller that should
+                  handle this gateway class
                 type: string
-              aiModels:
-                description: List of AI models to be made available through the gateway.
-                items:
-                  properties:
-                    name:
-                      description: Name is the identifier for the AI model (e.g.,
-                        "gpt-4", "claude-3-opus")
-                      type: string
-                    provider:
-                      description: Provider specifies the AI provider (e.g., "openai",
-                        "anthropic", "azure")
-                      type: string
-                  required:
-                  - name
-                  - provider
-                  type: object
-                type: array
-              port:
-                default: 4000
-                description: Port on which the AI gateway will be exposed.
-                format: int32
-                maximum: 65535
-                minimum: 1
-                type: integer
+            required:
+            - controller
             type: object
           status:
-            description: AiGatewayStatus defines the observed state of AiGateway.
+            description: AiGatewayClassStatus defines the observed state of AiGatewayClass.
             properties:
               conditions:
                 items:
@@ -128,11 +105,6 @@ spec:
                   - type
                   type: object
                 type: array
-              url:
-                description: |-
-                  Url is the cluster-local URL where this AI Gateway can be accessed.
-                  Format: http://{name}.{namespace}.svc.cluster.local:{port}
-                type: string
             type: object
         type: object
     served: true

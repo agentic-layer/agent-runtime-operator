@@ -26,8 +26,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
-	aigatewayv1alpha1 "github.com/agentic-layer/ai-gateway-operator/api/v1alpha1"
 )
+
+var aiGatewaySpec = runtimev1alpha1.AiGatewaySpec{
+	AiModels: []runtimev1alpha1.AiModel{
+		{
+			Name:     "gpt-4",
+			Provider: "openai",
+		},
+	},
+}
 
 var _ = Describe("Agent AiGateway Resolution", func() {
 	ctx := context.Background()
@@ -65,7 +73,7 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 		}
 
 		// Clean up all AiGateways in ai-gateway namespace (don't delete namespace)
-		aiGatewayList := &aigatewayv1alpha1.AiGatewayList{}
+		aiGatewayList := &runtimev1alpha1.AiGatewayList{}
 		_ = k8sClient.List(ctx, aiGatewayList, &client.ListOptions{Namespace: "ai-gateway"})
 		for i := range aiGatewayList.Items {
 			_ = k8sClient.Delete(ctx, &aiGatewayList.Items[i])
@@ -79,7 +87,7 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 		}
 
 		// Clean up AiGateways in other-namespace
-		otherNsAiGatewayList := &aigatewayv1alpha1.AiGatewayList{}
+		otherNsAiGatewayList := &runtimev1alpha1.AiGatewayList{}
 		_ = k8sClient.List(ctx, otherNsAiGatewayList, &client.ListOptions{Namespace: "other-namespace"})
 		for i := range otherNsAiGatewayList.Items {
 			_ = k8sClient.Delete(ctx, &otherNsAiGatewayList.Items[i])
@@ -92,12 +100,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists(testAiGatewayNamespace)
 
 			// Create AiGateway in ai-gateway namespace
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-ai-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -126,12 +134,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 
 		It("should default to agent's namespace when AiGatewayRef namespace is not specified", func() {
 			// Create AiGateway in default namespace
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default-ai-gateway",
 					Namespace: "default",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -163,12 +171,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create default AiGateway
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -239,21 +247,21 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create multiple AiGateways
-			gateway1 := &aigatewayv1alpha1.AiGateway{
+			gateway1 := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "gateway-1",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, gateway1)).To(Succeed())
 
-			gateway2 := &aigatewayv1alpha1.AiGateway{
+			gateway2 := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "gateway-2",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, gateway2)).To(Succeed())
 
@@ -284,12 +292,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create AiGateway
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -323,14 +331,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create AiGateway
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "referenced-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -359,14 +365,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 
 		It("should match with namespace defaulting in AiGatewayRef", func() {
 			// Create AiGateway in default namespace
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "gateway-with-defaulting",
 					Namespace: "default",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -397,14 +401,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create AiGateway in default ai-gateway namespace
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -432,14 +434,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("other-namespace")
 
 			// Create AiGateway in non-default namespace
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "other-gateway",
 					Namespace: "other-namespace",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -466,14 +466,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create shared AiGateway
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "shared-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
@@ -525,26 +523,22 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create first AiGateway
-			aiGateway1 := &aigatewayv1alpha1.AiGateway{
+			aiGateway1 := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "gateway1",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway1)).To(Succeed())
 
 			// Create second AiGateway (this is the one we'll watch)
-			aiGateway2 := &aigatewayv1alpha1.AiGateway{
+			aiGateway2 := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "gateway2",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4001,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway2)).To(Succeed())
 
@@ -575,14 +569,12 @@ var _ = Describe("Agent AiGateway Resolution", func() {
 			createNamespaceIfNotExists("ai-gateway")
 
 			// Create AiGateway
-			aiGateway := &aigatewayv1alpha1.AiGateway{
+			aiGateway := &runtimev1alpha1.AiGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "lonely-gateway",
 					Namespace: "ai-gateway",
 				},
-				Spec: aigatewayv1alpha1.AiGatewaySpec{
-					Port: 4000,
-				},
+				Spec: aiGatewaySpec,
 			}
 			Expect(k8sClient.Create(ctx, aiGateway)).To(Succeed())
 
