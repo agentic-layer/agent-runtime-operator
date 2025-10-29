@@ -88,6 +88,31 @@ kubectl get crd agents.runtime.agentic-layer.ai
 
 You should see the operator pod running and the Agent CRD available.
 
+== Advanced Configuration (Optional)
+
+=== Enable hostPath Volumes
+
+By default, the Agent Runtime Operator blocks hostPath volumes for security reasons. If your use case requires hostPath volumes (e.g., accessing host-specific data or devices), you can enable them by configuring the operator deployment.
+
+WARNING: *Security Risk* - hostPath volumes provide direct access to the host filesystem. Only enable this in trusted environments where users are authorized to access host resources. Enabling this flag allows agents to potentially read sensitive host data or modify host system files.
+
+To enable hostPath volumes, add the `--allow-host-path=true` flag to the operator deployment:
+
+[source,bash]
+----
+# Update the operator deployment to allow hostPath volumes
+kubectl set env deployment/agent-runtime-operator-controller-manager \
+  -n agent-runtime-operator-system \
+  --containers=manager \
+  ARGS="--allow-host-path=true"
+
+# Restart the operator to apply changes
+kubectl rollout restart deployment/agent-runtime-operator-controller-manager \
+  -n agent-runtime-operator-system
+----
+
+Alternatively, you can modify the deployment manifest before initial installation by adding the flag to the manager container args.
+
 == Next Steps
 
 Now that you have the Agent Runtime Operator installed, you can:

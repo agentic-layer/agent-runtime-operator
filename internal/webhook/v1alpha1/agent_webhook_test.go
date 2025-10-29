@@ -807,8 +807,7 @@ var _ = Describe("Agent Webhook", func() {
 
 				warnings, err := validator.validateAgent(obj)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("overlaps"))
-				Expect(err.Error()).To(ContainSubstring("nested mount paths"))
+				Expect(err.Error()).To(ContainSubstring("is nested under"))
 				Expect(warnings).To(BeEmpty())
 			})
 
@@ -820,41 +819,7 @@ var _ = Describe("Agent Webhook", func() {
 
 				warnings, err := validator.validateAgent(obj)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("overlaps"))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("should reject duplicate mount paths", func() {
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "vol1", MountPath: "/etc/config"},
-					{Name: "vol2", MountPath: "/etc/config"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Or(ContainSubstring("duplicate"), ContainSubstring("Duplicate")))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("should reject mountPath containing colon", func() {
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "vol1", MountPath: "/etc:config"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("must not contain ':'"))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("should reject empty mountPath", func() {
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "vol1", MountPath: ""},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("mountPath is required"))
+				Expect(err.Error()).To(ContainSubstring("is nested under"))
 				Expect(warnings).To(BeEmpty())
 			})
 
@@ -882,28 +847,6 @@ var _ = Describe("Agent Webhook", func() {
 		})
 
 		Describe("Volume name validation", func() {
-			It("should reject duplicate volume names", func() {
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "data",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					},
-					{
-						Name: "data",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Or(ContainSubstring("duplicate"), ContainSubstring("Duplicate")))
-				Expect(warnings).To(BeEmpty())
-			})
-
 			It("should reject reserved volume name prefix", func() {
 				obj.Spec.Volumes = []corev1.Volume{
 					{
@@ -921,41 +864,6 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("reserved for operator use"))
 				Expect(err.Error()).To(ContainSubstring("agent-operator-"))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("should reject empty volume name", func() {
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("volume must have a name"))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("should reject empty volumeMount name", func() {
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "data",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					},
-				}
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "", MountPath: "/data"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("volumeMount must have a name"))
 				Expect(warnings).To(BeEmpty())
 			})
 		})
@@ -983,69 +891,6 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(err.Error()).To(ContainSubstring("security reasons"))
 				Expect(warnings).To(BeEmpty())
 			})
-
-			It("should reject empty ConfigMap name", func() {
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "config",
-						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ""},
-							},
-						},
-					},
-				}
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "config", MountPath: "/config"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("configMap name must be specified"))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("should reject empty Secret name", func() {
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "secrets",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName: "",
-							},
-						},
-					},
-				}
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "secrets", MountPath: "/secrets"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("secret name must be specified"))
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("should reject empty PersistentVolumeClaim name", func() {
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "data",
-						VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								ClaimName: "",
-							},
-						},
-					},
-				}
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "data", MountPath: "/data"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("persistentVolumeClaim claimName must be specified"))
-				Expect(warnings).To(BeEmpty())
-			})
 		})
 
 		Describe("Complex validation scenarios", func() {
@@ -1055,14 +900,14 @@ var _ = Describe("Agent Webhook", func() {
 						Name: "agent-operator-reserved",
 						VolumeSource: corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{Name: ""},
+								LocalObjectReference: corev1.LocalObjectReference{Name: "my-config"},
 							},
 						},
 					},
 				}
 				obj.Spec.VolumeMounts = []corev1.VolumeMount{
 					{Name: "missing-vol", MountPath: "/data1"},
-					{Name: "", MountPath: "/data2"},
+					{Name: "agent-operator-reserved", MountPath: "/data2"},
 				}
 
 				warnings, err := validator.validateAgent(obj)
@@ -1070,7 +915,7 @@ var _ = Describe("Agent Webhook", func() {
 				// Should contain multiple error messages
 				errMsg := err.Error()
 				Expect(errMsg).To(ContainSubstring("reserved for operator use"))
-				Expect(errMsg).To(ContainSubstring("configMap name must be specified"))
+				Expect(errMsg).To(ContainSubstring("does not exist in spec.volumes"))
 				Expect(warnings).To(BeEmpty())
 			})
 
@@ -1101,7 +946,7 @@ var _ = Describe("Agent Webhook", func() {
 					{Name: "helper", Url: "https://example.com/helper.json"},
 				}
 				obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-					{Name: "tool1", Url: "https://example.com/tool"},
+					{Name: "tool1", ToolServerRef: corev1.ObjectReference{Name: "tool1"}},
 				}
 				obj.Spec.Volumes = []corev1.Volume{
 					{

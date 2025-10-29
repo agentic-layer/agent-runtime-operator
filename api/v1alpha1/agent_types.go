@@ -152,6 +152,7 @@ type AgentSpec struct {
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 
 	// Volumes defines volumes to be added to the agent pod.
+	// Volume names starting with "agent-operator-" are reserved for operator use and will be rejected.
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 }

@@ -218,7 +218,7 @@ See https://kubernetes.io/docs/concepts/storage/volumes/[Kubernetes volume docum
 
 IMPORTANT: For security reasons, certain volume types have restrictions:
 
-* *HostPath volumes are disabled by default* - Contact your cluster administrator if you need this feature
+* *HostPath volumes are disabled by default* - The Agent Runtime Operator must be configured with `--allow-host-path=true` to enable this feature. Contact your operator administrator if you need hostPath volumes.
 * *Reserved volume names* - Names starting with `agent-operator-` are reserved for operator use
 * *Mount path validation* - Paths cannot overlap or contain `:`
 
