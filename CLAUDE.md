@@ -8,6 +8,7 @@ Project Overview and Developer Documentation
 User Guides and How-To Guides
 - @docs/modules/agent-runtime/partials/how-to-guide.adoc
 - @docs/modules/agents/partials/how-to-guide.adoc
+- @docs/modules/tool-servers/partials/how-to-guide.adoc
 - @docs/modules/agent-gateways/partials/how-to-guide.adoc
 
 Reference Documentation
