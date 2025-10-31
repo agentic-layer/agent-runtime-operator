@@ -16,6 +16,11 @@ spec:
       value: "8080"
     - name: LOG_LEVEL
       value: "info"
-  envFrom:
-    - configMapRef:
+  volumeMounts:
+    - name: config-volume
+      mountPath: /etc/agent-config
+      readOnly: true
+  volumes:
+    - name: config-volume
+      configMap:
         name: agent-config-map
