@@ -4,30 +4,7 @@ This guide walks you through creating and deploying tool servers using the Agent
 
 IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Install the Agent Runtime Operator] for installation instructions.
 
-== What is a Tool Server?
-
-Tool servers are specialized services that provide tools to agents through the Model Context Protocol (MCP). They enable agents to:
-
-* Access external APIs and services
-* Query databases
-* Fetch web content
-* Process files
-* Perform specialized computations
-
-The Agent Runtime Operator supports deploying tool servers in different modes depending on your use case.
-
-NOTE: The ToolServer CRD is designed to support multiple protocols, but currently only the Model Context Protocol (MCP) is implemented. Additional protocols may be supported in future releases.
-
-Tool servers communicate with agents using transport protocols. The recommended transport is **HTTP**, which provides:
-
-* Standalone deployment with dedicated pods and services
-* HTTP-based communication supporting both request/response and streaming
-* Load balancing and horizontal scaling
-* Cluster-wide accessibility
-
-NOTE: SSE transport is also available. HTTP transport is recommended for new MCP servers.
-
-== Quick Start: HTTP Tool Server
+== Quick Start: Your First Tool Server
 
 Get your first tool server running in under 5 minutes.
 
@@ -35,12 +12,12 @@ Get your first tool server running in under 5 minutes.
 
 [source,bash]
 ----
-# Create a simple HTTP-based tool server using Context7 MCP server
+# Create a tool server using the Context7 MCP server (provides up-to-date code docs)
 cat <<EOF | kubectl apply -f -
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: ToolServer
 metadata:
-  name: my-first-toolserver
+  name: context7-toolserver
 spec:
   protocol: mcp
   transportType: http
@@ -58,16 +35,13 @@ EOF
 [source,bash]
 ----
 # Check the tool server resource
-kubectl get toolserver my-first-toolserver
+kubectl get toolserver context7-toolserver
 
-# Check the deployment (for http/sse transports)
-kubectl get deployment my-first-toolserver
+# Check the deployment
+kubectl get deployment context7-toolserver
 
-# Check the service (for http/sse transports)
-kubectl get service my-first-toolserver
-
-# Get the service URL
-kubectl get toolserver my-first-toolserver -o jsonpath='{.status.url}'
+# Check the service
+kubectl get service context7-toolserver
 ----
 
 === Check the logs
@@ -75,217 +49,42 @@ kubectl get toolserver my-first-toolserver -o jsonpath='{.status.url}'
 [source,bash]
 ----
 # View tool server logs
-kubectl logs -l app=my-first-toolserver
+kubectl logs -l app=context7-toolserver
 ----
 
 🎉 *Congratulations!* You've successfully deployed your first tool server.
 
-== Step-by-Step: HTTP Tool Server
+== Using Tool Servers with Agents
 
-HTTP transport tool servers run as standalone deployments and are accessible via Kubernetes services.
+To connect a tool server to your agent, reference it using `toolServerRef`:
 
-=== When to use HTTP transport
-
-* You have multiple agents that need to share the same tools
-* You want to scale tool servers independently
-* Your tools don't require file system access
-* You prefer network-based communication
-
-=== Basic HTTP Tool Server
-
-[source,yaml]
-----
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: ToolServer
-metadata:
-  name: context7-http
-spec:
-  protocol: mcp
-  transportType: http
-  image: mcp/context7:latest
-  port: 8080
-  path: /mcp
-  replicas: 2
-  env:
-    - name: LOG_LEVEL
-      value: info
-----
-
-=== Configuration Options
-
-* *port*: Port number where the tool server listens (defaults to 8080)
-* *path*: URL path for the MCP endpoint (defaults to `/mcp`)
-* *replicas*: Number of replicas for load balancing and high availability (defaults to 1)
-* *env*: Environment variables for configuration
-* *envFrom*: Load environment variables from ConfigMaps or Secrets
-
-=== Using the HTTP Tool Server
-
-Once deployed, you can reference the tool server in your Agent's `tools` configuration:
+NOTE: Replace `your-gemini-api-key-here` with your actual Gemini API key before deploying.
 
 [source,yaml]
 ----
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent
 metadata:
-  name: my-agent
+  name: coding-assistant
 spec:
   framework: google-adk
-  description: "Agent with tool server access"
-  instruction: "You can use external tools to help users."
+  description: "A coding assistant with access to up-to-date documentation"
+  instruction: "You are a helpful coding assistant. Use the context7 tool to fetch up-to-date documentation for libraries and frameworks to help answer coding questions accurately."
   model: "gemini/gemini-2.5-flash"
   tools:
     - name: context7_tools
       toolServerRef:
-        name: context7-http
+        name: context7-toolserver
   protocols:
     - type: A2A
+  replicas: 1
+  env:
+    - name: GEMINI_API_KEY
+      value: "your-gemini-api-key-here"
 ----
 
 The operator automatically wires the agent to the tool server using the ToolServer's name.
 
-== Finding Tool Server Images
-
-Tool server images can be found in various locations:
-
-* *Docker Hub MCP Catalog*: https://hub.docker.com/u/mcp
-* *Custom images*: Build your own MCP-compliant tool servers
-* *Community repositories*: Check GitHub for MCP server implementations
-
-== Understanding ToolServer Status
-
-After deploying a ToolServer, the operator populates status information that helps you verify deployment success and troubleshoot issues.
-
-=== Status Fields
-
-The ToolServer status contains the following fields:
-
-==== .status.url
-
-This field contains the cluster-local URL where the tool server can be accessed.
-
-[source,bash]
-----
-kubectl get toolserver my-toolserver -o jsonpath='{.status.url}'
-# Example output: http://my-toolserver.default.svc.cluster.local:8080/mcp
-----
-
-The operator uses this URL internally when wiring agents to tool servers via `toolServerRef`.
-
-==== .status.conditions
-
-ToolServer resources use standard Kubernetes conditions to report their operational state. The primary condition is `Ready`.
-
-**Ready Condition Values:**
-
-* *Status: True* - ToolServer is successfully deployed and operational
-  - *Reason: Reconciled* - All resources created successfully
-
-* *Status: False* - ToolServer deployment failed or has issues
-  - *Reason: DeploymentFailed* - Failed to create or update the Deployment
-  - *Reason: ServiceFailed* - Failed to create or update the Service
-
-**Checking Conditions:**
-
-[source,bash]
-----
-# Check if a ToolServer is ready
-kubectl get toolserver my-toolserver -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-# Output: True or False
-
-# Get the reason for the current state
-kubectl get toolserver my-toolserver -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}'
-# Output: Reconciled, DeploymentFailed, or ServiceFailed
-
-# Get the full condition message
-kubectl get toolserver my-toolserver -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}'
-----
-
-**View all conditions:**
-
-[source,bash]
-----
-kubectl get toolserver my-toolserver -o yaml | grep -A 10 "^status:"
-----
-
-IMPORTANT: The `Ready` condition turns True *optimistically* after resources are created, but doesn't wait for pods to be running. Always verify pod status separately: `kubectl get pods -l app=<toolserver-name>`
-
-== Troubleshooting
-
-=== Tool Server Not Ready
-
-When a ToolServer is not ready, use the following diagnostic steps:
-
-**Step 1: Check the Ready condition**
-
-[source,bash]
-----
-# Check if the ToolServer is ready
-kubectl get toolserver <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-
-# Get the failure reason
-kubectl get toolserver <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}'
-
-# Get the detailed error message
-kubectl get toolserver <name> -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}'
-----
-
-**Step 2: Inspect the full resource status**
-
-[source,bash]
-----
-kubectl describe toolserver <name>
-----
-
-Look for conditions and events that indicate what's wrong.
-
-**Step 3: Check related resources**
-
-[source,bash]
-----
-# Check if deployment was created
-kubectl get deployment <name>
-
-# Check deployment status
-kubectl describe deployment <name>
-
-# Check if service was created
-kubectl get service <name>
-
-# Check pod status
-kubectl get pods -l app=<name>
-----
-
-**Common Issues:**
-
-* *Reason: DeploymentFailed* - Check that the image exists and is accessible. Verify environment variables and configuration.
-* *Reason: ServiceFailed* - Verify port configuration is valid. Check for port conflicts.
-* Pods not starting - Check pod logs and events for image pull errors or startup failures.
-
-=== Connection Issues from Agents
-
-Verify the service URL is correct:
-
-[source,bash]
-----
-kubectl get toolserver <name> -o jsonpath='{.status.url}'
-----
-
-Test connectivity from within the cluster:
-
-[source,bash]
-----
-kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
-  curl http://<toolserver-name>.<namespace>.svc.cluster.local:<port><path>
-----
-
-=== View Logs
-
-[source,bash]
-----
-kubectl logs -l app=<toolserver-name>
-----
-
-'''
+For more details on creating and configuring agents, see xref:agent-runtime-operator:agents:how-to-guide.adoc[Create an AI Agent].
 
 Happy tool server building! 🔧
