@@ -39,7 +39,6 @@ const (
 	googleAdkFramework           = "google-adk"
 	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.4.0"
 	defaultTemplateImageFallback = "invalid"
-	operatorVolumePrefix         = "agent-operator-"
 )
 
 // agentlog is for logging in this package.
@@ -213,19 +212,6 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 		}
 	}
 
-	// Validate Tool URLs (only scheme validation, kubebuilder handles URI format)
-	for i, tool := range agent.Spec.Tools {
-		if tool.Url != "" {
-			if err := v.validateHTTPScheme(tool.Url); err != nil {
-				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spec", "tools").Index(i).Child("url"),
-					tool.Url,
-					fmt.Sprintf("Tool[%d].Url: %s", i, err.Error()),
-				))
-			}
-		}
-	}
-
 	// Validate VolumeMounts reference existing Volumes
 	if errs := v.validateVolumeMounts(agent); len(errs) > 0 {
 		allErrs = append(allErrs, errs...)
@@ -348,45 +334,19 @@ func sanitizeForPortName(name string) string {
 	return result
 }
 
-// validateVolumeMounts validates that all volumeMounts reference volumes that exist in the volumes list.
+// validateVolumeMounts validates volume and volumeMount requirements.
+// Performs additional validation that is not possible through OpenAPI validation by Kubernetes.
 func (v *AgentCustomValidator) validateVolumeMounts(agent *runtimev1alpha1.Agent) []*field.Error {
 	var errs []*field.Error
 
-	// Build a set of available volume names and check for duplicates
+	// Build a set of available volume names for reference checking.
 	volumeNames := make(map[string]bool)
-	for i, volume := range agent.Spec.Volumes {
-		if volume.Name == "" {
-			errs = append(errs, field.Required(
-				field.NewPath("spec", "volumes").Index(i).Child("name"),
-				"volume must have a name"))
-		} else if strings.HasPrefix(volume.Name, operatorVolumePrefix) {
-			// Reject reserved volume names
-			errs = append(errs, field.Forbidden(
-				field.NewPath("spec", "volumes").Index(i).Child("name"),
-				fmt.Sprintf("volume names starting with %q are reserved for operator use", operatorVolumePrefix)))
-		} else if volumeNames[volume.Name] {
-			// Check for duplicate volume names
-			errs = append(errs, field.Duplicate(
-				field.NewPath("spec", "volumes").Index(i).Child("name"),
-				volume.Name))
-			// Already in map, don't re-add
-		} else {
-			// Valid, unique volume name - add to tracking map
-			volumeNames[volume.Name] = true
-		}
+	for _, volume := range agent.Spec.Volumes {
+		volumeNames[volume.Name] = true
 	}
 
-	// Track seen mount paths to detect duplicates
-	seenMountPaths := make(map[string]bool)
-
-	// Check each volumeMount references an existing volume
+	// Check each volumeMount references an existing volume (business logic validation)
 	for i, volumeMount := range agent.Spec.VolumeMounts {
-		if volumeMount.Name == "" {
-			errs = append(errs, field.Required(
-				field.NewPath("spec", "volumeMounts").Index(i).Child("name"),
-				"volumeMount must have a name"))
-			continue
-		}
 
 		if !volumeNames[volumeMount.Name] {
 			errs = append(errs, field.Invalid(
@@ -395,51 +355,34 @@ func (v *AgentCustomValidator) validateVolumeMounts(agent *runtimev1alpha1.Agent
 				fmt.Sprintf("volumeMount references volume %q which does not exist in spec.volumes", volumeMount.Name)))
 		}
 
-		// Validate mountPath
-		if volumeMount.MountPath == "" {
-			errs = append(errs, field.Required(
-				field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
-				"mountPath is required"))
-			continue
-		}
-
-		// Check mountPath does not contain ':' (Kubernetes requirement)
-		if strings.Contains(volumeMount.MountPath, ":") {
-			errs = append(errs, field.Invalid(
-				field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
-				volumeMount.MountPath,
-				"mountPath must not contain ':'"))
-		}
-
-		// Check for duplicate mount paths
-		if seenMountPaths[volumeMount.MountPath] {
-			errs = append(errs, field.Duplicate(
-				field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
-				volumeMount.MountPath))
-		}
-		seenMountPaths[volumeMount.MountPath] = true
-
-		// Check for overlapping/nested mount paths
+		// Check for overlapping/nested mount paths (operator-specific enhanced validation)
+		// Only check forward (j > i) to avoid reporting the same error multiple times
 		for j := i + 1; j < len(agent.Spec.VolumeMounts); j++ {
 			if agent.Spec.VolumeMounts[j].MountPath == "" {
-				continue // Skip if mountPath is empty (will be caught by validation above)
+				continue // Skip if empty (K8s will validate)
 			}
 
 			path1 := filepath.Clean(volumeMount.MountPath)
 			path2 := filepath.Clean(agent.Spec.VolumeMounts[j].MountPath)
 
-			// Check if one path is a parent of the other
-			// We need to add trailing slash to prevent false positives like /data and /data-backup
+			// Skip exact duplicates (K8s validates duplicate mount paths)
+			if path1 == path2 {
+				continue
+			}
+
+			// Check if path2 is nested under path1
+			// Add trailing slash to prevent false positives like /data and /data-backup
 			if strings.HasPrefix(path2+"/", path1+"/") {
 				errs = append(errs, field.Invalid(
 					field.NewPath("spec", "volumeMounts").Index(j).Child("mountPath"),
 					path2,
-					fmt.Sprintf("mountPath %q overlaps with volumeMount at index %d (%q). Kubernetes does not allow nested mount paths", path2, i, path1)))
+					fmt.Sprintf("mountPath %q is nested under %q (index %d)", path2, path1, i)))
 			} else if strings.HasPrefix(path1+"/", path2+"/") {
+				// path1 is nested under path2
 				errs = append(errs, field.Invalid(
 					field.NewPath("spec", "volumeMounts").Index(i).Child("mountPath"),
 					path1,
-					fmt.Sprintf("mountPath %q overlaps with volumeMount at index %d (%q). Kubernetes does not allow nested mount paths", path1, j, path2)))
+					fmt.Sprintf("mountPath %q is nested under %q (index %d)", path1, path2, j)))
 			}
 		}
 	}
@@ -448,37 +391,24 @@ func (v *AgentCustomValidator) validateVolumeMounts(agent *runtimev1alpha1.Agent
 }
 
 // validateVolumeSource validates volume source configurations.
+//
+// This webhook implements only operator-specific security policies:
+//   - hostPath volume blocking (security policy)
+//
+// The following validations are intentionally NOT implemented here because Kubernetes API server
+// already validates them when creating the underlying Deployment:
+//   - Empty ConfigMap/Secret/PVC names (K8s required field validation)
+//   - Volume source configuration format (K8s schema validation)
 func (v *AgentCustomValidator) validateVolumeSource(volume corev1.Volume, index int) []*field.Error {
 	var errs []*field.Error
 	basePath := field.NewPath("spec", "volumes").Index(index)
 
-	// Block hostPath unless explicitly allowed
+	// Block hostPath unless explicitly allowed (operator-specific security policy)
 	if volume.HostPath != nil && !v.AllowHostPath {
 		errs = append(errs, field.Forbidden(
 			basePath.Child("hostPath"),
 			"hostPath volumes are not allowed for security reasons. "+
 				"Contact your cluster administrator if you need this feature."))
-	}
-
-	// Validate ConfigMap
-	if volume.ConfigMap != nil && volume.ConfigMap.Name == "" {
-		errs = append(errs, field.Required(
-			basePath.Child("configMap", "name"),
-			"configMap name must be specified"))
-	}
-
-	// Validate Secret
-	if volume.Secret != nil && volume.Secret.SecretName == "" {
-		errs = append(errs, field.Required(
-			basePath.Child("secret", "secretName"),
-			"secret name must be specified"))
-	}
-
-	// Validate PersistentVolumeClaim
-	if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == "" {
-		errs = append(errs, field.Required(
-			basePath.Child("persistentVolumeClaim", "claimName"),
-			"persistentVolumeClaim claimName must be specified"))
 	}
 
 	return errs

@@ -166,69 +166,6 @@ Your custom agent container must:
 1. Expose an HTTP server on the configured port
 2. Implement the A2A protocol specification
 
-== Mounting Configuration and Data
-
-Agents can mount ConfigMaps, Secrets, and persistent storage using standard Kubernetes volume types.
-
-=== Quick Example
-
-Mount configuration and secrets into your agent:
-
-[source,yaml]
-----
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: Agent
-metadata:
-  name: agent-with-volumes
-spec:
-  framework: google-adk
-  image: ghcr.io/example/my-agent:1.0.0
-  protocols:
-    - type: A2A
-  volumeMounts:
-    - name: config
-      mountPath: /etc/config
-      readOnly: true
-    - name: secrets
-      mountPath: /etc/secrets
-      readOnly: true
-    - name: cache
-      mountPath: /tmp/cache
-  volumes:
-    - name: config
-      configMap:
-        name: agent-config
-    - name: secrets
-      secret:
-        secretName: agent-secrets
-    - name: cache
-      emptyDir: {}
-----
-
-=== Supported Volume Types
-
-* *ConfigMap*: Configuration files and static data
-* *Secret*: API keys, credentials, certificates (always use `readOnly: true`)
-* *EmptyDir*: Temporary storage (cleared on pod restart)
-* *PersistentVolumeClaim*: Persistent data across restarts
-
-See https://kubernetes.io/docs/concepts/storage/volumes/[Kubernetes volume documentation] for detailed volume type specifications.
-
-=== Security Restrictions
-
-IMPORTANT: For security reasons, certain volume types have restrictions:
-
-* *HostPath volumes are disabled by default* - Contact your cluster administrator if you need this feature
-* *Reserved volume names* - Names starting with `agent-operator-` are reserved for operator use
-* *Mount path validation* - Paths cannot overlap or contain `:`
-
-=== Best Practices
-
-1. Always use `readOnly: true` for ConfigMaps and Secrets to prevent accidental modifications
-2. Follow standard mount path conventions: `/etc/config`, `/etc/secrets`, `/data`, `/tmp/cache`
-3. Avoid nested mount paths (e.g., `/etc/config` and `/etc/config/subdir`)
-4. Use descriptive volume names that clearly indicate their purpose
-
 == Agent-Specific Configuration
 
 === Protocols

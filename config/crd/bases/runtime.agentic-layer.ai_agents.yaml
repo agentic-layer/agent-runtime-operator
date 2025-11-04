@@ -566,7 +566,9 @@ spec:
                   type: object
                 type: array
               volumes:
-                description: Volumes defines volumes to be added to the agent pod.
+                description: |-
+                  Volumes defines volumes to be added to the agent pod.
+                  Volume names starting with "agent-operator-" are reserved for operator use and will be rejected.
                 items:
                   description: Volume represents a named volume in a pod that may
                     be accessed by any container in the pod.
