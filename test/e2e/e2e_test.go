@@ -43,6 +43,15 @@ const metricsServiceName = "agent-runtime-operator-controller-manager-metrics-se
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
 const metricsRoleBindingName = "agent-runtime-operator-metrics-binding"
 
+// webhookService is the name of the webhook service
+const webhookService = "agent-runtime-operator-webhook-service"
+
+// webhookMutatingConfiguration is the name of the mutating webhook configuration
+const webhookMutatingConfiguration = "agent-runtime-operator-mutating-webhook-configuration"
+
+// webhookValidatingConfiguration is the name of the validating webhook configuration
+const webhookValidatingConfiguration = "agent-runtime-operator-validating-webhook-configuration"
+
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
 
@@ -271,44 +280,6 @@ var _ = Describe("Manager", Ordered, func() {
 			Expect(metricsOutput).To(ContainSubstring(
 				"controller_runtime_reconcile_total",
 			))
-		})
-
-		It("should provisioned cert-manager", func() {
-			By("validating that cert-manager has the certificate Secret")
-			verifyCertManager := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "secrets", "webhook-server-cert", "-n", namespace)
-				_, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-			}
-			Eventually(verifyCertManager).Should(Succeed())
-		})
-
-		It("should have CA injection for mutating webhooks", func() {
-			By("checking CA injection for mutating webhooks")
-			verifyCAInjection := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get",
-					"mutatingwebhookconfigurations.admissionregistration.k8s.io",
-					"agent-runtime-operator-mutating-webhook-configuration",
-					"-o", "go-template={{ range .webhooks }}{{ .clientConfig.caBundle }}{{ end }}")
-				mwhOutput, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(mwhOutput)).To(BeNumerically(">", 10))
-			}
-			Eventually(verifyCAInjection).Should(Succeed())
-		})
-
-		It("should have CA injection for validating webhooks", func() {
-			By("checking CA injection for validating webhooks")
-			verifyCAInjection := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get",
-					"validatingwebhookconfigurations.admissionregistration.k8s.io",
-					"agent-runtime-operator-validating-webhook-configuration",
-					"-o", "go-template={{ range .webhooks }}{{ .clientConfig.caBundle }}{{ end }}")
-				vwhOutput, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(vwhOutput)).To(BeNumerically(">", 10))
-			}
-			Eventually(verifyCAInjection).Should(Succeed())
 		})
 
 		// +kubebuilder:scaffold:e2e-webhooks-checks
@@ -1609,20 +1580,51 @@ func getMetricsOutput() string {
 	return metricsOutput
 }
 
+func waitForWebhookCaBundle(kind string, name string) {
+	verifyCAInjection := func(g Gomega) {
+		cmd := exec.Command("kubectl", "get",
+			kind,
+			name,
+			"-o", "go-template={{ range .webhooks }}{{ .clientConfig.caBundle }}{{ end }}")
+		mwhOutput, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(len(mwhOutput)).To(BeNumerically(">", 10))
+	}
+	Eventually(verifyCAInjection).Should(Succeed())
+}
+
+func waitForWebhookCaBundleMutating() {
+	waitForWebhookCaBundle("mutatingwebhookconfigurations.admissionregistration.k8s.io", webhookMutatingConfiguration)
+}
+func waitForWebhookCaBundleValidating() {
+	waitForWebhookCaBundle("validatingwebhookconfigurations.admissionregistration.k8s.io", webhookValidatingConfiguration)
+}
+
 // waitForWebhookServiceReady waits for the webhook service to be ready with endpoints.
 func waitForWebhookServiceReady(g Gomega) {
 	// Check that the webhook service exists and has endpoints
 	cmd := exec.Command("kubectl", "get", "service",
-		"agent-runtime-operator-webhook-service", "-n", "agent-runtime-operator-system")
+		webhookService, "-n", namespace)
 	_, err := utils.Run(cmd)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Check that the webhook service has endpoints (meaning pods are ready)
-	cmd = exec.Command("kubectl", "get", "endpoints", "agent-runtime-operator-webhook-service",
-		"-n", "agent-runtime-operator-system", "-o", "jsonpath={.subsets[*].addresses[*].ip}")
+	cmd = exec.Command("kubectl", "get", "endpoints", webhookService,
+		"-n", namespace, "-o", "jsonpath={.subsets[*].addresses[*].ip}")
 	output, err := utils.Run(cmd)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
+
+	// Verify that the certificate secret has been created
+	verifyCertManager := func(g Gomega) {
+		cmd := exec.Command("kubectl", "get", "secrets", "webhook-server-cert", "-n", namespace)
+		_, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+	Eventually(verifyCertManager).Should(Succeed())
+
+	waitForWebhookCaBundleMutating()
+	waitForWebhookCaBundleValidating()
 }
 
 // ensureWebhookServiceReady is a helper function that waits for webhook service to be ready
