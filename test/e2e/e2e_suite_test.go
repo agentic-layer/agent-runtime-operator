@@ -21,12 +21,17 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
+	webhookv1alpha1 "github.com/agentic-layer/agent-runtime-operator/internal/webhook/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/agentic-layer/agent-runtime-operator/test/utils"
 )
+
+// namespace where the project is deployed in
+const namespace = "agent-runtime-operator-system"
 
 var (
 	// Optional Environment Variables:
@@ -76,9 +81,76 @@ var _ = BeforeSuite(func() {
 			_, _ = fmt.Fprintf(GinkgoWriter, "WARNING: CertManager is already installed. Skipping installation...\n")
 		}
 	}
+
+	// Deploy the operator
+	By("creating manager namespace")
+	cmd = exec.Command("kubectl", "create", "ns", namespace)
+	_, err = utils.Run(cmd)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
+
+	By("labeling the namespace to enforce the restricted security policy")
+	cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
+		"pod-security.kubernetes.io/enforce=restricted")
+	_, err = utils.Run(cmd)
+	Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with restricted policy")
+
+	By("installing CRDs")
+	cmd = exec.Command("make", "install")
+	_, err = utils.Run(cmd)
+	Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
+
+	By("deploying the controller-manager")
+	cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
+	_, err = utils.Run(cmd)
+	Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
+
+	By("waiting for webhook deployment to be ready")
+	Eventually(func(g Gomega) {
+		// Check that the webhook deployment is ready
+		cmd := exec.Command("kubectl", "get", "deployment",
+			"-l", "control-plane=controller-manager", "-n", namespace,
+			"-o", "jsonpath={.items[0].status.readyReplicas}")
+		output, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(output).To(Equal("1"), "Controller manager should have 1 ready replica")
+	}, 3*time.Minute, 5*time.Second).Should(Succeed())
+
+	By("waiting for webhook service to be ready")
+	ensureWebhookServiceReady()
+
+	sampleImages := []string{
+		"ghcr.io/agentic-layer/weather-agent:0.3.0",
+		webhookv1alpha1.DefaultTemplateImageAdk,
+	}
+
+	By("loading the sample images on Kind")
+	for _, img := range sampleImages {
+		cmd = exec.Command("docker", "pull", img)
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to pull image ", img)
+		err = utils.LoadImageToKindClusterWithName(img)
+		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load image ", img, " into Kind")
+	}
 })
 
 var _ = AfterSuite(func() {
+	// Cleanup operator resources
+	By("cleaning up the curl pod for metrics")
+	cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
+	_, _ = utils.Run(cmd)
+
+	By("undeploying the controller-manager")
+	cmd = exec.Command("make", "undeploy")
+	_, _ = utils.Run(cmd)
+
+	By("uninstalling CRDs")
+	cmd = exec.Command("make", "uninstall")
+	_, _ = utils.Run(cmd)
+
+	By("removing manager namespace")
+	cmd = exec.Command("kubectl", "delete", "ns", namespace)
+	_, _ = utils.Run(cmd)
+
 	// Teardown CertManager after the suite if not skipped and if it was not already installed
 	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
 		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
