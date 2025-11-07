@@ -30,8 +30,20 @@ import (
 	"github.com/agentic-layer/agent-runtime-operator/test/utils"
 )
 
+// operatorName is the name of the operator being tested
+const operatorName = "agent-runtime-operator"
+
 // namespace where the project is deployed in
 const namespace = "agent-runtime-operator-system"
+
+// webhookServiceName is the name of the webhook service
+const webhookServiceName = "agent-runtime-operator-webhook-service"
+
+// webhookMutatingConfiguration is the name of the mutating webhook configuration
+const webhookMutatingConfiguration = "agent-runtime-operator-mutating-webhook-configuration"
+
+// webhookValidatingConfiguration is the name of the validating webhook configuration
+const webhookValidatingConfiguration = "agent-runtime-operator-validating-webhook-configuration"
 
 var (
 	// Optional Environment Variables:
@@ -104,6 +116,44 @@ var _ = BeforeSuite(func() {
 	_, err = utils.Run(cmd)
 	Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
 
+	By("loading the sample images on Kind")
+	// speed-up tests by pre-loading sample images used by tests from docker daemon into kind cluster
+	sampleImages := []string{
+		"ghcr.io/agentic-layer/weather-agent:0.3.0",
+		webhookv1alpha1.DefaultTemplateImageAdk,
+	}
+	for _, img := range sampleImages {
+		cmd = exec.Command("docker", "pull", img)
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to pull image ", img)
+		err = utils.LoadImageToKindClusterWithName(img)
+		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load image ", img, " into Kind")
+	}
+
+	waitForWebhook(namespace, webhookServiceName)
+	waitForWebhookCaBundleMutating(webhookMutatingConfiguration)
+	waitForWebhookCaBundleValidating(webhookValidatingConfiguration)
+})
+
+var _ = AfterSuite(func() {
+	By("undeploying the controller-manager")
+	_, _ = utils.Run(exec.Command("make", "undeploy"))
+
+	By("uninstalling CRDs")
+	_, _ = utils.Run(exec.Command("make", "uninstall"))
+
+	By("removing manager namespace")
+	_, _ = utils.Run(exec.Command("kubectl", "delete", "ns", namespace))
+
+	// Teardown CertManager after the suite if not skipped and if it was not already installed
+	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
+		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
+		utils.UninstallCertManager()
+	}
+})
+
+// waitForWebhook is a helper function that waits for webhook service to be ready
+func waitForWebhook(namespace string, webhookServiceName string) {
 	By("waiting for webhook deployment to be ready")
 	Eventually(func(g Gomega) {
 		// Check that the webhook deployment is ready
@@ -116,44 +166,72 @@ var _ = BeforeSuite(func() {
 	}, 3*time.Minute, 5*time.Second).Should(Succeed())
 
 	By("waiting for webhook service to be ready")
-	ensureWebhookServiceReady()
+	Eventually(func(g Gomega) {
+		// Check that the webhook service exists and has endpoints
+		cmd := exec.Command("kubectl", "get", "service",
+			webhookServiceName, "-n", namespace)
+		_, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
 
-	sampleImages := []string{
-		"ghcr.io/agentic-layer/weather-agent:0.3.0",
-		webhookv1alpha1.DefaultTemplateImageAdk,
+		// Check that the webhook service has endpoints (meaning pods are ready)
+		cmd = exec.Command("kubectl", "get", "endpoints", webhookServiceName,
+			"-n", namespace, "-o", "jsonpath={.subsets[*].addresses[*].ip}")
+		output, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
+	}).Should(Succeed())
+
+	By("verifying that the certificate secret has been created")
+	Eventually(func(g Gomega) {
+		cmd := exec.Command("kubectl", "get", "secrets", "webhook-server-cert", "-n", namespace)
+		_, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
+	}).Should(Succeed())
+}
+
+func waitForWebhookCaBundle(kind string, name string) {
+	Eventually(func(g Gomega) {
+		cmd := exec.Command("kubectl", "get",
+			kind,
+			name,
+			"-o", "go-template={{ range .webhooks }}{{ .clientConfig.caBundle }}{{ end }}")
+		mwhOutput, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(len(mwhOutput)).To(BeNumerically(">", 10))
+	}).Should(Succeed())
+}
+
+func waitForWebhookCaBundleMutating(name string) {
+	waitForWebhookCaBundle(
+		"mutatingwebhookconfigurations.admissionregistration.k8s.io",
+		name,
+	)
+}
+func waitForWebhookCaBundleValidating(name string) {
+	waitForWebhookCaBundle(
+		"validatingwebhookconfigurations.admissionregistration.k8s.io",
+		name,
+	)
+}
+
+func fetchKubernetesEvents() {
+	By("Fetching Kubernetes events")
+	cmd := exec.Command("kubectl", "get", "events", "-n", namespace, "--sort-by=.lastTimestamp")
+	eventsOutput, err := utils.Run(cmd)
+	if err == nil {
+		_, _ = fmt.Fprintf(GinkgoWriter, "Kubernetes events:\n%s", eventsOutput)
+	} else {
+		_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get Kubernetes events: %s", err)
 	}
+}
 
-	By("loading the sample images on Kind")
-	for _, img := range sampleImages {
-		cmd = exec.Command("docker", "pull", img)
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to pull image ", img)
-		err = utils.LoadImageToKindClusterWithName(img)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load image ", img, " into Kind")
+func fetchControllerManagerPodLogs() {
+	By("Fetching controller manager pod logs")
+	cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name="+operatorName, "-n", namespace)
+	controllerLogs, err := utils.Run(cmd)
+	if err == nil {
+		_, _ = fmt.Fprintf(GinkgoWriter, "Controller logs:\n %s", controllerLogs)
+	} else {
+		_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get Controller logs: %s", err)
 	}
-})
-
-var _ = AfterSuite(func() {
-	// Cleanup operator resources
-	By("cleaning up the curl pod for metrics")
-	cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
-	_, _ = utils.Run(cmd)
-
-	By("undeploying the controller-manager")
-	cmd = exec.Command("make", "undeploy")
-	_, _ = utils.Run(cmd)
-
-	By("uninstalling CRDs")
-	cmd = exec.Command("make", "uninstall")
-	_, _ = utils.Run(cmd)
-
-	By("removing manager namespace")
-	cmd = exec.Command("kubectl", "delete", "ns", namespace)
-	_, _ = utils.Run(cmd)
-
-	// Teardown CertManager after the suite if not skipped and if it was not already installed
-	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
-		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
-		utils.UninstallCertManager()
-	}
-})
+}

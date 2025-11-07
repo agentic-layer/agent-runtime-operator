@@ -32,10 +32,6 @@ var _ = Describe("ToolServer Deployment", Ordered, func() {
 	const httpToolServerName = "example-http-toolserver"
 	const stdioToolServerName = "example-stdio-toolserver"
 
-	BeforeAll(func() {
-		ensureWebhookServiceReady()
-	})
-
 	AfterAll(func() {
 		By("cleaning up sample toolservers")
 		cmd := exec.Command("kubectl", "delete", "-f", "config/samples/runtime_v1alpha1_toolserver_http.yaml",
@@ -45,6 +41,15 @@ var _ = Describe("ToolServer Deployment", Ordered, func() {
 		cmd = exec.Command("kubectl", "delete", "-f",
 			"config/samples/runtime_v1alpha1_toolserver_stdio.yaml", "-n", testNamespace, "--ignore-not-found=true")
 		_, _ = utils.Run(cmd)
+	})
+
+	// After each test, check for failures and collect logs, events and pod descriptions for debugging.
+	AfterEach(func() {
+		specReport := CurrentSpecReport()
+		if specReport.Failed() {
+			fetchControllerManagerPodLogs()
+			fetchKubernetesEvents()
+		}
 	})
 
 	It("should successfully deploy and manage http transport toolserver", func() {

@@ -104,6 +104,13 @@ spec:
 	})
 
 	AfterEach(func() {
+		// After each test, check for failures and collect logs, events and pod descriptions for debugging.
+		specReport := CurrentSpecReport()
+		if specReport.Failed() {
+			fetchControllerManagerPodLogs()
+			fetchKubernetesEvents()
+		}
+
 		By("cleaning up test workforces")
 		testWorkforces := []string{testWorkforceName, testWorkforce2Name, "dynamic-workforce", "shared-deps-workforce"}
 		for _, wfName := range testWorkforces {

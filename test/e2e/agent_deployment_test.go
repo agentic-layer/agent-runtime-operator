@@ -35,8 +35,6 @@ var _ = Describe("Agent Deployment", Ordered, func() {
 	const configMapName = "agent-config-map"
 
 	BeforeAll(func() {
-		ensureWebhookServiceReady()
-
 		By("applying sample configmap")
 		cmd := exec.Command("kubectl", "apply", "-f", "config/samples/configmap.yaml",
 			"-n", testNamespace)
@@ -45,6 +43,13 @@ var _ = Describe("Agent Deployment", Ordered, func() {
 	})
 
 	AfterEach(func() {
+		// After each test, check for failures and collect logs, events and pod descriptions for debugging.
+		specReport := CurrentSpecReport()
+		if specReport.Failed() {
+			fetchControllerManagerPodLogs()
+			fetchKubernetesEvents()
+		}
+
 		By("cleaning up test agents from individual tests")
 		// Clean up test agents created in individual tests
 		testAgents := []string{"test-subagent", "test-parent-agent", "watch-subagent", "watch-parent"}
