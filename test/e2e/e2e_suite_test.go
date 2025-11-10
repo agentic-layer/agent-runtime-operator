@@ -145,11 +145,7 @@ var _ = AfterSuite(func() {
 	By("removing manager namespace")
 	_, _ = utils.Run(exec.Command("kubectl", "delete", "ns", namespace))
 
-	// Teardown CertManager after the suite if not skipped and if it was not already installed
-	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
-		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
-		utils.UninstallCertManager()
-	}
+	// Note: Not tearing down CertManager for potential reuse during local testing
 })
 
 // waitForWebhook is a helper function that waits for webhook service to be ready
