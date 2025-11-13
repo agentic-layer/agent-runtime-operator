@@ -88,11 +88,17 @@ make lint-fix
 
 ### End-to-End Tests
 
-The E2E tests automatically create an isolated Kind cluster, deploy the operator, run comprehensive tests, and clean up afterward.
+The E2E tests automatically create an isolated Kind cluster, deploy the operator and run e2e tests.
+Test cluster is kept after execution for faster reruns, so you may need to clean it up manually.
 
 ```shell
 # Run complete E2E test suite
 make test-e2e
+```
+
+```shell
+# Clean up test cluster
+make cleanup-test-e2e
 ```
 
 **E2E Test Features:**
@@ -102,28 +108,6 @@ make test-e2e
 - Metrics endpoint validation
 - Certificate management verification
 
-**Manual E2E Test Management:**
-
-For faster iteration, you can manually set up and tear down the test cluster and run tests against it.
-
-```shell
-# Set up test cluster manually
-make setup-test-e2e
-
-# Run tests against existing cluster
-KIND_CLUSTER=agent-runtime-operator-test-e2e go test ./test/e2e/ -v -ginkgo.v
-
-# Clean up test cluster
-make cleanup-test-e2e
-```
-
-**Clean up failed test runs:**
-
-When E2E tests fail, the cleanup step is not run to allow for manual analysis of the failure. As the cluster is in an undefined state, it is recommended to delete the cluster and start fresh:
-
-```shell
-make cleanup-test-e2e
-```
 
 ### Create or Update API and Webhooks
 
