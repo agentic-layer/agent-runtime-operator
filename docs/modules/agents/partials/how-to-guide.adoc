@@ -196,6 +196,102 @@ spec:
 
 Additional frameworks will be supported in the future.
 
+== Create an Agentic Workforce
+=== What is an agentic workforce?
+An agentic workforce is a collection of agents that work together to handle complex tasks. Instead of managing individual
+agents, you define entry points and let the operator automatically discover all connected agents and their capabilities.
+
+
+**Key terms**
+
+* *entry-point agents* serve as the initial contact points, and the operator automatically discovers all
+* *transitive agents* are sub-agents called by your entry-point agents
+
+=== When to use an agentic workforce
+
+*Use agentic workforces when:*
+
+* You have multiple agents that need to collaborate on tasks
+* You want centralized visibility into all agents and tools in a system
+* You need to track which agents can delegate to which other agents
+* You want to organize agents by business domain or use case
+* You need automatic discovery of agent dependencies and capabilities
+
+*Use individual agents when:*
+
+* You have a single, standalone agent
+* Your agent doesn't interact with other agents
+* You need simple, direct agent deployment
+
+=== Deploy your first workforce
+
+NOTE: This example assumes you have already deployed the agents referenced as entry points. See the sections above for
+how to create agents.
+
+[source,bash]
+----
+# Create a workforce that orchestrates multiple customer service agents
+cat <<EOF | kubectl apply -f -
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgenticWorkforce
+metadata:
+  name: customer-service-workforce
+spec:
+  # Human-readable name for the workforce
+  name: "Customer Service Team"
+
+  # Description of the workforce's purpose
+  description: "A workforce handling customer inquiries, support tickets, and product recommendations"
+
+  # Owner of the workforce (email or identifier)
+  owner: "platform-team@example.com"
+
+  # Optional tags for organization
+  tags:
+    - customer-service
+    - support
+    - production
+
+  # Entry point agents - the initial agents users interact with
+  # The operator discovers all transitive agents (sub-agents) automatically
+  entryPointAgents:
+    # Agent in the same namespace
+    - name: my-first-agent
+
+    # Agent in a different namespace (optional)
+    # - name: specialist-agent
+    #   namespace: ai-agents
+EOF
+----
+
+=== Verify your workforce is running
+
+[source,bash]
+----
+# Check the workforce resource
+kubectl get agenticworkforce customer-service-workforce
+
+# View detailed status including discovered agents and tools
+kubectl describe agenticworkforce customer-service-workforce
+
+# Check discovered transitive agents
+kubectl get agenticworkforce customer-service-workforce -o jsonpath='{.status.transitiveAgents[*].name}'
+
+# Check discovered transitive tools
+kubectl get agenticworkforce customer-service-workforce -o jsonpath='{.status.transitiveTools[*]}'
+----
+
+=== Understanding workforce discovery
+
+The operator automatically analyzes your entry-point agents to discover:
+
+* *Transitive agents*: All sub-agents that your entry points can delegate to (both in-cluster and remote)
+* *Transitive tools*: All tools available across the entire workforce
+
+This information appears in the workforce's status, giving you complete visibility into your agent ecosystem.
+
+🎉 *Congratulations!* You've successfully created your first agentic workforce.
+
 '''
 
 Happy agent building! 🤖
