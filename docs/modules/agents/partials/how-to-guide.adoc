@@ -148,7 +148,7 @@ spec:
     - type: A2A
   replicas: 1
   env:
-    - name: LOG_LEVEL
+    - name: LOGLEVEL
       value: "info"
 ----
 

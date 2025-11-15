@@ -146,7 +146,7 @@ var _ = Describe("ToolServer Controller", func() {
 						Path:          "/mcp",
 						Replicas:      &replicas,
 						Env: []corev1.EnvVar{
-							{Name: "LOG_LEVEL", Value: "info"},
+							{Name: "LOGLEVEL", Value: "info"},
 						},
 					},
 				}
@@ -193,7 +193,7 @@ var _ = Describe("ToolServer Controller", func() {
 			Expect(container.Args).To(Equal([]string{"src/main.py", "--port", "8080"}))
 			Expect(container.Ports).To(HaveLen(1))
 			Expect(container.Ports[0].ContainerPort).To(Equal(int32(8080)))
-			Expect(container.Env).To(ContainElement(corev1.EnvVar{Name: "LOG_LEVEL", Value: "info"}))
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{Name: "LOGLEVEL", Value: "info"}))
 			Expect(container.ReadinessProbe).NotTo(BeNil())
 			Expect(container.ReadinessProbe.TCPSocket).NotTo(BeNil())
 			Expect(container.ReadinessProbe.TCPSocket.Port.IntValue()).To(Equal(8080))
@@ -244,7 +244,7 @@ var _ = Describe("ToolServer Controller", func() {
 			newReplicas := int32(3)
 			toolserver.Spec.Replicas = &newReplicas
 			toolserver.Spec.Env = []corev1.EnvVar{
-				{Name: "LOG_LEVEL", Value: "debug"},
+				{Name: "LOGLEVEL", Value: "debug"},
 			}
 			err = k8sClient.Update(ctx, toolserver)
 			Expect(err).NotTo(HaveOccurred())
@@ -266,7 +266,7 @@ var _ = Describe("ToolServer Controller", func() {
 			Expect(*deployment.Spec.Replicas).To(Equal(int32(3)))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("python:3.12"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Env).To(ContainElement(
-				corev1.EnvVar{Name: "LOG_LEVEL", Value: "debug"},
+				corev1.EnvVar{Name: "LOGLEVEL", Value: "debug"},
 			))
 		})
 	})

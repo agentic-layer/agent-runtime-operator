@@ -118,7 +118,7 @@ var _ = Describe("ToolServer Deployment", Ordered, func() {
 				"-o", "jsonpath={.spec.template.spec.containers[0].env[*].name}")
 			output, err := utils.Run(cmd)
 			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(ContainSubstring("LOG_LEVEL"), "Should contain LOG_LEVEL env var")
+			g.Expect(output).To(ContainSubstring("LOGLEVEL"), "Should contain LOGLEVEL env var")
 		}
 		Eventually(verifyEnvironmentVariables).Should(Succeed())
 	})

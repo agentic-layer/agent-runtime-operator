@@ -148,7 +148,7 @@ var _ = Describe("Agent Deployment", Ordered, func() {
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(output).To(ContainSubstring("AGENT_NAME"), "Should contain template AGENT_NAME env var")
 			g.Expect(output).To(ContainSubstring("PORT"), "Should contain user-defined PORT env var")
-			g.Expect(output).To(ContainSubstring("LOG_LEVEL"), "Should contain user-defined LOG_LEVEL env var")
+			g.Expect(output).To(ContainSubstring("LOGLEVEL"), "Should contain user-defined LOGLEVEL env var")
 		}
 		Eventually(verifyEnvironmentVariables).Should(Succeed())
 

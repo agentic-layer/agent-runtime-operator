@@ -22,5 +22,5 @@ spec:
     - "--db-path"
     - "/mcp/test.db"
   env:
-    - name: LOG_LEVEL
+    - name: LOGLEVEL
       value: info

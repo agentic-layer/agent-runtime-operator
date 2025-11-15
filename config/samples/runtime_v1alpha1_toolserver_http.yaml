@@ -18,5 +18,5 @@ spec:
   # path: /mcp
   replicas: 2
   env:
-    - name: LOG_LEVEL
+    - name: LOGLEVEL
       value: info

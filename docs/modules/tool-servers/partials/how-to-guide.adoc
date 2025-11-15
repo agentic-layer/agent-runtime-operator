@@ -25,7 +25,7 @@ spec:
   port: 8080
   replicas: 2
   env:
-    - name: LOG_LEVEL
+    - name: LOGLEVEL
       value: info
 EOF
 ----
