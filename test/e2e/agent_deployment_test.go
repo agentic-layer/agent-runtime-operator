@@ -568,7 +568,7 @@ metadata:
   name: invalid-mount-agent
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   volumeMounts:
     - name: non-existent
       mountPath: /data
@@ -596,7 +596,7 @@ metadata:
   name: overlapping-mount-agent
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   volumeMounts:
     - name: vol1
       mountPath: /etc/config
@@ -631,7 +631,7 @@ metadata:
   name: hostpath-agent
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   volumeMounts:
     - name: host
       mountPath: /host-root
@@ -670,7 +670,7 @@ metadata:
   name: %s
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   volumeMounts:
     - name: test-volume
       mountPath: /test-data
@@ -708,7 +708,7 @@ metadata:
   name: %s
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   protocols:
     - type: A2A
 `, agentName)
@@ -757,7 +757,7 @@ metadata:
   name: %s
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   protocols:
     - type: A2A
 `, agentName)

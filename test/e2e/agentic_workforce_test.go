@@ -73,7 +73,7 @@ metadata:
   name: weather-agent
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   protocols:
     - type: A2A
       port: 8000
@@ -197,7 +197,7 @@ metadata:
   name: temp-agent-for-deletion
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6
   protocols:
     - type: A2A
       port: 8000
