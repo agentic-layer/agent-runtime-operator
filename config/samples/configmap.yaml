@@ -3,5 +3,5 @@ kind: ConfigMap
 metadata:
   name: agent-config-map
 data:
-  LOGLEVEL: "debug"
+  LOGLEVEL: "DEBUG"
   TIMEOUT_SECONDS: "30"

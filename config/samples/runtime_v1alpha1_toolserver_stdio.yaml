@@ -23,4 +23,4 @@ spec:
     - "/mcp/test.db"
   env:
     - name: LOGLEVEL
-      value: info
+      value: INFO

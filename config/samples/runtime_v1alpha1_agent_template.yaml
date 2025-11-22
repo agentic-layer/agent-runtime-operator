@@ -18,7 +18,7 @@ spec:
   replicas: 1
   env:
     - name: LOGLEVEL
-      value: "info"
+      value: "INFO"
   envFrom:
     - configMapRef:
         name: agent-config-map

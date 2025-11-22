@@ -15,7 +15,7 @@ spec:
     - name: PORT
       value: "8080"
     - name: LOGLEVEL
-      value: "info"
+      value: "INFO"
   envFrom:
     - configMapRef:
         name: agent-config-map

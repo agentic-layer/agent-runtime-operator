@@ -149,7 +149,7 @@ spec:
   replicas: 1
   env:
     - name: LOGLEVEL
-      value: "info"
+      value: "INFO"
 ----
 
 === Building Custom Agents
