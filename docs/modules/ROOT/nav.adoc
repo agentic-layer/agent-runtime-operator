@@ -2,7 +2,7 @@
 * xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[]
 * xref:agent-runtime-operator:agents:how-to-guide.adoc[]
 * xref:agent-runtime-operator:tool-servers:how-to-guide.adoc[]
-* xref:agent-runtime-operator:agent-gateways:how-to-guide.adoc[]
+* xref:agent-gateway-krakend-operator:operator:how-to-guide.adoc[]
 
 .Reference
 * xref:agent-runtime-operator:agent-runtime:reference.adoc[]

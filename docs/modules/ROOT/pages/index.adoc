@@ -13,7 +13,7 @@ Step-by-step guides to get you up and running:
 
 For advanced routing and gateway patterns:
 
-* xref:agent-runtime-operator:agent-gateways:how-to-guide.adoc[] - Set up agent gateways for complex routing scenarios
+* xref:agent-gateway-krakend-operator:operator:how-to-guide.adoc[] - Set up agent gateways for complex routing scenarios
 
 == Reference
 
