@@ -1,0 +1,58 @@
+= Create a KrakenD Agent Gateway
+
+This guide walks you through deploying a KrakenD instance using the AgentGateway custom resource.
+
+IMPORTANT: Before following this guide, make sure you have the KrakenD Agent Gateway Operator installed. See xref:agent-gateway-krakend-operator:operator:how-to-guide.adoc[Install the AI Gateway KrakenD Operator] for installation instructions.
+
+== Create an AgentGateway Resource
+
+. Create a AgentGateway resource file:
++
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentGateway
+metadata:
+  name: agent-gateway
+  namespace: agent-gateway
+spec:
+  replicas: 1
+  timeout: 5m0s
+----
+
+. Apply the configuration:
++
+[source,bash]
+----
+kubectl apply -f my-agentgateway.yaml
+----
+
+== Verify the Deployment
+
+. Check the AgentGateway status:
++
+[source,bash]
+----
+kubectl get agentgateways agent-gateway -n agent-gateway
+----
+
+. Verify the created resources:
++
+[source,bash]
+----
+# Check the deployment created by the operator
+kubectl get deployments -l app=agent-gateway -A
+
+# Check the service
+kubectl get services -l app=agent-gateway -A
+
+# Check the configmap with KrakenD configuration
+kubectl get configmaps agent-gateway-krakend-config -n agent-gateway
+----
+
+. Check the pod logs to ensure KrakenD started successfully:
++
+[source,bash]
+----
+kubectl logs -l app=agent-gateway -n agent-gateway
+----

@@ -1,0 +1,77 @@
+= Create a LiteLLM AI Gateway
+
+This guide walks you through deploying a LiteLLM instance using the AiGateway custom resource.
+
+IMPORTANT: Before following this guide, make sure you have an AI Gateway Operator installed. See xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[Install the AI Gateway LiteLLM Operator] for installation instructions of one such operator.
+
+== Create API Key Secret
+
+First, create a secret containing credentials for the LLM providers you plan to use:
+
+[source,bash]
+----
+kubectl create secret generic api-key-secrets \
+  --namespace=ai-gateway \
+  --from-literal=OPENAI_API_KEY=$OPENAI_API_KEY \
+  --from-literal=GEMINI_API_KEY=$GEMINI_API_KEY \
+  --from-literal=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+----
+
+NOTE: The secret name must match the value configured in the operator. The default expected name is `api-key-secrets`. API keys that are not provided will not cause deployment failures - the corresponding models just won't be available.
+
+== Create an AiGateway Resource
+
+. Create a AiGateway resource file:
++
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AiGateway
+metadata:
+  name: ai-gateway-litellm
+  namespace: ai-gateway
+spec:
+  AiGatewayClassName: litellm
+  aiModels:
+    - provider: openai
+      name: gpt-3.5-turbo
+    - provider: gemini
+      name: gemini-1.5-pro
+----
+
+. Apply the configuration:
++
+[source,bash]
+----
+kubectl apply -f my-aigateway.yaml
+----
+
+== Verify the Deployment
+
+. Check the AiGateway status:
++
+[source,bash]
+----
+kubectl get aigateways ai-gateway-litellm -o yaml
+----
+
+. Verify the created resources:
++
+[source,bash]
+----
+# Check the deployment created by the operator
+kubectl get deployments -l app=ai-gateway-litellm
+
+# Check the service
+kubectl get services -l app=ai-gateway-litellm
+
+# Check the configmap with LiteLLM configuration
+kubectl get configmaps ai-gateway-litellm-config
+----
+
+. Check the pod logs to ensure LiteLLM started successfully:
++
+[source,bash]
+----
+kubectl logs -l app=ai-gateway-litellm -c litellm
+----

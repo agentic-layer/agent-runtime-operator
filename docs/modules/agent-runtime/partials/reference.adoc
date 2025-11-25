@@ -12,4 +12,6 @@ The following Custom Resource Definitions (CRDs) are provided by the Agent Runti
 * *AgenticWorkforce*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agenticworkforces.yaml
 * *AgentGateway*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgateways.yaml
 * *AgentGatewayClass*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgatewayclasses.yaml
+* *AIGateway*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgateways.yaml
+* *AIGatewayClass*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_aigatewayclasses.yaml
 * *ToolServer*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_toolservers.yaml
