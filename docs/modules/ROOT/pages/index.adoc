@@ -13,13 +13,14 @@ Step-by-step guides to get you up and running:
 
 For advanced routing and gateway patterns:
 
-* xref:agent-gateway-krakend-operator:operator:how-to-guide.adoc[] - Set up agent gateways for complex routing scenarios
+* xref:agent-runtime-operator:agent-gateways:how-to-guide.adoc[] - Set up agent gateways to manage routing to agents
+* xref:agent-runtime-operator:ai-gateways:how-to-guide.adoc[] - Set up AI gateways to manage routing from agents to LLMs
 
 == Reference
 
 Detailed reference information for all components:
 
-* xref:agent-runtime-operator:agent-runtime:reference.adoc[] - Complete API reference for Agent resources
+* xref:agent-runtime-operator:agent-runtime:reference.adoc[] - Complete API reference for all custom resources
 
 == External Resources
 
