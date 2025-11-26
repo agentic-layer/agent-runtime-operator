@@ -52,7 +52,8 @@ var _ = Describe("Agent Deployment", Ordered, func() {
 
 		By("cleaning up test agents from individual tests")
 		// Clean up test agents created in individual tests
-		testAgents := []string{"test-subagent", "test-parent-agent", "watch-subagent", "watch-parent"}
+		testAgents := []string{"test-subagent", "test-parent-agent", "watch-subagent", "watch-parent",
+			"template-update-test-agent", "custom-image-test-agent"}
 		for _, agentName := range testAgents {
 			cmd := exec.Command("kubectl", "delete", "agent", agentName, "-n", testNamespace, "--ignore-not-found=true")
 			_, _ = utils.Run(cmd)
@@ -298,6 +299,168 @@ var _ = Describe("Agent Deployment", Ordered, func() {
 			g.Expect(output).To(Equal("gemini/gemini-2.5-flash"), "AGENT_MODEL should be set correctly")
 		}
 		Eventually(verifyTemplateEnvironmentVariables).Should(Succeed())
+	})
+
+	It("should NOT write default image to Agent CR spec for template agents", func() {
+		const templateAgentName = "template-update-test-agent"
+
+		By("creating a template agent without specifying an image")
+		templateAgentYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  description: "Test agent for validating template image updates"
+  instruction: "You are a test agent"
+  model: "gemini/gemini-2.5-flash"
+  protocols:
+    - type: A2A
+      port: 8000
+`, templateAgentName)
+
+		cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+		stdin, err := cmd.StdinPipe()
+		Expect(err).NotTo(HaveOccurred())
+		go func() {
+			defer func() { _ = stdin.Close() }()
+			_, _ = stdin.Write([]byte(templateAgentYAML))
+		}()
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to create template agent")
+
+		By("verifying the Agent CR does NOT have image field set (or is empty)")
+		verifyImageNotSet := func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "agent", templateAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.image}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(BeEmpty(),
+				"Agent CR should not have image field set for template agents")
+		}
+		Eventually(verifyImageNotSet, 10*time.Second).Should(Succeed())
+		Consistently(verifyImageNotSet, 5*time.Second).Should(Succeed())
+
+		By("verifying the deployment DOES use a template image")
+		verifyDeploymentImage := func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "deployment", templateAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.template.spec.containers[0].image}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).NotTo(BeEmpty(), "Deployment should have an image")
+			g.Expect(output).To(ContainSubstring("agent-template-adk"),
+				"Deployment should use the agent-template-adk image")
+			g.Expect(output).To(ContainSubstring("ghcr.io/agentic-layer"),
+				"Deployment should use an image from agentic-layer registry")
+		}
+		Eventually(verifyDeploymentImage, 30*time.Second).Should(Succeed())
+
+		By("waiting for deployment to be ready")
+		var originalImage string
+		Eventually(func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "deployment", templateAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.status.readyReplicas}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(Equal("1"), "Deployment should have 1 ready replica")
+
+			cmd = exec.Command("kubectl", "get", "deployment", templateAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.template.spec.containers[0].image}")
+			output, err = utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			originalImage = output
+			g.Expect(originalImage).NotTo(BeEmpty())
+		}, 3*time.Minute).Should(Succeed())
+
+		By("updating the agent spec (changing description to trigger reconciliation)")
+		cmd = exec.Command("kubectl", "patch", "agent", templateAgentName, "-n", testNamespace,
+			"--type=merge", "-p", `{"spec":{"description":"Updated description to trigger reconciliation"}}`)
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to patch agent")
+
+		By("verifying the Agent CR still has no image field set after update")
+		verifyImageStillNotSet := func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "agent", templateAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.image}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(BeEmpty(),
+				"Agent CR should still not have image field set after update")
+		}
+		Eventually(verifyImageStillNotSet, 10*time.Second).Should(Succeed())
+
+		By("verifying the deployment continues using the same template image after update")
+		verifyDeploymentImageUnchanged := func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "deployment", templateAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.template.spec.containers[0].image}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(Equal(originalImage),
+				"Deployment should continue using the same template image")
+		}
+		Eventually(verifyDeploymentImageUnchanged, 30*time.Second).Should(Succeed())
+	})
+
+	It("should allow custom images to be set explicitly and preserve them", func() {
+		const customAgentName = "custom-image-test-agent"
+
+		By("creating an agent with an explicit custom image")
+		customImageYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  protocols:
+    - type: A2A
+`, customAgentName)
+
+		cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+		stdin, err := cmd.StdinPipe()
+		Expect(err).NotTo(HaveOccurred())
+		go func() {
+			defer func() { _ = stdin.Close() }()
+			_, _ = stdin.Write([]byte(customImageYAML))
+		}()
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to create custom image agent")
+
+		By("verifying the Agent CR has the custom image set")
+		verifyCustomImage := func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "agent", customAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.image}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(Equal("ghcr.io/agentic-layer/weather-agent:0.3.0"),
+				"Agent CR should have the custom image set")
+		}
+		Eventually(verifyCustomImage).Should(Succeed())
+
+		By("verifying the deployment uses the custom image")
+		verifyDeploymentUsesCustomImage := func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "deployment", customAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.template.spec.containers[0].image}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(Equal("ghcr.io/agentic-layer/weather-agent:0.3.0"),
+				"Deployment should use the custom image")
+		}
+		Eventually(verifyDeploymentUsesCustomImage, 30*time.Second).Should(Succeed())
+
+		By("updating the agent spec and verifying custom image is preserved")
+		cmd = exec.Command("kubectl", "patch", "agent", customAgentName, "-n", testNamespace,
+			"--type=merge", "-p", `{"spec":{"replicas":2}}`)
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to patch custom agent")
+
+		By("verifying the custom image is still set in the CR")
+		Eventually(verifyCustomImage).Should(Succeed())
+
+		By("verifying the deployment still uses the custom image")
+		Eventually(verifyDeploymentUsesCustomImage, 30*time.Second).Should(Succeed())
 	})
 
 	It("should verify successful reconciliation", func() {

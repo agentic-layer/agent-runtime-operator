@@ -36,9 +36,8 @@ import (
 )
 
 const (
-	googleAdkFramework           = "google-adk"
-	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.4.0"
-	defaultTemplateImageFallback = "invalid"
+	googleAdkFramework      = "google-adk"
+	DefaultTemplateImageAdk = "ghcr.io/agentic-layer/agent-template-adk:0.4.0"
 )
 
 // agentlog is for logging in this package.
@@ -109,18 +108,6 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 	if agent.Spec.Replicas == nil {
 		agent.Spec.Replicas = new(int32)
 		*agent.Spec.Replicas = d.DefaultReplicas
-	}
-
-	// Set default image if not specified (template image)
-	if agent.Spec.Image == "" {
-		switch agent.Spec.Framework {
-		case googleAdkFramework:
-			agent.Spec.Image = DefaultTemplateImageAdk
-		default:
-			// Validation will catch unsupported frameworks without images
-			// This shouldn't be reached due to validation, but set template as fallback
-			agent.Spec.Image = defaultTemplateImageFallback
-		}
 	}
 
 	// Add default protocols if none are specified

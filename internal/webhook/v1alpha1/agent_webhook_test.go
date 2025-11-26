@@ -293,30 +293,6 @@ var _ = Describe("Agent Webhook", func() {
 		})
 
 		Context("When setting default images", func() {
-			It("Should set template image for google-adk framework when no image specified", func() {
-				By("setting up a google-adk agent without image")
-				obj.Spec.Framework = googleAdkFramework
-
-				By("calling the Default method")
-				err := defaulter.Default(ctx, obj)
-				Expect(err).NotTo(HaveOccurred())
-
-				By("verifying that template image is set")
-				Expect(obj.Spec.Image).To(Equal(DefaultTemplateImageAdk))
-			})
-
-			It("Should set fallback image for unknown framework when no image specified", func() {
-				By("setting up an unknown framework agent without image")
-				obj.Spec.Framework = "unknown-framework"
-
-				By("calling the Default method")
-				err := defaulter.Default(ctx, obj)
-				Expect(err).NotTo(HaveOccurred())
-
-				By("verifying that fallback image is set")
-				Expect(obj.Spec.Image).To(Equal("invalid"))
-			})
-
 			It("Should not override existing image", func() {
 				By("setting up an agent with custom image")
 				obj.Spec.Framework = googleAdkFramework
@@ -451,9 +427,6 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.Tools).To(HaveLen(1))
 				Expect(obj.Spec.Tools[0].Name).To(Equal("news_fetcher"))
 				Expect(obj.Spec.Tools[0].ToolServerRef.Name).To(Equal("news-fetcher-tool"))
-
-				By("verifying that template image is still set")
-				Expect(obj.Spec.Image).To(Equal(DefaultTemplateImageAdk))
 			})
 
 			It("Should work with empty template fields", func() {
@@ -471,9 +444,6 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.Model).To(BeEmpty())
 				Expect(obj.Spec.SubAgents).To(BeEmpty())
 				Expect(obj.Spec.Tools).To(BeEmpty())
-
-				By("verifying that template image is still set")
-				Expect(obj.Spec.Image).To(Equal(DefaultTemplateImageAdk))
 			})
 		})
 

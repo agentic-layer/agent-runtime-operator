@@ -38,8 +38,11 @@ import (
 )
 
 const (
-	agentContainerName = "agent"
-	agentCardEndpoint  = "/.well-known/agent-card.json"
+	agentContainerName           = "agent"
+	agentCardEndpoint            = "/.well-known/agent-card.json"
+	googleAdkFramework           = "google-adk"
+	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.4.0"
+	defaultTemplateImageFallback = "invalid"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -220,7 +223,18 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 			// Get pointer to the newly added container
 			container = &deployment.Spec.Template.Spec.Containers[len(deployment.Spec.Template.Spec.Containers)-1]
 		}
-		container.Image = agent.Spec.Image
+		if agent.Spec.Image != "" {
+			container.Image = agent.Spec.Image
+		} else {
+			switch agent.Spec.Framework {
+			case googleAdkFramework:
+				container.Image = defaultTemplateImageAdk
+			default:
+				// Validation will catch unsupported frameworks without images
+				// This shouldn't be reached due to validation, but set template as fallback
+				container.Image = defaultTemplateImageFallback
+			}
+		}
 		container.Ports = containerPorts
 		container.Env = allEnvVars
 		container.EnvFrom = agent.Spec.EnvFrom
