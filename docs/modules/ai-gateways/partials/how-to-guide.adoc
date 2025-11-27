@@ -1,8 +1,12 @@
-= Create a LiteLLM AI Gateway
+= Create an AI Gateway
 
-This guide walks you through deploying a LiteLLM instance using the AiGateway custom resource.
+This guide walks you through deploying an instance of the `AiGateway` custom resource.
 
-IMPORTANT: Before following this guide, make sure you have an AI Gateway Operator installed. See xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[Install the AI Gateway LiteLLM Operator] for installation instructions of one such operator.
+An `AiGateway` is like a Kubernetes https://kubernetes.io/docs/concepts/services-networking/gateway/#api-kind-gateway[Gateway] in that there might be many different implementations (also known as "classes"). Example implementations of the Kubernetes Gateway specification include Envoy Gateway, Cilium, or `amazon-vpc-lattice`).
+
+One example implementation of the Agentic Layer `AiGateway` specification is based on LiteLLM. This guide explains how to instantiate one such instance of an `AiGateway`.
+
+TIP: Before following this guide, make sure you have some kind of AiGateway Operator installed. See xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[Install the AI Gateway LiteLLM Operator] for installation instructions of one such operator.
 
 == Create API Key Secret
 
@@ -28,7 +32,7 @@ NOTE: The secret name must match the value configured in the operator. The defau
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: AiGateway
 metadata:
-  name: ai-gateway-litellm
+  name: ai-gateway
   namespace: ai-gateway
 spec:
   AiGatewayClassName: litellm
@@ -38,6 +42,8 @@ spec:
     - provider: gemini
       name: gemini-1.5-pro
 ----
+
+Note: The `AiGatewayClassName` is optional.
 
 . Apply the configuration:
 +
@@ -52,7 +58,7 @@ kubectl apply -f my-aigateway.yaml
 +
 [source,bash]
 ----
-kubectl get aigateways ai-gateway-litellm -o yaml
+kubectl get aigateways ai-gateway -o yaml
 ----
 
 . Verify the created resources:
@@ -60,18 +66,18 @@ kubectl get aigateways ai-gateway-litellm -o yaml
 [source,bash]
 ----
 # Check the deployment created by the operator
-kubectl get deployments -l app=ai-gateway-litellm
+kubectl get deployments -l app=ai-gateway
 
 # Check the service
-kubectl get services -l app=ai-gateway-litellm
+kubectl get services -l app=ai-gateway
 
 # Check the configmap with LiteLLM configuration
-kubectl get configmaps ai-gateway-litellm-config
+kubectl get configmaps ai-gateway-config
 ----
 
 . Check the pod logs to ensure LiteLLM started successfully:
 +
 [source,bash]
 ----
-kubectl logs -l app=ai-gateway-litellm -c litellm
+kubectl logs -l app=ai-gateway -c litellm
 ----

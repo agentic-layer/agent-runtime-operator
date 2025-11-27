@@ -1,8 +1,12 @@
-= Create a KrakenD Agent Gateway
+= Create an Agent Gateway
 
-This guide walks you through deploying a KrakenD instance using the AgentGateway custom resource.
+This guide walks you through deploying an instance of the `AgentGateway` custom resource.
 
-IMPORTANT: Before following this guide, make sure you have the KrakenD Agent Gateway Operator installed. See xref:agent-gateway-krakend-operator:operator:how-to-guide.adoc[Install the AI Gateway KrakenD Operator] for installation instructions.
+An `AgentGateway` is like a Kubernetes https://kubernetes.io/docs/concepts/services-networking/gateway/#api-kind-gateway[Gateway] in that there might be many different implementations (also known as "classes"). Example implementations of the Kubernetes Gateway specification include Envoy Gateway, Cilium, or `amazon-vpc-lattice`).
+
+One implementation of the `AgentGateway` specification is based on KrakenD. This guide explains how to instantiate one such instance of an `AgentGateway`.
+
+TIP: Before following this guide, make sure you have some kind of Agent Gateway Operator installed. See xref:agent-gateway-krakend-operator:operator:how-to-guide.adoc[Install the Agent Gateway KrakenD Operator] for one example.
 
 == Create an AgentGateway Resource
 
