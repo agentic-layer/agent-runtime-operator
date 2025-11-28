@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,6 +37,11 @@ type AiGatewaySpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
 	AiModels []AiModel `json:"aiModels,omitempty"`
+
+	// Environment variables to pass to the AI gateway container.
+	// These can include configuration values, credentials, or feature flags.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 type AiModel struct {
