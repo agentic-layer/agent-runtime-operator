@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"time"
 
-	webhookv1alpha1 "github.com/agentic-layer/agent-runtime-operator/internal/webhook/v1alpha1"
+	"github.com/agentic-layer/agent-runtime-operator/internal/controller"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -271,7 +271,7 @@ var _ = Describe("Agent Deployment", Ordered, func() {
 				"-o", "jsonpath={.spec.template.spec.containers[0].image}")
 			output, err := utils.Run(cmd)
 			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(Equal(webhookv1alpha1.DefaultTemplateImageAdk), "Should use template image")
+			g.Expect(output).To(Equal(controller.DefaultTemplateImageAdk), "Should use template image")
 		}
 		Eventually(verifyTemplateImage).Should(Succeed())
 
@@ -526,7 +526,7 @@ spec:
   protocols:
     - type: A2A
       port: 8000
-`, subAgentName, webhookv1alpha1.DefaultTemplateImageAdk)
+`, subAgentName, controller.DefaultTemplateImageAdk)
 
 		cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
 		stdin, err := cmd.StdinPipe()
@@ -564,7 +564,7 @@ spec:
   protocols:
     - type: A2A
       port: 8000
-`, parentAgentName, webhookv1alpha1.DefaultTemplateImageAdk, subAgentName, subAgentName)
+`, parentAgentName, controller.DefaultTemplateImageAdk, subAgentName, subAgentName)
 
 		cmd = exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
 		stdin, err = cmd.StdinPipe()
@@ -625,7 +625,7 @@ spec:
   protocols:
     - type: A2A
       port: 8000
-`, subAgentName, webhookv1alpha1.DefaultTemplateImageAdk)
+`, subAgentName, controller.DefaultTemplateImageAdk)
 
 		cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
 		stdin, err := cmd.StdinPipe()
@@ -662,7 +662,7 @@ spec:
   protocols:
     - type: A2A
       port: 8000
-`, parentAgentName, webhookv1alpha1.DefaultTemplateImageAdk, subAgentName, subAgentName)
+`, parentAgentName, controller.DefaultTemplateImageAdk, subAgentName, subAgentName)
 
 		cmd = exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
 		stdin, err = cmd.StdinPipe()

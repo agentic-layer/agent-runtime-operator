@@ -41,7 +41,7 @@ const (
 	agentContainerName           = "agent"
 	agentCardEndpoint            = "/.well-known/agent-card.json"
 	googleAdkFramework           = "google-adk"
-	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.4.0"
+	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.5"
 	defaultTemplateImageFallback = "invalid"
 )
 
@@ -228,7 +228,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		} else {
 			switch agent.Spec.Framework {
 			case googleAdkFramework:
-				container.Image = defaultTemplateImageAdk
+				container.Image = DefaultTemplateImageAdk
 			default:
 				// Validation will catch unsupported frameworks without images
 				// This shouldn't be reached due to validation, but set template as fallback

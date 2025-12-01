@@ -36,8 +36,7 @@ import (
 )
 
 const (
-	googleAdkFramework      = "google-adk"
-	DefaultTemplateImageAdk = "ghcr.io/agentic-layer/agent-template-adk:0.4.0"
+	googleAdkFramework = "google-adk"
 )
 
 // agentlog is for logging in this package.
