@@ -42,6 +42,11 @@ type AiGatewaySpec struct {
 	// These can include configuration values, credentials, or feature flags.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// List of sources to populate environment variables in the AI gateway container.
+	// This allows loading variables from ConfigMaps and Secrets.
+	// +optional
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 type AiModel struct {
