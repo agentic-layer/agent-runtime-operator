@@ -108,6 +108,7 @@ spec:
   subAgents:
     - name: summarizer_agent
       url: "https://agents.example.com/summarizer-agent.json"
+      interactionType: "tool_call"  # Optional: treat subagent as tool call (default) rather than "transfer"ing the session to the subagent
 
   protocols:
     - type: A2A
@@ -121,6 +122,27 @@ spec:
 * *description*: Brief description of your agent's purpose
 * *instruction*: Detailed system prompt defining the agent's behavior
 * *model*: Language model to use (defaults to framework default if not specified)
+
+==== Sub-Agent Interaction Types
+
+When configuring sub-agents, you can control how your agent interacts with them using the optional `interactionType` field:
+
+* *`tool_call` (default)*: The sub-agent is invoked as a regular tool call. The parent agent remains in control and receives the sub-agent's response as tool output.
+* *`transfer`*: Uses the `transfer_to_agent` mechanism to hand off control to the sub-agent. The sub-agent takes over the conversation and can interact directly with the user.
+
+[source,yaml]
+----
+subAgents:
+  # Tool call: agent calls sub-agent and processes response
+  - name: summarizer_agent
+    url: "https://agents.example.com/summarizer-agent.json"
+    interactionType: "tool_call"  # Default behavior
+
+  # Transfer: hand off conversation to specialist
+  - name: specialist_agent
+    url: "https://agents.example.com/specialist-agent.json"
+    interactionType: "transfer"
+----
 
 == Custom Image Agents
 

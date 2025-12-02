@@ -84,8 +84,8 @@ var _ = Describe("Agent Config", func() {
 					Instruction: "You are a helpful assistant",
 					Model:       "gpt-4",
 					SubAgents: []runtimev1alpha1.SubAgent{
-						{Name: "sub1", Url: "https://example.com/sub1.json"},
-						{Name: "sub2", Url: "https://example.com/sub2.json"},
+						{Name: "sub1", Url: "https://example.com/sub1.json", InteractionType: "tool_call"},
+						{Name: "sub2", Url: "https://example.com/sub2.json", InteractionType: "transfer"},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
 						{Name: "tool1", ToolServerRef: corev1.ObjectReference{Name: "tool-server-1"}},
@@ -140,7 +140,7 @@ var _ = Describe("Agent Config", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					SubAgents: []runtimev1alpha1.SubAgent{
-						{Name: "test-sub", Url: "https://example.com/sub.json"},
+						{Name: "test-sub", Url: "https://example.com/sub.json", InteractionType: "tool_call"},
 					},
 				},
 			}
@@ -155,7 +155,7 @@ var _ = Describe("Agent Config", func() {
 
 			// Verify JSON structure is valid
 			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
-			Expect(subAgentsVar.Value).To(MatchJSON(`{"test_sub":{"url":"https://example.com/sub.json"}}`))
+			Expect(subAgentsVar.Value).To(MatchJSON(`{"test_sub":{"url":"https://example.com/sub.json","interaction_type":"tool_call"}}`))
 		})
 
 		It("should handle JSON marshaling of tools", func() {
