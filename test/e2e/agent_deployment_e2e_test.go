@@ -53,7 +53,8 @@ var _ = Describe("Agent Deployment", Ordered, func() {
 		By("cleaning up test agents from individual tests")
 		// Clean up test agents created in individual tests
 		testAgents := []string{"test-subagent", "test-parent-agent", "watch-subagent", "watch-parent",
-			"template-update-test-agent", "custom-image-test-agent"}
+			"template-update-test-agent", "custom-image-test-agent",
+			"interaction-type-subagent", "interaction-type-parent"}
 		for _, agentName := range testAgents {
 			cmd := exec.Command("kubectl", "delete", "agent", agentName, "-n", testNamespace, "--ignore-not-found=true")
 			_, _ = utils.Run(cmd)
@@ -717,6 +718,119 @@ spec:
 			g.Expect(newSubAgentsValue).NotTo(Equal(initialSubAgentsValue),
 				"SUB_AGENTS value should have changed")
 		}, 2*time.Minute).Should(Succeed())
+	})
+
+	It("should handle subAgent interactionType field (default and explicit)", func() {
+		const subAgentName = "interaction-type-subagent"
+		const parentAgentName = "interaction-type-parent"
+
+		By("creating a subAgent with A2A protocol")
+		subAgentYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  image: %s
+  protocols:
+    - type: A2A
+      port: 8000
+`, subAgentName, controller.DefaultTemplateImageAdk)
+
+		cmd := exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+		stdin, err := cmd.StdinPipe()
+		Expect(err).NotTo(HaveOccurred())
+		go func() {
+			defer func() { _ = stdin.Close() }()
+			_, _ = stdin.Write([]byte(subAgentYAML))
+		}()
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to create subAgent")
+
+		By("waiting for subAgent Status.Url to be populated")
+		Eventually(func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "agent", subAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.status.url}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).NotTo(BeEmpty(), "SubAgent status URL should be set")
+		}).Should(Succeed())
+
+		By("creating parent agent WITHOUT specifying interactionType (should default to tool_call)")
+		parentAgentYAML := fmt.Sprintf(`
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: %s
+spec:
+  framework: google-adk
+  image: %s
+  subAgents:
+    - name: %s
+      agentRef:
+        name: %s
+  protocols:
+    - type: A2A
+      port: 8000
+`, parentAgentName, controller.DefaultTemplateImageAdk, subAgentName, subAgentName)
+
+		cmd = exec.Command("kubectl", "apply", "-f", "-", "-n", testNamespace)
+		stdin, err = cmd.StdinPipe()
+		Expect(err).NotTo(HaveOccurred())
+		go func() {
+			defer func() { _ = stdin.Close() }()
+			_, _ = stdin.Write([]byte(parentAgentYAML))
+		}()
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to create parent agent")
+
+		By("waiting for parent deployment to be ready")
+		Eventually(func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.status.readyReplicas}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(Equal("1"), "Parent deployment should have 1 ready replica")
+		}, 3*time.Minute).Should(Succeed())
+
+		By("verifying SUB_AGENTS has default interaction_type 'tool_call'")
+		var initialSubAgentsValue string
+		Eventually(func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='SUB_AGENTS')].value}")
+			output, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(output).To(ContainSubstring(subAgentName), "SUB_AGENTS should contain subAgent name")
+			g.Expect(output).To(ContainSubstring(`"interaction_type":"tool_call"`),
+				"SUB_AGENTS should contain default interaction_type 'tool_call'")
+			initialSubAgentsValue = output
+		}).Should(Succeed())
+
+		By("updating parent agent to set explicit interactionType: transfer")
+		cmd = exec.Command("kubectl", "patch", "agent", parentAgentName, "-n", testNamespace,
+			"--type=json", "-p",
+			`[{"op":"replace","path":"/spec/subAgents/0/interactionType","value":"transfer"}]`)
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to patch parent agent with interactionType")
+
+		By("verifying deployment SUB_AGENTS was updated to interaction_type 'transfer'")
+		Eventually(func(g Gomega) {
+			cmd := exec.Command("kubectl", "get", "deployment", parentAgentName, "-n", testNamespace,
+				"-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='SUB_AGENTS')].value}")
+			newSubAgentsValue, err := utils.Run(cmd)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(newSubAgentsValue).To(ContainSubstring(`"interaction_type":"transfer"`),
+				"SUB_AGENTS should now contain interaction_type 'transfer'")
+			g.Expect(newSubAgentsValue).NotTo(Equal(initialSubAgentsValue),
+				"SUB_AGENTS value should have changed")
+		}, 2*time.Minute).Should(Succeed())
+
+		By("cleaning up test agents")
+		cmd = exec.Command("kubectl", "delete", "agent", subAgentName, "-n", testNamespace, "--ignore-not-found=true")
+		_, _ = utils.Run(cmd)
+		cmd = exec.Command("kubectl", "delete", "agent", parentAgentName, "-n", testNamespace, "--ignore-not-found=true")
+		_, _ = utils.Run(cmd)
 	})
 
 	Context("Agent Volume Validation", func() {
