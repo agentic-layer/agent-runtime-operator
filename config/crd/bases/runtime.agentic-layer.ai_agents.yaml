@@ -424,12 +424,8 @@ spec:
                       x-kubernetes-map-type: atomic
                     interactionType:
                       default: tool_call
-                      description: |-
-                        InteractionType specifies how the agent should interact with this sub-agent.
-                        Valid values are:
-                        - "transfer": Use transfer_to_agent mechanism (handoff control to sub-agent)
-                        - "tool_call": Treat sub-agent as a regular tool call
-                        Defaults to "transfer" if not specified.
+                      description: InteractionType specifies how the agent should
+                        interact with this sub-agent.
                       enum:
                       - transfer
                       - tool_call
