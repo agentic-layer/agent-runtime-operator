@@ -40,7 +40,7 @@ import (
 //   - AGENT_TOOLS: JSON-encoded map of MCP tool configurations (empty object if none)
 //
 // JSON Structure:
-//   - SubAgents: {"agentName": {"url": "https://..."}}
+//   - SubAgents: {"agentName": {"url": "https://...", "interaction_type": "transfer|tool_call"}}
 //   - Tools: {"toolName": {"url": "https://..."}}
 //
 // Parameters:
@@ -111,8 +111,21 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 	if len(resolvedSubAgents) > 0 {
 		subAgentsMap := make(map[string]map[string]string)
 		for name, url := range resolvedSubAgents {
+			// Find the SubAgent spec to get the interaction type
+			var interactionType string
+			for _, subAgent := range agent.Spec.SubAgents {
+				if subAgent.Name == name {
+					interactionType = subAgent.InteractionType
+					break
+				}
+			}
+			// InteractionType should always be set by CRD default
+			if interactionType == "" {
+				return nil, fmt.Errorf("subAgent %q has no interactionType set (CRD defaulting failed)", name)
+			}
 			subAgentsMap[r.sanitizeAgentName(name)] = map[string]string{
-				"url": url,
+				"url":              url,
+				"interaction_type": interactionType,
 			}
 		}
 		subAgentsJSON, err = json.Marshal(subAgentsMap)

@@ -13,6 +13,10 @@ spec:
   subAgents:
     - name: summarizer_agent
       url: "https://agents.example.com/summarizer-agent.json"
+      interactionType: "tool_call"  # Optional, defaults to "tool_call"
+    - name: specialist_agent
+      url: "https://agents.example.com/specialist-agent.json"
+      interactionType: "transfer"  # Handoff control to this agent
   protocols:
     - type: A2A
   replicas: 1
