@@ -218,8 +218,8 @@ var _ = Describe("Agent SubAgent", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					SubAgents: []runtimev1alpha1.SubAgent{
-						{Name: "cluster-sub1", AgentRef: &corev1.ObjectReference{Name: "cluster-sub1"}},
-						{Name: "remote-sub", Url: "https://example.com/sub.json"},
+						{Name: "cluster-sub1", AgentRef: &corev1.ObjectReference{Name: "cluster-sub1"}, InteractionType: "tool_call"},
+						{Name: "remote-sub", Url: "https://example.com/sub.json", InteractionType: "transfer"},
 					},
 				},
 			}
@@ -227,8 +227,14 @@ var _ = Describe("Agent SubAgent", func() {
 			resolved, err := reconciler.resolveAllSubAgents(ctx, parentAgent)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolved).To(HaveLen(2))
-			Expect(resolved["cluster-sub1"]).To(Equal("http://cluster-sub1.default.svc.cluster.local:8000/"))
-			Expect(resolved["remote-sub"]).To(Equal("https://example.com/sub.json"))
+			Expect(resolved["cluster-sub1"]).To(Equal(ResolvedSubAgent{
+				Url:             "http://cluster-sub1.default.svc.cluster.local:8000/",
+				InteractionType: "tool_call",
+			}))
+			Expect(resolved["remote-sub"]).To(Equal(ResolvedSubAgent{
+				Url:             "https://example.com/sub.json",
+				InteractionType: "transfer",
+			}))
 		})
 
 		It("should collect all resolution errors", func() {
