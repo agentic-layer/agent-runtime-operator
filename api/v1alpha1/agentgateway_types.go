@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -34,6 +35,16 @@ type AgentGatewaySpec struct {
 	// Timeout specifies the gateway timeout for requests
 	// +kubebuilder:default="360s"
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
+	// Environment variables to pass to the AgentGateway container.
+	// These can include configuration values, credentials, or feature flags.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// List of sources to populate environment variables in the AgentGateway container.
+	// This allows loading variables from ConfigMaps and Secrets.
+	// +optional
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 // AgentGatewayStatus defines the observed state of AgentGateway
