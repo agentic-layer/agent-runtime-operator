@@ -66,10 +66,6 @@ type SubAgent struct {
 	Url string `json:"url,omitempty"`
 
 	// InteractionType specifies how the agent should interact with this sub-agent.
-	// Valid values are:
-	// - "transfer": Use transfer_to_agent mechanism (handoff control to sub-agent)
-	// - "tool_call": Treat sub-agent as a regular tool call
-	// Defaults to "transfer" if not specified.
 	// +optional
 	// +kubebuilder:validation:Enum=transfer;tool_call
 	// +kubebuilder:default="tool_call"
