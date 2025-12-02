@@ -42,7 +42,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{},
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{},
 				nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(envVars).To(HaveLen(6))
@@ -95,9 +95,9 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			// Simulate resolved subagents (URL-based subagents pass through directly)
-			resolvedSubAgents := map[string]string{
-				"sub1": "https://example.com/sub1.json",
-				"sub2": "https://example.com/sub2.json",
+			resolvedSubAgents := map[string]ResolvedSubAgent{
+				"sub1": {Url: "https://example.com/sub1.json", InteractionType: "tool_call"},
+				"sub2": {Url: "https://example.com/sub2.json", InteractionType: "transfer"},
 			}
 
 			// Simulate resolved tools (from ToolServer references)
@@ -146,8 +146,8 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			// Simulate resolved subagents (URL-based subagents pass through directly)
-			resolvedSubAgents := map[string]string{
-				"test-sub": "https://example.com/sub.json",
+			resolvedSubAgents := map[string]ResolvedSubAgent{
+				"test-sub": {Url: "https://example.com/sub.json", InteractionType: "tool_call"},
 			}
 
 			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, resolvedSubAgents, map[string]string{}, nil)
@@ -176,7 +176,7 @@ var _ = Describe("Agent Config", func() {
 				"test-tool": "http://tool-server-1.default.svc.cluster.local:8080/sse",
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, resolvedTools, nil)
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, resolvedTools, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify JSON structure is valid
@@ -201,7 +201,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{},
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{},
 				nil)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -219,7 +219,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{},
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{},
 				nil)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -239,7 +239,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			gatewayUrl := "http://ai-gateway.ai-gateway-ns.svc.cluster.local:4000"
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{}, &gatewayUrl)
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should have base variables (6) + LiteLLM variables (3) = 9 total
@@ -270,7 +270,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{}, nil)
+			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should only have base variables (6), no LiteLLM variables
@@ -292,7 +292,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			gatewayUrl := "http://ai-gateway.default.svc.cluster.local:4000"
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]string{}, map[string]string{}, &gatewayUrl)
+			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			userVars := []corev1.EnvVar{

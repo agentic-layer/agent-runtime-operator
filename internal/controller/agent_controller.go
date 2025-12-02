@@ -131,7 +131,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
 func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent,
-	resolvedSubAgents map[string]string, resolvedTools map[string]string, aiGateway *runtimev1alpha1.AiGateway) error {
+	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string, aiGateway *runtimev1alpha1.AiGateway) error {
 	log := logf.FromContext(ctx)
 
 	log.V(1).Info("Ensuring Deployment for Agent")

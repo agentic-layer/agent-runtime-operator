@@ -28,11 +28,19 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// resolveAllSubAgents resolves all subAgent URLs and returns a map of name to URL.
+// ResolvedSubAgent contains the resolved information for a sub-agent
+type ResolvedSubAgent struct {
+	// Url is the resolved agent card URL
+	Url string
+	// InteractionType specifies how to interact with this sub-agent ("transfer" or "tool_call")
+	InteractionType string
+}
+
+// resolveAllSubAgents resolves all subAgent URLs and returns a map of name to ResolvedSubAgent.
 // Collects all resolution errors and returns them together, allowing the caller to see
 // all missing subAgents at once rather than failing on the first error.
-func (r *AgentReconciler) resolveAllSubAgents(ctx context.Context, agent *runtimev1alpha1.Agent) (map[string]string, error) {
-	resolved := make(map[string]string)
+func (r *AgentReconciler) resolveAllSubAgents(ctx context.Context, agent *runtimev1alpha1.Agent) (map[string]ResolvedSubAgent, error) {
+	resolved := make(map[string]ResolvedSubAgent)
 	var issues []string
 
 	for _, subAgent := range agent.Spec.SubAgents {
@@ -40,7 +48,10 @@ func (r *AgentReconciler) resolveAllSubAgents(ctx context.Context, agent *runtim
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("subAgent %q: %v", subAgent.Name, err))
 		} else {
-			resolved[subAgent.Name] = url
+			resolved[subAgent.Name] = ResolvedSubAgent{
+				Url:             url,
+				InteractionType: subAgent.InteractionType,
+			}
 		}
 	}
 

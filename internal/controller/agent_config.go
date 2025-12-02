@@ -45,14 +45,14 @@ import (
 //
 // Parameters:
 //   - agent: The Agent resource to generate template variables for
-//   - resolvedSubAgents: Map of subAgent name to resolved URL (already validated)
+//   - resolvedSubAgents: Map of subAgent name to ResolvedSubAgent (URL and interactionType)
 //   - aiGatewayUrl: URL of the resolved AiGateway (nil if not found)
 //
 // Returns:
 //   - []corev1.EnvVar: Slice of environment variables for template configuration
 //   - error: JSON marshaling error if SubAgents or Tools contain invalid data
 func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent,
-	resolvedSubAgents map[string]string, resolvedTools map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar,
+	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar,
 	error) {
 	var templateEnvVars []corev1.EnvVar
 	var err error
@@ -110,22 +110,14 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 	var subAgentsJSON []byte
 	if len(resolvedSubAgents) > 0 {
 		subAgentsMap := make(map[string]map[string]string)
-		for name, url := range resolvedSubAgents {
-			// Find the SubAgent spec to get the interaction type
-			var interactionType string
-			for _, subAgent := range agent.Spec.SubAgents {
-				if subAgent.Name == name {
-					interactionType = subAgent.InteractionType
-					break
-				}
-			}
+		for name, resolved := range resolvedSubAgents {
 			// InteractionType should always be set by CRD default
-			if interactionType == "" {
+			if resolved.InteractionType == "" {
 				return nil, fmt.Errorf("subAgent %q has no interactionType set (CRD defaulting failed)", name)
 			}
 			subAgentsMap[r.sanitizeAgentName(name)] = map[string]string{
-				"url":              url,
-				"interaction_type": interactionType,
+				"url":              resolved.Url,
+				"interaction_type": resolved.InteractionType,
 			}
 		}
 		subAgentsJSON, err = json.Marshal(subAgentsMap)
