@@ -70,8 +70,7 @@ func TestE2E(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	By("building the manager(Operator) image")
-	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
-	_, err := utils.Run(cmd)
+	_, err := utils.Run(exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage)))
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
 
 	By("loading the manager(Operator) image on Kind")
@@ -95,24 +94,20 @@ var _ = BeforeSuite(func() {
 
 	// Deploy the operator
 	By("creating manager namespace")
-	cmd = exec.Command("kubectl", "create", "ns", namespace)
-	_, err = utils.Run(cmd)
+	_, err = utils.Run(exec.Command("kubectl", "create", "ns", namespace))
 	Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
 
 	By("labeling the namespace to enforce the restricted security policy")
-	cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
-		"pod-security.kubernetes.io/enforce=restricted")
-	_, err = utils.Run(cmd)
+	_, err = utils.Run(exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
+		"pod-security.kubernetes.io/enforce=restricted"))
 	Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with restricted policy")
 
 	By("installing CRDs")
-	cmd = exec.Command("make", "install")
-	_, err = utils.Run(cmd)
+	_, err = utils.Run(exec.Command("make", "install"))
 	Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
 
 	By("deploying the controller-manager")
-	cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
-	_, err = utils.Run(cmd)
+	_, err = utils.Run(exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage)))
 	Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
 
 	waitForWebhook(namespace, webhookServiceName)
@@ -138,10 +133,9 @@ func waitForWebhook(namespace string, webhookServiceName string) {
 	By("waiting for webhook deployment to be ready")
 	Eventually(func(g Gomega) {
 		// Check that the webhook deployment is ready
-		cmd := exec.Command("kubectl", "get", "deployment",
+		output, err := utils.Run(exec.Command("kubectl", "get", "deployment",
 			"-l", "control-plane=controller-manager", "-n", namespace,
-			"-o", "jsonpath={.items[0].status.readyReplicas}")
-		output, err := utils.Run(cmd)
+			"-o", "jsonpath={.items[0].status.readyReplicas}"))
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(output).To(Equal("1"), "Controller manager should have 1 ready replica")
 	}, 3*time.Minute, 5*time.Second).Should(Succeed())
@@ -149,34 +143,30 @@ func waitForWebhook(namespace string, webhookServiceName string) {
 	By("waiting for webhook service to be ready")
 	Eventually(func(g Gomega) {
 		// Check that the webhook service exists and has endpoints
-		cmd := exec.Command("kubectl", "get", "service",
-			webhookServiceName, "-n", namespace)
-		_, err := utils.Run(cmd)
+		_, err := utils.Run(exec.Command("kubectl", "get", "service",
+			webhookServiceName, "-n", namespace))
 		g.Expect(err).NotTo(HaveOccurred())
 
 		// Check that the webhook service has endpoints (meaning pods are ready)
-		cmd = exec.Command("kubectl", "get", "endpoints", webhookServiceName,
-			"-n", namespace, "-o", "jsonpath={.subsets[*].addresses[*].ip}")
-		output, err := utils.Run(cmd)
+		output, err := utils.Run(exec.Command("kubectl", "get", "endpoints", webhookServiceName,
+			"-n", namespace, "-o", "jsonpath={.subsets[*].addresses[*].ip}"))
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(output).NotTo(BeEmpty(), "Webhook service should have endpoints")
 	}).Should(Succeed())
 
 	By("verifying that the certificate secret has been created")
 	Eventually(func(g Gomega) {
-		cmd := exec.Command("kubectl", "get", "secrets", "webhook-server-cert", "-n", namespace)
-		_, err := utils.Run(cmd)
+		_, err := utils.Run(exec.Command("kubectl", "get", "secrets", "webhook-server-cert", "-n", namespace))
 		g.Expect(err).NotTo(HaveOccurred())
 	}).Should(Succeed())
 }
 
 func waitForWebhookCaBundle(kind string, name string) {
 	Eventually(func(g Gomega) {
-		cmd := exec.Command("kubectl", "get",
+		mwhOutput, err := utils.Run(exec.Command("kubectl", "get",
 			kind,
 			name,
-			"-o", "go-template={{ range .webhooks }}{{ .clientConfig.caBundle }}{{ end }}")
-		mwhOutput, err := utils.Run(cmd)
+			"-o", "go-template={{ range .webhooks }}{{ .clientConfig.caBundle }}{{ end }}"))
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(len(mwhOutput)).To(BeNumerically(">", 10))
 	}).Should(Succeed())
@@ -197,8 +187,7 @@ func waitForWebhookCaBundleValidating(name string) {
 
 func fetchKubernetesEvents() {
 	By("Fetching Kubernetes events")
-	cmd := exec.Command("kubectl", "get", "events", "-n", namespace, "--sort-by=.lastTimestamp")
-	eventsOutput, err := utils.Run(cmd)
+	eventsOutput, err := utils.Run(exec.Command("kubectl", "get", "events", "-n", namespace, "--sort-by=.lastTimestamp"))
 	if err == nil {
 		_, _ = fmt.Fprintf(GinkgoWriter, "Kubernetes events:\n%s", eventsOutput)
 	} else {
@@ -208,8 +197,8 @@ func fetchKubernetesEvents() {
 
 func fetchControllerManagerPodLogs() {
 	By("Fetching controller manager pod logs")
-	cmd := exec.Command("kubectl", "logs", "-l", "app.kubernetes.io/name="+operatorName, "-n", namespace)
-	controllerLogs, err := utils.Run(cmd)
+	controllerLogs, err := utils.Run(exec.Command("kubectl", "logs",
+		"-l", "app.kubernetes.io/name="+operatorName, "-n", namespace))
 	if err == nil {
 		_, _ = fmt.Fprintf(GinkgoWriter, "Controller logs:\n %s", controllerLogs)
 	} else {
