@@ -1,47 +1,175 @@
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: AgenticWorkforce
-metadata:
-  labels:
-    app.kubernetes.io/name: agent-runtime-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: customer-service-workforce
-spec:
-  # Human-readable name for the workforce
-  name: "Customer Service Team"
+# AgenticWorkforce Sample
+#
+# This sample demonstrates all key features of AgenticWorkforce:
+# 1. Multiple independent workforces
+# 2. Agent sharing across workforces
+# 3. 3-level agent hierarchies
+# 4. Transitive agent and tool discovery
+# 5. Cross-namespace agent and tool references
+# 6. Simple vs complex workforce patterns
+#
+# Deploy with: kubectl apply -f runtime_v1alpha1_agenticworkforce.yaml
 
-  # Description of the workforce's purpose and capabilities
-  description: "A workforce of agents handling customer inquiries, support tickets, and product recommendations"
-
-  # Owner of the workforce (email or identifier)
-  owner: "user-name@example.com"
-
-  # Optional tags for categorization and organization
-  tags:
-    - customer-service
-    - support
-    - production
-
-  # Entry point agents - these are the initial agents users interact with
-  # References to existing Agent resources in the cluster
-  entryPointAgents:
-    # Agent in the same namespace (namespace field omitted)
-    - name: weather-agent
-
-    # Agent with explicit namespace reference (commented out example)
-    - name: assistant-agent
-      # namespace: ai-agents
 ---
-# Minimal AgenticWorkforce configuration
+# Namespace 1: Primary namespace for workforces and some agents/tools
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-wf-ns1
+
+---
+# Namespace 2: Secondary namespace for cross-namespace references
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-wf-ns2
+
+---
+# ToolServer 1: HTTP toolserver in namespace 1
+# This tool will be used by the shared agent
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: toolserver-ns1
+  namespace: test-wf-ns1
+spec:
+  protocol: mcp
+  transportType: http
+  image: ghcr.io/agentic-layer/mock-agent:0.6
+  port: 8080
+  replicas: 1
+
+---
+# ToolServer 2: HTTP toolserver in namespace 2
+# This demonstrates cross-namespace tool references
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: toolserver-ns2
+  namespace: test-wf-ns2
+spec:
+  protocol: mcp
+  transportType: http
+  image: ghcr.io/agentic-layer/mock-agent:0.6
+  port: 8080
+  replicas: 1
+
+---
+# Shared Agent (Leaf Agent): Used by BOTH workforces
+# - In Workforce 1: Part of the 3-level hierarchy (leaf)
+# - In Workforce 2: Direct entry point (simple workforce)
+# This agent uses tools from namespace 1
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: shared-agent
+  namespace: test-wf-ns1
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/mock-agent:0.6
+  tools:
+    - name: tool-ns1
+      toolServerRef:
+        name: toolserver-ns1
+
+---
+# Mid-level Agent: Part of the hierarchy for Workforce 1
+# This agent in namespace 2 references the shared agent in namespace 1
+# Demonstrates cross-namespace agent references
+# It also uses a tool from namespace 2 to demonstrate cross-namespace tool discovery
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: mid-agent
+  namespace: test-wf-ns2
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/mock-agent:0.6
+  # Cross-namespace tool reference
+  tools:
+    - name: tool-ns2
+      toolServerRef:
+        name: toolserver-ns2
+  # Cross-namespace sub-agent reference
+  subAgents:
+    - name: shared
+      agentRef:
+        name: shared-agent
+        namespace: test-wf-ns1
+
+---
+# Entry Agent: Top-level agent for Workforce 1
+# This agent references the mid-level agent, creating a 3-level hierarchy
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: entry-agent
+  namespace: test-wf-ns1
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/mock-agent:0.6
+  # Cross-namespace sub-agent reference
+  subAgents:
+    - name: mid
+      agentRef:
+        name: mid-agent
+        namespace: test-wf-ns2
+
+---
+# Workforce 1 (Complex): Demonstrates hierarchies and transitive discovery
+# Entry point: entry-agent
+# Transitive agents discovered: entry-agent -> mid-agent -> shared-agent
+# Transitive tools discovered: toolserver-ns1 (from shared-agent), toolserver-ns2 (from mid-agent)
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: AgenticWorkforce
 metadata:
-  labels:
-    app.kubernetes.io/name: agent-runtime-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: minimal-workforce
+  name: complex-workforce
+  namespace: test-wf-ns1
 spec:
-  name: "Minimal Workforce"
-  description: "A minimal workforce example with one entry point"
-  owner: "admin@example.com"
+  name: "Complex Agent Hierarchy"
+  description: "A workforce demonstrating 3-level agent hierarchies, cross-namespace references, and transitive discovery of agents and tools"
+  owner: "platform-team@example.com"
   entryPointAgents:
-    - name: news-agent
+    - name: entry-agent
+
+---
+# Workforce 2 (Simple): Demonstrates simple workforce and agent sharing
+# Entry point: shared-agent (same agent used in Workforce 1's hierarchy)
+# This shows that:
+# - Workforces are independent
+# - Agents can be shared across multiple workforces
+# - A simple workforce can consist of just one agent
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgenticWorkforce
+metadata:
+  name: simple-workforce
+  namespace: test-wf-ns1
+spec:
+  name: "Simple Single Agent"
+  description: "A simple workforce with a single agent, demonstrating agent sharing across multiple workforces"
+  owner: "dev-team@example.com"
+  entryPointAgents:
+    - name: shared-agent
+
+---
+# Expected Results:
+#
+# complex-workforce status should show:
+#   transitiveAgents:
+#     - entry-agent (ns1)
+#     - mid-agent (ns2)
+#     - shared-agent (ns1)
+#   transitiveTools:
+#     - toolserver-ns1 (ns1) [from shared-agent]
+#     - toolserver-ns2 (ns2) [from mid-agent]
+#
+# simple-workforce status should show:
+#   transitiveAgents:
+#     - shared-agent (ns1)
+#   transitiveTools:
+#     - toolserver-ns1 (ns1) [from shared-agent]
+#
+# Verification commands:
+#   kubectl get agenticworkforce -n test-wf-ns1
+#   kubectl describe agenticworkforce complex-workforce -n test-wf-ns1
+#   kubectl describe agenticworkforce simple-workforce -n test-wf-ns1
