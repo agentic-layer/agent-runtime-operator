@@ -1,8 +1,6 @@
 ## Append samples of your project ##
 resources:
 - runtime_v1alpha1_agent.yaml
-- runtime_v1alpha1_agent_template.yaml
-- runtime_v1alpha1_agent_with_tools.yaml
 - runtime_v1alpha1_agenticworkforce.yaml
 - configmap.yaml
 - runtime_v1alpha1_toolserver_http.yaml
