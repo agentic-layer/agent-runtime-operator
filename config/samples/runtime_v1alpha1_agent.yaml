@@ -1,29 +1,84 @@
+# Agent E2E Test Sample
+#
+# This sample demonstrates basic Agent functionality for end-to-end testing:
+# 1. Simple minimal agent
+# 2. Complex agent with volumes and environment variables
+
+---
+# Namespace for agent tests
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-agents
+
+---
+# Agent 1: Simple minimal agent
+# Demonstrates: minimal configuration
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent
 metadata:
-  labels:
-    app.kubernetes.io/name: agent-runtime-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: weather-agent
+  name: simple-agent
+  namespace: test-agents
 spec:
   framework: google-adk
-  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  image: ghcr.io/agentic-layer/mock-agent:0.6.2
+
+---
+# Agent 2: Complex agent with config volume and environment variables
+# Demonstrates: volume mounts, env vars, envFrom
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config
+  namespace: test-agents
+data:
+  # Wiremock mapping for /.well-known/agent-card.json
+  agent-card.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/.well-known/agent-card.json"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "name": "mock_agent",
+          "description": "Mock Agent for the agent-runtime-operator E2E tests",
+          "preferredTransport": "JSONRPC",
+          "protocolVersion": "0.3.0",
+          "capabilities": {},
+          "supportsAuthenticatedExtendedCard": false,
+          "url": "{{systemValue type='ENVIRONMENT' key='AGENT_A2A_RPC_URL' default='http://localhost:8000'}}",
+          "version": "0.0.1"
+        }
+      }
+    }
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: complex-agent
+  namespace: test-agents
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/mock-agent:0.6.2
   protocols:
     - type: A2A
-  replicas: 1
+      port: 9000
   env:
-    - name: PORT
-      value: "8080"
-    - name: LOGLEVEL
-      value: "INFO"
+    - name: WIREMOCK_OPTIONS
+      value: "--port 9000 --permitted-system-keys AGENT_.*"
   envFrom:
     - configMapRef:
-        name: agent-config-map
+        name: agent-config
   volumeMounts:
     - name: config-volume
-      mountPath: /etc/agent-config
-      readOnly: true
+      subPath: agent-card.json
+      mountPath: /home/wiremock/mappings/agent-card.json
   volumes:
     - name: config-volume
       configMap:
-        name: agent-config-map
+        name: agent-config
