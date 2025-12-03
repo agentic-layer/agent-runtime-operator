@@ -159,9 +159,9 @@ func (r *AgenticWorkforceReconciler) collectTransitiveAgentsAndTools(ctx context
 
 		namespace := GetNamespaceWithDefault(agentRef, workforce.Namespace)
 
-		agentKey := fmt.Sprintf("%s/%s", namespace, agentRef.Name)
 		if err := r.traverseAgent(ctx, namespace, agentRef.Name, visitedAgents, allTools); err != nil {
-			log.Error(err, "Failed to traverse agent", "agent", agentKey)
+			agentKey := fmt.Sprintf("%s/%s", namespace, agentRef.Name)
+			log.Error(err, "Failed to traverse agent", "agentKey", agentKey)
 			// Continue with other agents even if one fails
 		}
 	}
