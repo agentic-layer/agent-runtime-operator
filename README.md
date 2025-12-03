@@ -37,7 +37,7 @@ kind create cluster
 Install cert-manager in the cluster, as it is required for webhook certificate management:
 ```shell
 # Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.1/cert-manager.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.3.1/cert-manager.yaml
 
 # Wait for cert-manager to be ready
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
