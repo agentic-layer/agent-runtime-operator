@@ -81,3 +81,33 @@ kubectl get configmaps ai-gateway-config
 ----
 kubectl logs -l app=ai-gateway -c litellm
 ----
+
+== Configure OpenTelemetry (Optional)
+
+To send traces to an OpenTelemetry collector, configure the following environment variables:
+
+- **`OTEL_EXPORTER_OTLP_ENDPOINT`**: The endpoint URL of your OpenTelemetry collector
+- **`OTEL_EXPORTER_OTLP_PROTOCOL`**: Must be set to `http/json` (required when using OTLP endpoint)
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AiGateway
+metadata:
+  name: ai-gateway
+  namespace: ai-gateway
+spec:
+  AiGatewayClassName: litellm
+  aiModels:
+    - provider: openai
+      name: gpt-3.5-turbo
+    - provider: gemini
+      name: gemini-1.5-pro
+  env:
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://otel-collector:4318
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: http/json
+----
+
+For more information on LiteLLM-specific OpenTelemetry configuration, see the https://docs.litellm.ai/docs/proxy/logging#opentelemetry[LiteLLM OpenTelemetry documentation].
