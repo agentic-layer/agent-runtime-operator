@@ -119,7 +119,12 @@ var _ = Describe("Agents", Ordered, func() {
 
 // fetchAgentCard retrieves the agent card from the agent's well-known endpoint
 func fetchAgentCard(agentName, namespace string, port int) (map[string]interface{}, error) {
-	body, statusCode, err := utils.MakeServiceGet(namespace, agentName, port, "/.well-known/agent-card.json")
+	body, statusCode, err := utils.MakeServiceRequest(
+		namespace, agentName, port,
+		func(baseURL string) ([]byte, int, error) {
+			return utils.GetRequest(baseURL + "/.well-known/agent-card.json")
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch agent card: %w", err)
 	}
@@ -157,7 +162,16 @@ func sendAgentMessage(agentName, namespace string, port int, message string) (st
 		},
 	}
 
-	body, statusCode, err := utils.MakeServicePost(namespace, agentName, port, "/", payload)
+	headers := map[string]string{
+		"Content-Type": "application/json",
+	}
+
+	body, statusCode, err := utils.MakeServiceRequest(
+		namespace, agentName, port,
+		func(baseURL string) ([]byte, int, error) {
+			return utils.PostRequest(baseURL, payload, headers)
+		},
+	)
 	if err != nil {
 		return "", fmt.Errorf("failed to send message to agent: %w", err)
 	}

@@ -9,22 +9,22 @@ import (
 	"time"
 )
 
-// GetRequestWithStatus sends a GET request and returns the response body, status code, and error.
+// GetRequest sends a GET request and returns the response body, status code, and error.
 // This function does not treat non-200 status codes as errors,
 // allowing callers to explicitly check for specific status codes like 404.
-func GetRequestWithStatus(url string) ([]byte, int, error) {
+func GetRequest(url string) ([]byte, int, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	return requestWithStatus(req)
+	return executeRequest(req)
 }
 
-// PostRequestWithStatus sends a POST request with a JSON payload and returns the response body, status code, and error.
-// This function does not treat non-200 status codes as errors,
-// allowing callers to explicitly check for specific status codes.
-func PostRequestWithStatus(url string, payload any) ([]byte, int, error) {
+// PostRequest sends a POST request with a JSON payload and custom headers,
+// returning the response body, status code, and error.
+// This function does not treat non-200 status codes as errors.
+func PostRequest(url string, payload any, headers map[string]string) ([]byte, int, error) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to marshal payload: %w", err)
@@ -34,13 +34,17 @@ func PostRequestWithStatus(url string, payload any) ([]byte, int, error) {
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
 
-	return requestWithStatus(req)
+	// Set custom headers
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	return executeRequest(req)
 }
 
-// requestWithStatus executes an HTTP request and returns the response body, status code, and error.
-func requestWithStatus(req *http.Request) ([]byte, int, error) {
+// executeRequest executes an HTTP request and returns the response body, status code, and error.
+func executeRequest(req *http.Request) ([]byte, int, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {

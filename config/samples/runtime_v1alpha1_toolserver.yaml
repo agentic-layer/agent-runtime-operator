@@ -1,3 +1,12 @@
+
+---
+# Namespace for agent tests
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-tool-servers
+---
+
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: ToolServer
 metadata:
@@ -5,18 +14,14 @@ metadata:
     app.kubernetes.io/name: agent-runtime-operator
     app.kubernetes.io/managed-by: kustomize
   name: example-http-toolserver
+  namespace: test-tool-servers
 spec:
   protocol: mcp
   transportType: http
-  # Context7 MCP server with HTTP support
-  # This is a real MCP server from Docker's MCP catalog
   image: mcp/context7:latest
   port: 8080
-  # Optional: URL path for the MCP endpoint
-  # Defaults to "/mcp" if not specified
-  # Customize this if your MCP server uses a different path (e.g., "/api/mcp", "/v1/tools")
-  # path: /mcp
-  replicas: 2
+  path: /mcp
+  replicas: 1
   env:
     - name: LOGLEVEL
       value: INFO
