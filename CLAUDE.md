@@ -79,3 +79,34 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
     ├── e2e/              # End-to-end tests
     └── utils/            # Test utilities
 ```
+
+## Testing Strategy
+
+The project uses a three-tier testing approach, prioritized from simplest to most complex:
+
+### 1. Unit Tests
+- **Purpose**: Test isolated logic without external dependencies
+- **Framework**: Standard Go testing, no extra frameworks
+- **Location**: Next to implementation files (e.g., `*_test.go` files)
+- **When to use**: When logic can be tested without Kubernetes API or complex setup
+- **Example**: Helper functions, data transformations, validation logic
+
+### 2. Integration Tests
+- **Purpose**: Test controller/webhook logic with Kubernetes API interactions
+- **Framework**: [envtest](https://book.kubebuilder.io/reference/envtest.html) (provides Kubernetes API without a real cluster)
+- **Location**: Next to implementation classes (e.g., `internal/controller/*_test.go`)
+- **When to use**: When testing requires Kubernetes API but not a full cluster
+- **Example**: Controller reconciliation logic, webhook validation, resource creation
+
+### 3. End-to-End (E2E) Tests
+- **Purpose**: Blackbox testing of complete workflows
+- **Framework**: Real Kind cluster with full operator deployment
+- **Location**: `test/e2e/`
+- **When to use**: Verify complete user workflows work end-to-end
+- **Example**: Agent deployment, workforce discovery, tool server integration
+
+### Testing Principles
+1. **Avoid duplication**: Don't cover unit-tested logic in integration tests
+2. **Prefer simpler tests**: Unit test > Integration test > E2E test
+3. **Prefer real APIs over mocking**: Use envtest integration tests instead of extensive mocking
+4. **E2E tests are blackbox**: Implementation details should be tested in unit/integration tests
