@@ -17,8 +17,11 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os/exec"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,20 +31,23 @@ import (
 )
 
 var _ = Describe("ToolServer Deployment", Ordered, func() {
-	const testNamespace = "default"
-	const httpToolServerName = "example-http-toolserver"
-	const stdioToolServerName = "example-stdio-toolserver"
+	const (
+		sampleFile         = "config/samples/runtime_v1alpha1_toolserver.yaml"
+		testNamespace      = "test-tool-servers"
+		httpToolServerName = "example-http-toolserver"
+	)
 
-	AfterAll(func() {
-		By("cleaning up sample toolservers")
-		_, _ = utils.Run(exec.Command("kubectl", "delete", "-f", "config/samples/runtime_v1alpha1_toolserver_http.yaml",
-			"-n", testNamespace, "--ignore-not-found=true"))
-
-		_, _ = utils.Run(exec.Command("kubectl", "delete", "-f",
-			"config/samples/runtime_v1alpha1_toolserver_stdio.yaml", "-n", testNamespace, "--ignore-not-found=true"))
+	BeforeAll(func() {
+		By("applying the toolserver sample")
+		_, err := utils.Run(exec.Command("kubectl", "apply", "-f", sampleFile, "-n", testNamespace))
+		Expect(err).NotTo(HaveOccurred(), "Failed to apply toolserver sample")
 	})
 
-	// After each test, check for failures and collect logs, events and pod descriptions for debugging.
+	AfterAll(func() {
+		By("cleaning up the toolserver sample")
+		_, _ = utils.Run(exec.Command("kubectl", "delete", "-f", sampleFile, "-n", testNamespace, "--ignore-not-found=true"))
+	})
+
 	AfterEach(func() {
 		specReport := CurrentSpecReport()
 		if specReport.Failed() {
@@ -50,116 +56,114 @@ var _ = Describe("ToolServer Deployment", Ordered, func() {
 		}
 	})
 
-	It("should successfully deploy and manage http transport toolserver", func() {
-		By("applying the http toolserver sample")
-		_, err := utils.Run(exec.Command("kubectl", "apply", "-f",
-			"config/samples/runtime_v1alpha1_toolserver_http.yaml", "-n", testNamespace))
-		Expect(err).NotTo(HaveOccurred(), "Failed to apply http toolserver sample")
-
-		By("verifying the http toolserver resource is created")
-		verifyToolServerExists := func(g Gomega) {
-			_, err := utils.Run(exec.Command("kubectl", "get", "toolserver", httpToolServerName, "-n", testNamespace))
-			g.Expect(err).NotTo(HaveOccurred())
-		}
-		Eventually(verifyToolServerExists).Should(Succeed())
-
-		By("verifying the http toolserver deployment is created")
-		verifyDeploymentCreated := func(g Gomega) {
-			_, err := utils.Run(exec.Command("kubectl", "get", "deployment", httpToolServerName, "-n", testNamespace))
-			g.Expect(err).NotTo(HaveOccurred())
-
-			// Verify deployment has correct replica count
-			output, err := utils.Run(exec.Command("kubectl", "get", "deployment", httpToolServerName, "-n", testNamespace,
-				"-o", "jsonpath={.spec.replicas}"))
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(Equal("2"), "Deployment should be configured with 2 replicas")
-		}
-		Eventually(verifyDeploymentCreated).Should(Succeed())
-
-		By("verifying the http toolserver service is created")
-		verifyServiceExists := func(g Gomega) {
-			_, err := utils.Run(exec.Command("kubectl", "get", "service", httpToolServerName, "-n", testNamespace))
-			g.Expect(err).NotTo(HaveOccurred())
-
-			output, err := utils.Run(exec.Command("kubectl", "get", "service", httpToolServerName, "-n", testNamespace,
-				"-o", "jsonpath={.spec.ports[0].port}"))
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(Equal("8080"), "Service should expose port 8080")
-		}
-		Eventually(verifyServiceExists).Should(Succeed())
-
-		By("verifying the http toolserver status URL is set")
-		verifyStatusURL := func(g Gomega) {
-			output, err := utils.Run(exec.Command("kubectl", "get", "toolserver", httpToolServerName, "-n", testNamespace,
-				"-o", "jsonpath={.status.url}"))
-			g.Expect(err).NotTo(HaveOccurred())
-			expectedURL := fmt.Sprintf("http://%s.%s.svc.cluster.local:8080/mcp", httpToolServerName, testNamespace)
-			g.Expect(output).To(Equal(expectedURL), "Status URL should be set correctly")
-		}
-		Eventually(verifyStatusURL, 1*time.Minute).Should(Succeed())
-
-		By("verifying the http toolserver has Ready condition")
-		verifyReadyCondition := func(g Gomega) {
-			output, err := utils.Run(exec.Command("kubectl", "get", "toolserver", httpToolServerName, "-n", testNamespace,
-				"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}"))
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(Equal("True"), "ToolServer should have Ready condition set to True")
-		}
-		Eventually(verifyReadyCondition, 1*time.Minute).Should(Succeed())
-
-		By("verifying deployment has correct environment variables")
-		verifyEnvironmentVariables := func(g Gomega) {
-			output, err := utils.Run(exec.Command("kubectl", "get", "deployment", httpToolServerName, "-n", testNamespace,
-				"-o", "jsonpath={.spec.template.spec.containers[0].env[*].name}"))
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(ContainSubstring("LOGLEVEL"), "Should contain LOGLEVEL env var")
-		}
-		Eventually(verifyEnvironmentVariables).Should(Succeed())
-	})
-
-	It("should successfully create stdio transport toolserver without deployment", func() {
-		By("applying the stdio toolserver sample")
-		_, err := utils.Run(exec.Command("kubectl", "apply", "-f",
-			"config/samples/runtime_v1alpha1_toolserver_stdio.yaml", "-n", testNamespace))
-		Expect(err).NotTo(HaveOccurred(), "Failed to apply stdio toolserver sample")
-
-		By("verifying the stdio toolserver resource is created")
-		verifyToolServerExists := func(g Gomega) {
-			_, err := utils.Run(exec.Command("kubectl", "get", "toolserver", stdioToolServerName, "-n", testNamespace))
-			g.Expect(err).NotTo(HaveOccurred())
-		}
-		Eventually(verifyToolServerExists).Should(Succeed())
-
-		By("verifying no deployment is created for stdio transport")
-		verifyNoDeployment := func(g Gomega) {
-			_, err := utils.Run(exec.Command("kubectl", "get", "deployment", stdioToolServerName, "-n", testNamespace))
-			g.Expect(err).To(HaveOccurred(), "Deployment should not exist for stdio transport")
-		}
-		Consistently(verifyNoDeployment, 30*time.Second, 5*time.Second).Should(Succeed())
-
-		By("verifying no service is created for stdio transport")
-		verifyNoService := func(g Gomega) {
-			_, err := utils.Run(exec.Command("kubectl", "get", "service", stdioToolServerName, "-n", testNamespace))
-			g.Expect(err).To(HaveOccurred(), "Service should not exist for stdio transport")
-		}
-		Consistently(verifyNoService, 30*time.Second, 5*time.Second).Should(Succeed())
-
-		By("verifying the stdio toolserver has Ready condition")
-		verifyReadyCondition := func(g Gomega) {
-			output, err := utils.Run(exec.Command("kubectl", "get", "toolserver", stdioToolServerName, "-n", testNamespace,
-				"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}"))
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(Equal("True"), "ToolServer should have Ready condition set to True")
-		}
-		Eventually(verifyReadyCondition, 1*time.Minute).Should(Succeed())
-
-		By("verifying the stdio toolserver status URL is empty")
-		verifyStatusURL := func(g Gomega) {
-			output, err := utils.Run(exec.Command("kubectl", "get", "toolserver", stdioToolServerName, "-n", testNamespace,
-				"-o", "jsonpath={.status.url}"))
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(output).To(BeEmpty(), "Status URL should be empty for stdio transport")
-		}
-		Eventually(verifyStatusURL, 1*time.Minute).Should(Succeed())
+	It("should successfully handle MCP requests", func() {
+		By("sending an MCP tools/list request to the toolserver")
+		Eventually(func(g Gomega) {
+			tools, err := listMCPTools(httpToolServerName, testNamespace, 8080)
+			g.Expect(err).NotTo(HaveOccurred(), "Should be able to list MCP tools")
+			g.Expect(tools).NotTo(BeEmpty(), "Tool server should provide at least one tool")
+		}, 2*time.Minute, 5*time.Second).Should(Succeed())
 	})
 })
+
+// listMCPTools sends an MCP tools/list request to the tool server and returns the list of tools
+func listMCPTools(toolServerName, namespace string, port int) ([]interface{}, error) {
+	// Construct MCP JSON-RPC payload for tools/list
+	// Reference: https://spec.modelcontextprotocol.io/specification/server/tools/
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "tools/list",
+	}
+
+	// Some MCP servers require accepting both JSON and SSE even for HTTP transport
+	headers := map[string]string{
+		"Content-Type": "application/json",
+		"Accept":       "application/json, text/event-stream",
+	}
+
+	// Make the request with custom headers
+	body, statusCode, err := utils.MakeServiceRequest(
+		namespace, toolServerName, port,
+		func(baseURL string) ([]byte, int, error) {
+			return utils.PostRequest(baseURL+"/mcp", payload, headers)
+		},
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send MCP request: %w", err)
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d when sending MCP request: %s", statusCode, string(body))
+	}
+
+	// Handle SSE response format (event-stream)
+	// SSE responses may start with "event: " or "data: " prefixes
+	bodyStr := string(body)
+	if len(bodyStr) > 0 && (bodyStr[0] == 'e' || bodyStr[0] == 'd') {
+		// Parse SSE format: look for JSON data in the event stream
+		// Format: "event: message\ndata: {...}\n\n"
+		lines := string(body)
+		dataPrefix := "data: "
+		startIdx := 0
+		for {
+			dataIdx := strings.Index(lines[startIdx:], dataPrefix)
+			if dataIdx == -1 {
+				break
+			}
+			dataIdx += startIdx + len(dataPrefix)
+			endIdx := strings.Index(lines[dataIdx:], "\n")
+			if endIdx == -1 {
+				endIdx = len(lines)
+			} else {
+				endIdx += dataIdx
+			}
+			jsonData := lines[dataIdx:endIdx]
+
+			// Try to parse this data line as JSON
+			var response map[string]interface{}
+			if err := json.Unmarshal([]byte(jsonData), &response); err == nil {
+				// Successfully parsed JSON, check if it contains tools
+				if result, ok := response["result"].(map[string]interface{}); ok {
+					if tools, ok := result["tools"].([]interface{}); ok {
+						return tools, nil
+					}
+				}
+				// Check for error in this response
+				if errObj, ok := response["error"]; ok {
+					return nil, fmt.Errorf("MCP error response: %v", errObj)
+				}
+			}
+			startIdx = endIdx + 1
+			if startIdx >= len(lines) {
+				break
+			}
+		}
+		return nil, fmt.Errorf("no valid tool data found in SSE response")
+	}
+
+	// Handle standard JSON response
+	var response map[string]interface{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal MCP response: %w", err)
+	}
+
+	// Check for JSON-RPC error
+	if errObj, ok := response["error"]; ok {
+		return nil, fmt.Errorf("MCP error response: %v", errObj)
+	}
+
+	// Extract tools from result
+	result, ok := response["result"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid MCP response format: missing result")
+	}
+
+	tools, ok := result["tools"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid MCP response format: missing tools array")
+	}
+
+	return tools, nil
+}

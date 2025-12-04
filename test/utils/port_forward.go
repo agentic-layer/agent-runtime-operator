@@ -278,28 +278,3 @@ func MakeServiceRequest(
 	baseURL := fmt.Sprintf("http://localhost:%d", localPort)
 	return requestFunc(baseURL)
 }
-
-// MakeServiceGet is a convenience wrapper for GET requests to a Kubernetes service.
-func MakeServiceGet(namespace, serviceName string, servicePort int, endpoint string) ([]byte, int, error) {
-	return MakeServiceRequest(
-		namespace, serviceName, servicePort,
-		func(baseURL string) ([]byte, int, error) {
-			return GetRequestWithStatus(baseURL + endpoint)
-		},
-	)
-}
-
-// MakeServicePost is a convenience wrapper for POST requests to a Kubernetes service.
-func MakeServicePost(
-	namespace, serviceName string,
-	servicePort int,
-	endpoint string,
-	payload interface{},
-) ([]byte, int, error) {
-	return MakeServiceRequest(
-		namespace, serviceName, servicePort,
-		func(baseURL string) ([]byte, int, error) {
-			return PostRequestWithStatus(baseURL+endpoint, payload)
-		},
-	)
-}
