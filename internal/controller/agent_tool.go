@@ -52,11 +52,22 @@ func (r *AgentReconciler) resolveAllTools(ctx context.Context, agent *runtimev1a
 }
 
 // resolveToolServerUrl resolves a Tool configuration to its actual URL.
-// Looks up the ToolServer resource and uses its status.url
+// For remote tools (with URL): returns the URL directly
+// For cluster tools (with toolServerRef): looks up the ToolServer resource and uses its status.url
 // If namespace is not specified in toolServerRef, defaults to the parent agent's namespace
 func (r *AgentReconciler) resolveToolServerUrl(ctx context.Context, tool runtimev1alpha1.AgentTool, parentNamespace string) (string, error) {
+	// If URL is provided, this is a remote tool - use URL directly
+	if tool.Url != "" {
+		return tool.Url, nil
+	}
+
+	// This is a cluster ToolServer reference - resolve by looking up the resource
+	if tool.ToolServerRef == nil {
+		return "", fmt.Errorf("tool has neither url nor toolServerRef specified")
+	}
+
 	// Use namespace from ObjectReference, or default to parent namespace
-	namespace := GetNamespaceWithDefault(&tool.ToolServerRef, parentNamespace)
+	namespace := GetNamespaceWithDefault(tool.ToolServerRef, parentNamespace)
 
 	var referencedToolServer runtimev1alpha1.ToolServer
 	err := r.Get(ctx, types.NamespacedName{
@@ -94,10 +105,15 @@ func (r *AgentReconciler) findAgentsReferencingToolServer(ctx context.Context, o
 	// Enqueue agents that reference this ToolServer
 	for _, agent := range agentList.Items {
 		for _, tool := range agent.Spec.Tools {
+			// Skip tools with direct URLs (no ToolServerRef)
+			if tool.ToolServerRef == nil {
+				continue
+			}
+
 			// Check if this agent references the updated ToolServer
 			if tool.ToolServerRef.Name == updatedToolServer.Name {
 				// Use helper to get namespace
-				toolServerNamespace := GetNamespaceWithDefault(&tool.ToolServerRef, agent.Namespace)
+				toolServerNamespace := GetNamespaceWithDefault(tool.ToolServerRef, agent.Namespace)
 
 				if toolServerNamespace == updatedToolServer.Namespace {
 					// This agent references the updated ToolServer - enqueue it

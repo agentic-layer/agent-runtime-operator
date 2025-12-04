@@ -214,10 +214,15 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 
 	// Collect tools from this agent
 	for _, tool := range agent.Spec.Tools {
-		// Use namespace/name as the key for ToolServer references
-		toolNamespace := GetNamespaceWithDefault(&tool.ToolServerRef, agent.Namespace)
-		toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolServerRef.Name)
-		allTools[toolKey] = true
+		if tool.ToolServerRef != nil {
+			// Cluster ToolServer reference - use namespace/name format
+			toolNamespace := GetNamespaceWithDefault(tool.ToolServerRef, agent.Namespace)
+			toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolServerRef.Name)
+			allTools[toolKey] = true
+		} else if tool.Url != "" {
+			// Remote tool - record the URL directly (consistent with remote sub-agents)
+			allTools[tool.Url] = true
+		}
 	}
 
 	// Recursively traverse sub-agents

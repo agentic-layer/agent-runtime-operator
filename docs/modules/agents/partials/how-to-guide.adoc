@@ -100,9 +100,10 @@ spec:
     - name: news_fetcher
       toolServerRef:
         name: news_fetcher_toolserver
+
+    # Direct URL to external MCP server (no ToolServer resource needed)
     - name: web_fetcher
-      toolServerRef:
-        name: web_fetch_toolserver
+      url: "https://mcp.example.com/web-fetch"
 
   # Sub-agents this agent can delegate to
   subAgents:

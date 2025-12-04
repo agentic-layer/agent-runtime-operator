@@ -84,7 +84,7 @@ var _ = Describe("Agent Tool", func() {
 
 			tool := runtimev1alpha1.AgentTool{
 				Name: "cross-ns-tool",
-				ToolServerRef: corev1.ObjectReference{
+				ToolServerRef: &corev1.ObjectReference{
 					Name:      "cross-ns-toolserver",
 					Namespace: "test-ns-toolserver-explicit",
 				},
@@ -114,7 +114,7 @@ var _ = Describe("Agent Tool", func() {
 
 			tool := runtimev1alpha1.AgentTool{
 				Name: "local-tool",
-				ToolServerRef: corev1.ObjectReference{
+				ToolServerRef: &corev1.ObjectReference{
 					Name: "local-toolserver",
 					// Namespace is omitted to test defaulting
 				},
@@ -128,7 +128,7 @@ var _ = Describe("Agent Tool", func() {
 		It("should return error when ToolServer doesn't exist", func() {
 			tool := runtimev1alpha1.AgentTool{
 				Name: "missing-tool",
-				ToolServerRef: corev1.ObjectReference{
+				ToolServerRef: &corev1.ObjectReference{
 					Name: "nonexistent-toolserver",
 				},
 			}
@@ -156,7 +156,7 @@ var _ = Describe("Agent Tool", func() {
 
 			tool := runtimev1alpha1.AgentTool{
 				Name: "stdio-tool",
-				ToolServerRef: corev1.ObjectReference{
+				ToolServerRef: &corev1.ObjectReference{
 					Name: "stdio-toolserver",
 				},
 			}
@@ -165,6 +165,27 @@ var _ = Describe("Agent Tool", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("has no URL in its Status field"))
 			Expect(err.Error()).To(ContainSubstring("stdio"))
+		})
+
+		It("should return direct URL when provided", func() {
+			tool := runtimev1alpha1.AgentTool{
+				Name: "remote-tool",
+				Url:  "https://mcp.example.com/tools",
+			}
+
+			url, err := reconciler.resolveToolServerUrl(ctx, tool, "default")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(Equal("https://mcp.example.com/tools"))
+		})
+
+		It("should return error when neither toolServerRef nor url is specified", func() {
+			tool := runtimev1alpha1.AgentTool{
+				Name: "incomplete-tool",
+			}
+
+			_, err := reconciler.resolveToolServerUrl(ctx, tool, "default")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("has neither url nor toolServerRef specified"))
 		})
 	})
 
@@ -209,8 +230,8 @@ var _ = Describe("Agent Tool", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool1", ToolServerRef: corev1.ObjectReference{Name: "toolserver1"}},
-						{Name: "tool2", ToolServerRef: corev1.ObjectReference{Name: "toolserver2"}},
+						{Name: "tool1", ToolServerRef: &corev1.ObjectReference{Name: "toolserver1"}},
+						{Name: "tool2", ToolServerRef: &corev1.ObjectReference{Name: "toolserver2"}},
 					},
 				},
 			}
@@ -230,8 +251,8 @@ var _ = Describe("Agent Tool", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "missing-tool1", ToolServerRef: corev1.ObjectReference{Name: "missing-toolserver1"}},
-						{Name: "missing-tool2", ToolServerRef: corev1.ObjectReference{Name: "missing-toolserver2"}},
+						{Name: "missing-tool1", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver1"}},
+						{Name: "missing-tool2", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver2"}},
 					},
 				},
 			}
@@ -284,8 +305,8 @@ var _ = Describe("Agent Tool", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "working-tool", ToolServerRef: corev1.ObjectReference{Name: "working-toolserver"}},
-						{Name: "missing-tool", ToolServerRef: corev1.ObjectReference{Name: "missing-toolserver"}},
+						{Name: "working-tool", ToolServerRef: &corev1.ObjectReference{Name: "working-toolserver"}},
+						{Name: "missing-tool", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver"}},
 					},
 				},
 			}
@@ -300,6 +321,44 @@ var _ = Describe("Agent Tool", func() {
 			// Verify partial results contain the working tool
 			Expect(resolved).To(HaveLen(1))
 			Expect(resolved["working-tool"]).To(Equal("http://working-toolserver.default.svc.cluster.local:8080"))
+		})
+
+		It("should resolve mixed toolServerRef and direct URLs", func() {
+			// Create one ToolServer
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-toolserver",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					TransportType: "http",
+					Image:         "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+			toolServer.Status.Url = "http://local-toolserver.default.svc.cluster.local:8080"
+			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+
+			// Agent with mixed tools (ToolServerRef and direct URL)
+			parentAgent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-mixed-types",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Tools: []runtimev1alpha1.AgentTool{
+						{Name: "local-tool", ToolServerRef: &corev1.ObjectReference{Name: "local-toolserver"}},
+						{Name: "remote-tool", Url: "https://mcp.example.com/tools"},
+					},
+				},
+			}
+
+			resolved, err := reconciler.resolveAllTools(ctx, parentAgent)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resolved).To(HaveLen(2))
+			Expect(resolved["local-tool"]).To(Equal("http://local-toolserver.default.svc.cluster.local:8080"))
+			Expect(resolved["remote-tool"]).To(Equal("https://mcp.example.com/tools"))
 		})
 	})
 
@@ -332,7 +391,7 @@ var _ = Describe("Agent Tool", func() {
 					Tools: []runtimev1alpha1.AgentTool{
 						{
 							Name: "referenced-tool",
-							ToolServerRef: corev1.ObjectReference{
+							ToolServerRef: &corev1.ObjectReference{
 								Name:      "referenced-toolserver",
 								Namespace: "default",
 							},
@@ -376,7 +435,7 @@ var _ = Describe("Agent Tool", func() {
 					Tools: []runtimev1alpha1.AgentTool{
 						{
 							Name: "tool-with-defaulting",
-							ToolServerRef: corev1.ObjectReference{
+							ToolServerRef: &corev1.ObjectReference{
 								Name: "toolserver-with-defaulting",
 								// No namespace specified
 							},
@@ -417,7 +476,7 @@ var _ = Describe("Agent Tool", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "shared-tool", ToolServerRef: corev1.ObjectReference{Name: "shared-toolserver"}},
+						{Name: "shared-tool", ToolServerRef: &corev1.ObjectReference{Name: "shared-toolserver"}},
 					},
 				},
 			}
@@ -432,7 +491,7 @@ var _ = Describe("Agent Tool", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "shared-tool", ToolServerRef: corev1.ObjectReference{Name: "shared-toolserver"}},
+						{Name: "shared-tool", ToolServerRef: &corev1.ObjectReference{Name: "shared-toolserver"}},
 					},
 				},
 			}
@@ -482,7 +541,7 @@ var _ = Describe("Agent Tool", func() {
 					Tools: []runtimev1alpha1.AgentTool{
 						{
 							Name: "cross-ns-tool",
-							ToolServerRef: corev1.ObjectReference{
+							ToolServerRef: &corev1.ObjectReference{
 								Name:      "cross-ns-toolserver",
 								Namespace: "test-ns-cross-ref",
 							},
@@ -514,6 +573,63 @@ var _ = Describe("Agent Tool", func() {
 
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
 			Expect(requests).To(BeEmpty())
+		})
+
+		It("should skip agents with tools using direct URLs", func() {
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "some-toolserver",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					TransportType: "http",
+					Image:         "test-image:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+
+			toolServer.Status.Url = "http://some-toolserver.default.svc.cluster.local:8080"
+			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+
+			// Agent with only direct URL tools (no ToolServerRef)
+			agentWithDirectUrl := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-direct-url",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Tools: []runtimev1alpha1.AgentTool{
+						{Name: "remote-tool", Url: "https://mcp.example.com/tools"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agentWithDirectUrl)).To(Succeed())
+
+			// Agent with mixed tools (should only match if it has the ToolServerRef)
+			agentMixed := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-mixed",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Tools: []runtimev1alpha1.AgentTool{
+						{Name: "remote-tool", Url: "https://mcp.example.com/tools"},
+						{Name: "local-tool", ToolServerRef: &corev1.ObjectReference{Name: "some-toolserver"}},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agentMixed)).To(Succeed())
+
+			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
+			// Should only return agent-mixed (which has a ToolServerRef), not agent-direct-url
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("agent-mixed"))
+			Expect(requests[0].Namespace).To(Equal("default"))
 		})
 	})
 })
