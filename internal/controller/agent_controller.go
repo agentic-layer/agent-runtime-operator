@@ -41,7 +41,7 @@ const (
 	agentContainerName           = "agent"
 	agentCardEndpoint            = "/.well-known/agent-card.json"
 	googleAdkFramework           = "google-adk"
-	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.5.0"
+	DefaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.5.2"
 	defaultTemplateImageFallback = "invalid"
 )
 
