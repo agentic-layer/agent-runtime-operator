@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,6 +28,136 @@ import (
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
+
+const (
+	TestProtocol       = "mcp"
+	TestTransportHTTP  = "http"
+	TestTransportStdio = "stdio"
+	TestImage          = "test-image:latest"
+	TestFramework      = "google-adk"
+	DefaultNamespace   = "default"
+)
+
+func createToolServer(ctx context.Context, k8sClient client.Client, name, namespace string) *runtimev1alpha1.ToolServer {
+	toolServer := &runtimev1alpha1.ToolServer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: runtimev1alpha1.ToolServerSpec{
+			Protocol:      TestProtocol,
+			TransportType: TestTransportHTTP,
+			Image:         TestImage,
+		},
+	}
+	Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+	return toolServer
+}
+
+func createToolServerWithURL(ctx context.Context, k8sClient client.Client, name, namespace string) *runtimev1alpha1.ToolServer {
+	toolServer := createToolServer(ctx, k8sClient, name, namespace)
+
+	url := generateServiceURL(name, namespace)
+	toolServer.Status.Url = url
+	Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+
+	return toolServer
+}
+
+func createToolServerWithCustomTransport(ctx context.Context, k8sClient client.Client, name, namespace, transport string, command []string) *runtimev1alpha1.ToolServer {
+	toolServer := &runtimev1alpha1.ToolServer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: runtimev1alpha1.ToolServerSpec{
+			Protocol:      TestProtocol,
+			TransportType: transport,
+			Image:         TestImage,
+			Command:       command,
+		},
+	}
+	Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+	return toolServer
+}
+
+func generateServiceURL(name, namespace string) string {
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:8080", name, namespace)
+}
+
+func createAgentWithToolServerRef(ctx context.Context, k8sClient client.Client, agentName, toolServerName, toolServerNamespace string) {
+	var toolServerRef *corev1.ObjectReference
+	if toolServerNamespace == "" {
+		toolServerRef = &corev1.ObjectReference{
+			Name: toolServerName,
+		}
+	} else {
+		toolServerRef = &corev1.ObjectReference{
+			Name:      toolServerName,
+			Namespace: toolServerNamespace,
+		}
+	}
+
+	agent := &runtimev1alpha1.Agent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      agentName,
+			Namespace: DefaultNamespace,
+		},
+		Spec: runtimev1alpha1.AgentSpec{
+			Framework: TestFramework,
+			Image:     TestImage,
+			Tools: []runtimev1alpha1.AgentTool{
+				{
+					Name:          "test-tool",
+					ToolServerRef: toolServerRef,
+				},
+			},
+		},
+	}
+	Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+}
+
+func createAgentWithTools(ctx context.Context, k8sClient client.Client, name string, tools []runtimev1alpha1.AgentTool) *runtimev1alpha1.Agent {
+	agent := &runtimev1alpha1.Agent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: DefaultNamespace,
+		},
+		Spec: runtimev1alpha1.AgentSpec{
+			Framework: TestFramework,
+			Image:     TestImage,
+			Tools:     tools,
+		},
+	}
+	Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+	return agent
+}
+
+func createTestNamespace(ctx context.Context, k8sClient client.Client, name string) {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+	DeferCleanup(func() {
+		_ = k8sClient.Delete(ctx, ns)
+	})
+}
+
+func cleanupResourcesInNamespace(ctx context.Context, k8sClient client.Client, namespace string) {
+	agentList := &runtimev1alpha1.AgentList{}
+	Expect(k8sClient.List(ctx, agentList, &client.ListOptions{Namespace: namespace})).To(Succeed())
+	for i := range agentList.Items {
+		_ = k8sClient.Delete(ctx, &agentList.Items[i])
+	}
+
+	toolServerList := &runtimev1alpha1.ToolServerList{}
+	Expect(k8sClient.List(ctx, toolServerList, &client.ListOptions{Namespace: namespace})).To(Succeed())
+	for i := range toolServerList.Items {
+		_ = k8sClient.Delete(ctx, &toolServerList.Items[i])
+	}
+}
 
 var _ = Describe("Agent Tool", func() {
 	ctx := context.Background()
@@ -40,202 +171,125 @@ var _ = Describe("Agent Tool", func() {
 	})
 
 	AfterEach(func() {
-		// Clean up all agents and toolservers after each test
-		agentList := &runtimev1alpha1.AgentList{}
-		Expect(k8sClient.List(ctx, agentList, &client.ListOptions{Namespace: "default"})).To(Succeed())
-		for i := range agentList.Items {
-			_ = k8sClient.Delete(ctx, &agentList.Items[i])
-		}
-
-		toolServerList := &runtimev1alpha1.ToolServerList{}
-		Expect(k8sClient.List(ctx, toolServerList, &client.ListOptions{Namespace: "default"})).To(Succeed())
-		for i := range toolServerList.Items {
-			_ = k8sClient.Delete(ctx, &toolServerList.Items[i])
-		}
+		cleanupResourcesInNamespace(ctx, k8sClient, DefaultNamespace)
 	})
 
 	Describe("resolveToolServerUrl", func() {
 		It("should resolve ToolServer with explicit namespace", func() {
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ns-toolserver-explicit",
-				},
-			}
-			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
-			DeferCleanup(func() {
-				_ = k8sClient.Delete(ctx, ns)
-			})
+			By("creating a test namespace")
+			createTestNamespace(ctx, k8sClient, "test-ns-toolserver-explicit")
 
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cross-ns-toolserver",
-					Namespace: "test-ns-toolserver-explicit",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+			By("creating a ToolServer in the test namespace")
+			toolServer := createToolServerWithURL(ctx, k8sClient, "cross-ns-toolserver", "test-ns-toolserver-explicit")
 
-			toolServer.Status.Url = "http://cross-ns-toolserver.test-ns-toolserver-explicit.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
-
+			By("resolving a tool with explicit namespace reference")
 			tool := runtimev1alpha1.AgentTool{
 				Name: "cross-ns-tool",
-				ToolServerRef: corev1.ObjectReference{
-					Name:      "cross-ns-toolserver",
-					Namespace: "test-ns-toolserver-explicit",
+				ToolServerRef: &corev1.ObjectReference{
+					Name:      toolServer.Name,
+					Namespace: toolServer.Namespace,
 				},
 			}
 
-			url, err := reconciler.resolveToolServerUrl(ctx, tool, "default")
+			By("verifying the URL is resolved correctly")
+			url, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(Equal("http://cross-ns-toolserver.test-ns-toolserver-explicit.svc.cluster.local:8080"))
-		})
-
-		It("should default to parent agent's namespace", func() {
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "local-toolserver",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
-
-			toolServer.Status.Url = "http://local-toolserver.default.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
-
-			tool := runtimev1alpha1.AgentTool{
-				Name: "local-tool",
-				ToolServerRef: corev1.ObjectReference{
-					Name: "local-toolserver",
-					// Namespace is omitted to test defaulting
-				},
-			}
-
-			url, err := reconciler.resolveToolServerUrl(ctx, tool, "default")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(url).To(Equal("http://local-toolserver.default.svc.cluster.local:8080"))
+			Expect(url).To(Equal(toolServer.Status.Url))
 		})
 
 		It("should return error when ToolServer doesn't exist", func() {
+			By("creating a tool reference to a non-existent ToolServer")
 			tool := runtimev1alpha1.AgentTool{
 				Name: "missing-tool",
-				ToolServerRef: corev1.ObjectReference{
+				ToolServerRef: &corev1.ObjectReference{
 					Name: "nonexistent-toolserver",
 				},
 			}
 
-			_, err := reconciler.resolveToolServerUrl(ctx, tool, "default")
+			By("verifying an error is returned")
+			_, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve ToolServer"))
 			Expect(err.Error()).To(ContainSubstring("nonexistent-toolserver"))
 		})
 
 		It("should return error when ToolServer has empty Status.Url", func() {
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "stdio-toolserver",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "stdio",
-					Image:         "test-image:latest",
-					Command:       []string{"/bin/tool"},
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+			By("creating a stdio ToolServer without a URL")
+			createToolServerWithCustomTransport(ctx, k8sClient, "stdio-toolserver", DefaultNamespace, TestTransportStdio, []string{"/bin/tool"})
 
+			By("creating a tool reference to the stdio ToolServer")
 			tool := runtimev1alpha1.AgentTool{
 				Name: "stdio-tool",
-				ToolServerRef: corev1.ObjectReference{
+				ToolServerRef: &corev1.ObjectReference{
 					Name: "stdio-toolserver",
 				},
 			}
 
-			_, err := reconciler.resolveToolServerUrl(ctx, tool, "default")
+			By("verifying an error is returned for missing URL")
+			_, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("has no URL in its Status field"))
 			Expect(err.Error()).To(ContainSubstring("stdio"))
+		})
+
+		It("should return direct URL when provided", func() {
+			By("creating a tool with a direct URL")
+			tool := runtimev1alpha1.AgentTool{
+				Name: "remote-tool",
+				Url:  "https://mcp.example.com/tools",
+			}
+
+			By("verifying the direct URL is returned")
+			url, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(Equal("https://mcp.example.com/tools"))
+		})
+
+		It("should return error when neither toolServerRef nor url is specified", func() {
+			By("creating a tool without URL or ToolServerRef")
+			tool := runtimev1alpha1.AgentTool{
+				Name: "incomplete-tool",
+			}
+
+			By("verifying an error is returned")
+			_, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("has neither url nor toolServerRef specified"))
 		})
 	})
 
 	Describe("resolveAllTools", func() {
 		It("should resolve all tools successfully", func() {
-			toolServer1 := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "toolserver1",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer1)).To(Succeed())
+			By("creating the first ToolServer")
+			toolServer1 := createToolServerWithURL(ctx, k8sClient, "toolserver1", DefaultNamespace)
 
-			toolServer1.Status.Url = "http://toolserver1.default.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer1)).To(Succeed())
+			By("creating the second ToolServer")
+			toolServer2 := createToolServerWithURL(ctx, k8sClient, "toolserver2", DefaultNamespace)
 
-			toolServer2 := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "toolserver2",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer2)).To(Succeed())
+			By("creating an agent with tools referencing both ToolServers")
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-resolve-all", []runtimev1alpha1.AgentTool{
+				{Name: "tool1", ToolServerRef: &corev1.ObjectReference{Name: toolServer1.Name}},
+				{Name: "tool2", ToolServerRef: &corev1.ObjectReference{Name: toolServer2.Name}},
+			})
 
-			toolServer2.Status.Url = "http://toolserver2.default.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer2)).To(Succeed())
-
-			parentAgent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent-resolve-all",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool1", ToolServerRef: corev1.ObjectReference{Name: "toolserver1"}},
-						{Name: "tool2", ToolServerRef: corev1.ObjectReference{Name: "toolserver2"}},
-					},
-				},
-			}
-
+			By("resolving all tools for the agent")
 			resolved, err := reconciler.resolveAllTools(ctx, parentAgent)
+
+			By("verifying both tools are resolved correctly")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolved).To(HaveLen(2))
-			Expect(resolved["tool1"]).To(Equal("http://toolserver1.default.svc.cluster.local:8080"))
-			Expect(resolved["tool2"]).To(Equal("http://toolserver2.default.svc.cluster.local:8080"))
+			Expect(resolved["tool1"]).To(Equal(toolServer1.Status.Url))
+			Expect(resolved["tool2"]).To(Equal(toolServer2.Status.Url))
 		})
 
 		It("should collect all resolution errors", func() {
-			parentAgent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent-with-errors",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "missing-tool1", ToolServerRef: corev1.ObjectReference{Name: "missing-toolserver1"}},
-						{Name: "missing-tool2", ToolServerRef: corev1.ObjectReference{Name: "missing-toolserver2"}},
-					},
-				},
-			}
+			By("creating an agent with references to non-existent ToolServers")
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-with-errors", []runtimev1alpha1.AgentTool{
+				{Name: "missing-tool1", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver1"}},
+				{Name: "missing-tool2", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver2"}},
+			})
 
+			By("verifying all resolution errors are collected")
 			_, err := reconciler.resolveAllTools(ctx, parentAgent)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve 2 tool(s)"))
@@ -244,274 +298,134 @@ var _ = Describe("Agent Tool", func() {
 		})
 
 		It("should handle empty tools list", func() {
-			parentAgent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent-no-tools",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Tools: []runtimev1alpha1.AgentTool{},
-				},
-			}
+			By("creating an agent with no tools")
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-no-tools", []runtimev1alpha1.AgentTool{})
 
+			By("verifying empty result is returned")
 			resolved, err := reconciler.resolveAllTools(ctx, parentAgent)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolved).To(BeEmpty())
 		})
 
 		It("should return partial results when some tools fail", func() {
-			// Create one working ToolServer
-			workingToolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "working-toolserver",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, workingToolServer)).To(Succeed())
-			workingToolServer.Status.Url = "http://working-toolserver.default.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, workingToolServer)).To(Succeed())
+			By("creating a working ToolServer")
+			workingToolServer := createToolServerWithURL(ctx, k8sClient, "working-toolserver", DefaultNamespace)
 
-			// Agent with mixed tools (one working, one missing)
-			parentAgent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent-mixed-tools",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "working-tool", ToolServerRef: corev1.ObjectReference{Name: "working-toolserver"}},
-						{Name: "missing-tool", ToolServerRef: corev1.ObjectReference{Name: "missing-toolserver"}},
-					},
-				},
-			}
+			By("creating an agent with multiple tools (one working, one missing)")
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-mixed-tools", []runtimev1alpha1.AgentTool{
+				{Name: "working-tool", ToolServerRef: &corev1.ObjectReference{Name: workingToolServer.Name}},
+				{Name: "missing-tool", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver"}},
+			})
 
+			By("resolving all tools for the agent")
 			resolved, err := reconciler.resolveAllTools(ctx, parentAgent)
 
-			// Should return error but also partial results
+			By("verifying an error is returned for the missing tool")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve 1 tool(s)"))
 			Expect(err.Error()).To(ContainSubstring("missing-tool"))
 
-			// Verify partial results contain the working tool
+			By("verifying partial results contain the working tool")
 			Expect(resolved).To(HaveLen(1))
-			Expect(resolved["working-tool"]).To(Equal("http://working-toolserver.default.svc.cluster.local:8080"))
+			Expect(resolved["working-tool"]).To(Equal(workingToolServer.Status.Url))
+		})
+
+		It("should resolve mixed toolServerRef and direct URLs", func() {
+			By("creating a ToolServer")
+			toolServer := createToolServerWithURL(ctx, k8sClient, "local-toolserver", DefaultNamespace)
+
+			By("creating an agent with mixed tools (ToolServerRef and direct URL)")
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-mixed-types", []runtimev1alpha1.AgentTool{
+				{Name: "local-tool", ToolServerRef: &corev1.ObjectReference{Name: toolServer.Name}},
+				{Name: "remote-tool", Url: "https://mcp.example.com/tools"},
+			})
+
+			By("resolving all tools for the agent")
+			resolved, err := reconciler.resolveAllTools(ctx, parentAgent)
+
+			By("verifying both tool types are resolved correctly")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resolved).To(HaveLen(2))
+			Expect(resolved["local-tool"]).To(Equal(toolServer.Status.Url))
+			Expect(resolved["remote-tool"]).To(Equal("https://mcp.example.com/tools"))
 		})
 	})
 
 	Describe("findAgentsReferencingToolServer", func() {
 		It("should identify agents referencing the changed ToolServer", func() {
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "referenced-toolserver",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+			By("creating a ToolServer")
+			toolServer := createToolServerWithURL(ctx, k8sClient, "referenced-toolserver", DefaultNamespace)
 
-			toolServer.Status.Url = "http://referenced-toolserver.default.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+			By("creating an agent that references the ToolServer")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent-agent", toolServer.Name, toolServer.Namespace)
 
-			parentAgent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent-agent",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-					Tools: []runtimev1alpha1.AgentTool{
-						{
-							Name: "referenced-tool",
-							ToolServerRef: corev1.ObjectReference{
-								Name:      "referenced-toolserver",
-								Namespace: "default",
-							},
-						},
-					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, parentAgent)).To(Succeed())
-
+			By("finding agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
+
+			By("verifying the agent is found")
 			Expect(requests).To(HaveLen(1))
 			Expect(requests[0].Name).To(Equal("parent-agent"))
-			Expect(requests[0].Namespace).To(Equal("default"))
+			Expect(requests[0].Namespace).To(Equal(DefaultNamespace))
 		})
 
-		It("should match with namespace defaulting", func() {
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "toolserver-with-defaulting",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+		It("should find agents with empty toolServerRef namespace", func() {
+			By("creating a ToolServer")
+			toolServer := createToolServerWithURL(ctx, k8sClient, "toolserver-with-defaulting", DefaultNamespace)
 
-			toolServer.Status.Url = "http://toolserver-with-defaulting.default.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+			By("creating an agent that references the ToolServer without namespace")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent-with-defaulting", toolServer.Name, "")
 
-			parentAgent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent-with-defaulting",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-					Tools: []runtimev1alpha1.AgentTool{
-						{
-							Name: "tool-with-defaulting",
-							ToolServerRef: corev1.ObjectReference{
-								Name: "toolserver-with-defaulting",
-								// No namespace specified
-							},
-						},
-					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, parentAgent)).To(Succeed())
-
+			By("finding agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
+
+			By("verifying the agent is found when toolServerRef.namespace is empty")
 			Expect(requests).To(HaveLen(1))
 			Expect(requests[0].Name).To(Equal("parent-with-defaulting"))
 		})
 
 		It("should handle multiple agents referencing same ToolServer", func() {
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shared-toolserver",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+			By("creating a shared ToolServer")
+			toolServer := createToolServerWithURL(ctx, k8sClient, "shared-toolserver", DefaultNamespace)
 
-			toolServer.Status.Url = "http://shared-toolserver.default.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+			By("creating the first agent referencing the ToolServer")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent1", toolServer.Name, "")
 
-			parent1 := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent1",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "shared-tool", ToolServerRef: corev1.ObjectReference{Name: "shared-toolserver"}},
-					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, parent1)).To(Succeed())
+			By("creating the second agent referencing the same ToolServer")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent2", toolServer.Name, "")
 
-			parent2 := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent2",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "shared-tool", ToolServerRef: corev1.ObjectReference{Name: "shared-toolserver"}},
-					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, parent2)).To(Succeed())
-
+			By("finding all agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
+
+			By("verifying both agents are found")
 			Expect(requests).To(HaveLen(2))
 			names := []string{requests[0].Name, requests[1].Name}
 			Expect(names).To(ContainElements("parent1", "parent2"))
 		})
 
 		It("should handle cross-namespace references", func() {
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ns-cross-ref",
-				},
-			}
-			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
-			DeferCleanup(func() {
-				_ = k8sClient.Delete(ctx, ns)
-			})
+			By("creating a test namespace")
+			createTestNamespace(ctx, k8sClient, "test-ns-cross-ref")
 
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cross-ns-toolserver",
-					Namespace: "test-ns-cross-ref",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+			By("creating a ToolServer in the test namespace")
+			toolServer := createToolServerWithURL(ctx, k8sClient, "cross-ns-toolserver", "test-ns-cross-ref")
 
-			toolServer.Status.Url = "http://cross-ns-toolserver.test-ns-cross-ref.svc.cluster.local:8080"
-			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+			By("creating an agent in a different namespace that references the ToolServer")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent-cross-ns", toolServer.Name, toolServer.Namespace)
 
-			parentAgent := &runtimev1alpha1.Agent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parent-cross-ns",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.AgentSpec{
-					Framework: "google-adk",
-					Image:     "test-image:latest",
-					Tools: []runtimev1alpha1.AgentTool{
-						{
-							Name: "cross-ns-tool",
-							ToolServerRef: corev1.ObjectReference{
-								Name:      "cross-ns-toolserver",
-								Namespace: "test-ns-cross-ref",
-							},
-						},
-					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, parentAgent)).To(Succeed())
-
+			By("finding agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
+
+			By("verifying the cross-namespace agent is found")
 			Expect(requests).To(HaveLen(1))
 			Expect(requests[0].Name).To(Equal("parent-cross-ns"))
-			Expect(requests[0].Namespace).To(Equal("default"))
+			Expect(requests[0].Namespace).To(Equal(DefaultNamespace))
 		})
 
 		It("should return empty list when no agents reference the ToolServer", func() {
-			toolServer := &runtimev1alpha1.ToolServer{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "unreferenced-toolserver",
-					Namespace: "default",
-				},
-				Spec: runtimev1alpha1.ToolServerSpec{
-					Protocol:      "mcp",
-					TransportType: "http",
-					Image:         "test-image:latest",
-				},
-			}
-			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+			By("creating a ToolServer with no references")
+			toolServer := createToolServer(ctx, k8sClient, "unreferenced-toolserver", DefaultNamespace)
 
+			By("verifying no agents are found")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
 			Expect(requests).To(BeEmpty())
 		})

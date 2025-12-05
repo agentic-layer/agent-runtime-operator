@@ -198,6 +198,13 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 		}
 	}
 
+	// Validate Tools
+	for i, tool := range agent.Spec.Tools {
+		if errs := v.validateTool(tool, i); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+
 	// Validate VolumeMounts reference existing Volumes
 	if errs := v.validateVolumeMounts(agent); len(errs) > 0 {
 		allErrs = append(allErrs, errs...)
@@ -226,13 +233,6 @@ func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgen
 	hasAgentRef := subAgent.AgentRef != nil
 	hasURL := subAgent.Url != ""
 
-	// Must have a name
-	if subAgent.Name == "" {
-		errs = append(errs, field.Required(
-			field.NewPath("spec", "subAgents").Index(index).Child("name"),
-			"subAgent must have a name"))
-	}
-
 	// Exactly one of agentRef or url must be specified (mutually exclusive)
 	if hasAgentRef && hasURL {
 		errs = append(errs, field.Forbidden(
@@ -260,6 +260,48 @@ func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgen
 				field.NewPath("spec", "subAgents").Index(index).Child("url"),
 				subAgent.Url,
 				fmt.Sprintf("SubAgent[%d].Url: %s", index, err.Error())))
+		}
+	}
+
+	return errs
+}
+
+// validateTool validates a Tool configuration for business logic correctness.
+// This performs stateless validation only - no cluster state checks.
+// Basic URI format validation is handled by kubebuilder annotation.
+func (v *AgentCustomValidator) validateTool(tool runtimev1alpha1.AgentTool, index int) []*field.Error {
+	var errs []*field.Error
+
+	hasToolServerRef := tool.ToolServerRef != nil
+	hasURL := tool.Url != ""
+
+	// Exactly one of toolServerRef or url must be specified (mutually exclusive)
+	if hasToolServerRef && hasURL {
+		errs = append(errs, field.Forbidden(
+			field.NewPath("spec", "tools").Index(index),
+			"toolServerRef and url are mutually exclusive - specify exactly one"))
+	}
+
+	if !hasToolServerRef && !hasURL {
+		errs = append(errs, field.Required(
+			field.NewPath("spec", "tools").Index(index),
+			"either toolServerRef or url must be specified"))
+	}
+
+	// Validate toolServerRef if provided
+	if hasToolServerRef && tool.ToolServerRef.Name == "" {
+		errs = append(errs, field.Required(
+			field.NewPath("spec", "tools").Index(index).Child("toolServerRef", "name"),
+			"toolServerRef.name must be specified"))
+	}
+
+	// Only validate scheme restriction (kubebuilder handles URI format)
+	if hasURL {
+		if err := v.validateHTTPScheme(tool.Url); err != nil {
+			errs = append(errs, field.Invalid(
+				field.NewPath("spec", "tools").Index(index).Child("url"),
+				tool.Url,
+				fmt.Sprintf("Tool[%d].Url: %s", index, err.Error())))
 		}
 	}
 

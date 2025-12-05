@@ -307,18 +307,19 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 			}
 		})
 
-		It("should collect tools from agent", func() {
+		It("should collect tools from agent both ToolServer references and direct URL tools", func() {
 			agent := &runtimev1alpha1.Agent{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "agent-with-tools",
+					Name:      "agent-with-mixed-tools",
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool1", ToolServerRef: corev1.ObjectReference{Name: "tool1-server"}},
-						{Name: "tool2", ToolServerRef: corev1.ObjectReference{Name: "tool2-server"}},
+						{Name: "local-tool", ToolServerRef: &corev1.ObjectReference{Name: "local-server"}},
+						{Name: "remote-tool", Url: "https://mcp.example.com/tools"},
+						{Name: "another-local", ToolServerRef: &corev1.ObjectReference{Name: "another-server", Namespace: "tools"}},
 					},
 				},
 			}
@@ -331,18 +332,22 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 				},
 				Spec: runtimev1alpha1.AgenticWorkforceSpec{
 					EntryPointAgents: []*corev1.ObjectReference{
-						{Name: "agent-with-tools"},
+						{Name: "agent-with-mixed-tools"},
 					},
 				},
 			}
 
 			agents, tools := reconciler.collectTransitiveAgentsAndTools(ctx, workforce)
 			Expect(agents).To(ContainElement(runtimev1alpha1.TransitiveAgent{
-				Name:      "agent-with-tools",
+				Name:      "agent-with-mixed-tools",
 				Namespace: "default",
 			}))
-			Expect(tools).To(HaveLen(2))
-			Expect(tools).To(ContainElements("default/tool1-server", "default/tool2-server"))
+			Expect(tools).To(HaveLen(3))
+			Expect(tools).To(ContainElements(
+				"default/local-server",          // ToolServerRef format
+				"tools/another-server",          // ToolServerRef with namespace
+				"https://mcp.example.com/tools", // Direct URL format
+			))
 		})
 
 		It("should collect cluster sub-agent using AgentRef", func() {
@@ -449,7 +454,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-c", ToolServerRef: corev1.ObjectReference{Name: "tool-c-server"}},
+						{Name: "tool-c", ToolServerRef: &corev1.ObjectReference{Name: "tool-c-server"}},
 					},
 				},
 			}
@@ -471,7 +476,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 						},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-b", ToolServerRef: corev1.ObjectReference{Name: "tool-b-server"}},
+						{Name: "tool-b", ToolServerRef: &corev1.ObjectReference{Name: "tool-b-server"}},
 					},
 				},
 			}
@@ -493,7 +498,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 						},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-a", ToolServerRef: corev1.ObjectReference{Name: "tool-a-server"}},
+						{Name: "tool-a", ToolServerRef: &corev1.ObjectReference{Name: "tool-a-server"}},
 					},
 				},
 			}
