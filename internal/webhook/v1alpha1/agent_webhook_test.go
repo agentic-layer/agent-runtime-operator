@@ -615,18 +615,6 @@ var _ = Describe("Agent Webhook", func() {
 					Expect(warnings).To(BeEmpty())
 				})
 
-				It("should reject tool without name", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Url: "https://mcp.example.com/tools"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("tool must have a name"))
-					Expect(err.Error()).To(ContainSubstring("spec.tools[0].name"))
-					Expect(warnings).To(BeEmpty())
-				})
-
 				It("should reject toolServerRef without name", func() {
 					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
 						{Name: "tool", ToolServerRef: &corev1.ObjectReference{Namespace: "default"}},

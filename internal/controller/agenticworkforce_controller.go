@@ -220,7 +220,7 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 			toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolServerRef.Name)
 			allTools[toolKey] = true
 		} else if tool.Url != "" {
-			// Remote tool - record the URL directly (consistent with remote sub-agents)
+			// Remote tool - record the URL directly
 			allTools[tool.Url] = true
 		}
 	}

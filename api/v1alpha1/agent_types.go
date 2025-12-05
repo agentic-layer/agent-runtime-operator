@@ -48,6 +48,7 @@ type AgentProtocol struct {
 // SubAgent defines configuration for connecting to either a cluster agent or remote agent
 type SubAgent struct {
 	// Name is a descriptive identifier for this sub-agent connection
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// AgentRef references an Agent resource in the cluster.
@@ -75,6 +76,7 @@ type SubAgent struct {
 // AgentTool defines configuration for integrating an MCP (Model Context Protocol) tool
 type AgentTool struct {
 	// Name is the unique identifier for this tool
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// ToolServerRef references a ToolServer resource in the cluster.

@@ -233,13 +233,6 @@ func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgen
 	hasAgentRef := subAgent.AgentRef != nil
 	hasURL := subAgent.Url != ""
 
-	// Must have a name
-	if subAgent.Name == "" {
-		errs = append(errs, field.Required(
-			field.NewPath("spec", "subAgents").Index(index).Child("name"),
-			"subAgent must have a name"))
-	}
-
 	// Exactly one of agentRef or url must be specified (mutually exclusive)
 	if hasAgentRef && hasURL {
 		errs = append(errs, field.Forbidden(
@@ -281,13 +274,6 @@ func (v *AgentCustomValidator) validateTool(tool runtimev1alpha1.AgentTool, inde
 
 	hasToolServerRef := tool.ToolServerRef != nil
 	hasURL := tool.Url != ""
-
-	// Must have a name
-	if tool.Name == "" {
-		errs = append(errs, field.Required(
-			field.NewPath("spec", "tools").Index(index).Child("name"),
-			"tool must have a name"))
-	}
 
 	// Exactly one of toolServerRef or url must be specified (mutually exclusive)
 	if hasToolServerRef && hasURL {

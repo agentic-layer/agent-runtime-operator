@@ -433,6 +433,7 @@ spec:
                     name:
                       description: Name is a descriptive identifier for this sub-agent
                         connection
+                      minLength: 1
                       type: string
                     url:
                       description: |-
@@ -455,6 +456,7 @@ spec:
                   properties:
                     name:
                       description: Name is the unique identifier for this tool
+                      minLength: 1
                       type: string
                     toolServerRef:
                       description: |-
