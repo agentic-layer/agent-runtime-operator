@@ -85,7 +85,7 @@ func generateServiceURL(name, namespace string) string {
 	return fmt.Sprintf("http://%s.%s.svc.cluster.local:8080", name, namespace)
 }
 
-func createAgentWithToolServerRef(ctx context.Context, k8sClient client.Client, agentName, agentNamespace, toolServerName, toolServerNamespace string) *runtimev1alpha1.Agent {
+func createAgentWithToolServerRef(ctx context.Context, k8sClient client.Client, agentName, toolServerName, toolServerNamespace string) {
 	var toolServerRef *corev1.ObjectReference
 	if toolServerNamespace == "" {
 		toolServerRef = &corev1.ObjectReference{
@@ -101,7 +101,7 @@ func createAgentWithToolServerRef(ctx context.Context, k8sClient client.Client, 
 	agent := &runtimev1alpha1.Agent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      agentName,
-			Namespace: agentNamespace,
+			Namespace: DefaultNamespace,
 		},
 		Spec: runtimev1alpha1.AgentSpec{
 			Framework: TestFramework,
@@ -115,14 +115,13 @@ func createAgentWithToolServerRef(ctx context.Context, k8sClient client.Client, 
 		},
 	}
 	Expect(k8sClient.Create(ctx, agent)).To(Succeed())
-	return agent
 }
 
-func createAgentWithTools(ctx context.Context, k8sClient client.Client, name, namespace string, tools []runtimev1alpha1.AgentTool) *runtimev1alpha1.Agent {
+func createAgentWithTools(ctx context.Context, k8sClient client.Client, name string, tools []runtimev1alpha1.AgentTool) *runtimev1alpha1.Agent {
 	agent := &runtimev1alpha1.Agent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: namespace,
+			Namespace: DefaultNamespace,
 		},
 		Spec: runtimev1alpha1.AgentSpec{
 			Framework: TestFramework,
@@ -134,7 +133,7 @@ func createAgentWithTools(ctx context.Context, k8sClient client.Client, name, na
 	return agent
 }
 
-func createTestNamespace(ctx context.Context, k8sClient client.Client, name string) *corev1.Namespace {
+func createTestNamespace(ctx context.Context, k8sClient client.Client, name string) {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -144,7 +143,6 @@ func createTestNamespace(ctx context.Context, k8sClient client.Client, name stri
 	DeferCleanup(func() {
 		_ = k8sClient.Delete(ctx, ns)
 	})
-	return ns
 }
 
 func cleanupResourcesInNamespace(ctx context.Context, k8sClient client.Client, namespace string) {
@@ -269,7 +267,7 @@ var _ = Describe("Agent Tool", func() {
 			toolServer2 := createToolServerWithURL(ctx, k8sClient, "toolserver2", DefaultNamespace)
 
 			By("creating an agent with tools referencing both ToolServers")
-			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-resolve-all", DefaultNamespace, []runtimev1alpha1.AgentTool{
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-resolve-all", []runtimev1alpha1.AgentTool{
 				{Name: "tool1", ToolServerRef: &corev1.ObjectReference{Name: toolServer1.Name}},
 				{Name: "tool2", ToolServerRef: &corev1.ObjectReference{Name: toolServer2.Name}},
 			})
@@ -286,7 +284,7 @@ var _ = Describe("Agent Tool", func() {
 
 		It("should collect all resolution errors", func() {
 			By("creating an agent with references to non-existent ToolServers")
-			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-with-errors", DefaultNamespace, []runtimev1alpha1.AgentTool{
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-with-errors", []runtimev1alpha1.AgentTool{
 				{Name: "missing-tool1", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver1"}},
 				{Name: "missing-tool2", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver2"}},
 			})
@@ -301,7 +299,7 @@ var _ = Describe("Agent Tool", func() {
 
 		It("should handle empty tools list", func() {
 			By("creating an agent with no tools")
-			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-no-tools", DefaultNamespace, []runtimev1alpha1.AgentTool{})
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-no-tools", []runtimev1alpha1.AgentTool{})
 
 			By("verifying empty result is returned")
 			resolved, err := reconciler.resolveAllTools(ctx, parentAgent)
@@ -314,7 +312,7 @@ var _ = Describe("Agent Tool", func() {
 			workingToolServer := createToolServerWithURL(ctx, k8sClient, "working-toolserver", DefaultNamespace)
 
 			By("creating an agent with multiple tools (one working, one missing)")
-			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-mixed-tools", DefaultNamespace, []runtimev1alpha1.AgentTool{
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-mixed-tools", []runtimev1alpha1.AgentTool{
 				{Name: "working-tool", ToolServerRef: &corev1.ObjectReference{Name: workingToolServer.Name}},
 				{Name: "missing-tool", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver"}},
 			})
@@ -337,7 +335,7 @@ var _ = Describe("Agent Tool", func() {
 			toolServer := createToolServerWithURL(ctx, k8sClient, "local-toolserver", DefaultNamespace)
 
 			By("creating an agent with mixed tools (ToolServerRef and direct URL)")
-			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-mixed-types", DefaultNamespace, []runtimev1alpha1.AgentTool{
+			parentAgent := createAgentWithTools(ctx, k8sClient, "parent-mixed-types", []runtimev1alpha1.AgentTool{
 				{Name: "local-tool", ToolServerRef: &corev1.ObjectReference{Name: toolServer.Name}},
 				{Name: "remote-tool", Url: "https://mcp.example.com/tools"},
 			})
@@ -359,7 +357,7 @@ var _ = Describe("Agent Tool", func() {
 			toolServer := createToolServerWithURL(ctx, k8sClient, "referenced-toolserver", DefaultNamespace)
 
 			By("creating an agent that references the ToolServer")
-			createAgentWithToolServerRef(ctx, k8sClient, "parent-agent", DefaultNamespace, toolServer.Name, toolServer.Namespace)
+			createAgentWithToolServerRef(ctx, k8sClient, "parent-agent", toolServer.Name, toolServer.Namespace)
 
 			By("finding agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
@@ -375,7 +373,7 @@ var _ = Describe("Agent Tool", func() {
 			toolServer := createToolServerWithURL(ctx, k8sClient, "toolserver-with-defaulting", DefaultNamespace)
 
 			By("creating an agent that references the ToolServer without namespace")
-			createAgentWithToolServerRef(ctx, k8sClient, "parent-with-defaulting", DefaultNamespace, toolServer.Name, "")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent-with-defaulting", toolServer.Name, "")
 
 			By("finding agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
@@ -390,10 +388,10 @@ var _ = Describe("Agent Tool", func() {
 			toolServer := createToolServerWithURL(ctx, k8sClient, "shared-toolserver", DefaultNamespace)
 
 			By("creating the first agent referencing the ToolServer")
-			createAgentWithToolServerRef(ctx, k8sClient, "parent1", DefaultNamespace, toolServer.Name, "")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent1", toolServer.Name, "")
 
 			By("creating the second agent referencing the same ToolServer")
-			createAgentWithToolServerRef(ctx, k8sClient, "parent2", DefaultNamespace, toolServer.Name, "")
+			createAgentWithToolServerRef(ctx, k8sClient, "parent2", toolServer.Name, "")
 
 			By("finding all agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
@@ -412,7 +410,7 @@ var _ = Describe("Agent Tool", func() {
 			toolServer := createToolServerWithURL(ctx, k8sClient, "cross-ns-toolserver", "test-ns-cross-ref")
 
 			By("creating an agent in a different namespace that references the ToolServer")
-			createAgentWithToolServerRef(ctx, k8sClient, "parent-cross-ns", DefaultNamespace, toolServer.Name, toolServer.Namespace)
+			createAgentWithToolServerRef(ctx, k8sClient, "parent-cross-ns", toolServer.Name, toolServer.Namespace)
 
 			By("finding agents that reference the ToolServer")
 			requests := reconciler.findAgentsReferencingToolServer(ctx, toolServer)
