@@ -29,10 +29,9 @@ type ToolServerSpec struct {
 	Protocol string `json:"protocol"`
 
 	// TransportType defines how the tool server communicates
-	// - stdio: For sidecar injection into agent pods (no standalone deployment)
 	// - http: HTTP transport with standalone deployment and service
 	// - sse: Server-Sent Events transport with standalone deployment and service
-	// +kubebuilder:validation:Enum=stdio;http;sse
+	// +kubebuilder:validation:Enum=http;sse
 	// +kubebuilder:default=http
 	TransportType string `json:"transportType"`
 
@@ -53,7 +52,7 @@ type ToolServerSpec struct {
 	Args []string `json:"args,omitempty"`
 
 	// Port is the port number for http/sse transports
-	// Required for http and sse transports, must not be set for stdio
+	// Required for http and sse transports
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
@@ -62,13 +61,12 @@ type ToolServerSpec struct {
 	// Path is the URL path for http/sse transports
 	// Defaults to "/mcp" for http and "/sse" for sse if not specified
 	// Must start with "/" if specified
-	// Not applicable for stdio transport
 	// +optional
 	// +kubebuilder:validation:Pattern=`^/.*`
 	Path string `json:"path,omitempty"`
 
 	// Replicas is the number of replicas for http/sse transports
-	// Only applicable for http and sse transports, ignored for stdio
+	// Only applicable for http and sse transports
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	Replicas *int32 `json:"replicas,omitempty"`

@@ -30,12 +30,11 @@ import (
 )
 
 const (
-	TestProtocol       = "mcp"
-	TestTransportHTTP  = "http"
-	TestTransportStdio = "stdio"
-	TestImage          = "test-image:latest"
-	TestFramework      = "google-adk"
-	DefaultNamespace   = "default"
+	TestProtocol      = "mcp"
+	TestTransportHTTP = "http"
+	TestImage         = "test-image:latest"
+	TestFramework     = "google-adk"
+	DefaultNamespace  = "default"
 )
 
 func createToolServer(ctx context.Context, k8sClient client.Client, name, namespace string) *runtimev1alpha1.ToolServer {
@@ -61,23 +60,6 @@ func createToolServerWithURL(ctx context.Context, k8sClient client.Client, name,
 	toolServer.Status.Url = url
 	Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
 
-	return toolServer
-}
-
-func createToolServerWithCustomTransport(ctx context.Context, k8sClient client.Client, name, namespace, transport string, command []string) *runtimev1alpha1.ToolServer {
-	toolServer := &runtimev1alpha1.ToolServer{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: runtimev1alpha1.ToolServerSpec{
-			Protocol:      TestProtocol,
-			TransportType: transport,
-			Image:         TestImage,
-			Command:       command,
-		},
-	}
-	Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
 	return toolServer
 }
 
@@ -211,25 +193,6 @@ var _ = Describe("Agent Tool", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve ToolServer"))
 			Expect(err.Error()).To(ContainSubstring("nonexistent-toolserver"))
-		})
-
-		It("should return error when ToolServer has empty Status.Url", func() {
-			By("creating a stdio ToolServer without a URL")
-			createToolServerWithCustomTransport(ctx, k8sClient, "stdio-toolserver", DefaultNamespace, TestTransportStdio, []string{"/bin/tool"})
-
-			By("creating a tool reference to the stdio ToolServer")
-			tool := runtimev1alpha1.AgentTool{
-				Name: "stdio-tool",
-				ToolServerRef: &corev1.ObjectReference{
-					Name: "stdio-toolserver",
-				},
-			}
-
-			By("verifying an error is returned for missing URL")
-			_, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("has no URL in its Status field"))
-			Expect(err.Error()).To(ContainSubstring("stdio"))
 		})
 
 		It("should return direct URL when provided", func() {

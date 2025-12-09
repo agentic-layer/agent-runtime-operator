@@ -27,7 +27,6 @@ import (
 
 const (
 	testImageToolServer = "example.com/fake-toolserver:v1.0.0"
-	testImageNode       = "example.com/fake-node-mcp:v1.0"
 	testImagePython     = "example.com/fake-python-mcp:v1.0"
 )
 
@@ -115,20 +114,6 @@ var _ = Describe("ToolServer Webhook", func() {
 			Expect(obj.Spec.Port).To(Equal(int32(8080)))
 		})
 
-		It("Should not set default port for stdio transport", func() {
-			By("having stdio transport")
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageToolServer
-
-			By("calling the Default method")
-			err := defaulter.Default(ctx, obj)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("verifying that port remains unset")
-			Expect(obj.Spec.Port).To(Equal(int32(0)))
-		})
-
 		It("Should not override existing port", func() {
 			By("setting a custom port")
 			obj.Spec.Protocol = mcpProtocol
@@ -174,20 +159,6 @@ var _ = Describe("ToolServer Webhook", func() {
 			By("verifying that default replicas are set")
 			Expect(obj.Spec.Replicas).NotTo(BeNil())
 			Expect(*obj.Spec.Replicas).To(Equal(int32(1)))
-		})
-
-		It("Should not set default replicas for stdio transport", func() {
-			By("having stdio transport")
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageToolServer
-
-			By("calling the Default method")
-			err := defaulter.Default(ctx, obj)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("verifying that replicas remain unset")
-			Expect(obj.Spec.Replicas).To(BeNil())
 		})
 
 		It("Should not override existing replicas", func() {
@@ -236,20 +207,6 @@ var _ = Describe("ToolServer Webhook", func() {
 			Expect(obj.Spec.Path).To(Equal("/sse"))
 		})
 
-		It("Should not set default path for stdio transport", func() {
-			By("having stdio transport")
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageToolServer
-
-			By("calling the Default method")
-			err := defaulter.Default(ctx, obj)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("verifying that path remains unset")
-			Expect(obj.Spec.Path).To(BeEmpty())
-		})
-
 		It("Should not override existing path", func() {
 			By("setting a custom path")
 			obj.Spec.Protocol = mcpProtocol
@@ -267,65 +224,6 @@ var _ = Describe("ToolServer Webhook", func() {
 	})
 
 	Context("When creating or updating ToolServer under Validating Webhook", func() {
-		It("Should admit creation if image is specified", func() {
-			By("creating a valid stdio ToolServer")
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageNode
-
-			By("validating the creation")
-			_, err := validator.ValidateCreate(ctx, obj)
-
-			By("expecting validation to succeed")
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Should deny creation if stdio transport has port set", func() {
-			By("creating a stdio ToolServer with port")
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageNode
-			obj.Spec.Port = 8080
-
-			By("validating the creation")
-			_, err := validator.ValidateCreate(ctx, obj)
-
-			By("expecting validation to fail")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("port must not be specified for stdio transport"))
-		})
-
-		It("Should deny creation if stdio transport has replicas set", func() {
-			By("creating a stdio ToolServer with replicas")
-			replicas := int32(2)
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageNode
-			obj.Spec.Replicas = &replicas
-
-			By("validating the creation")
-			_, err := validator.ValidateCreate(ctx, obj)
-
-			By("expecting validation to fail")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("replicas must not be specified for stdio transport"))
-		})
-
-		It("Should deny creation if stdio transport has path set", func() {
-			By("creating a stdio ToolServer with path")
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageNode
-			obj.Spec.Path = "/mcp"
-
-			By("validating the creation")
-			_, err := validator.ValidateCreate(ctx, obj)
-
-			By("expecting validation to fail")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("path must not be specified for stdio transport"))
-		})
-
 		It("Should deny creation if http transport has no port", func() {
 			By("creating an http ToolServer without port")
 			obj.Spec.Protocol = mcpProtocol
@@ -399,26 +297,6 @@ var _ = Describe("ToolServer Webhook", func() {
 
 			By("expecting validation to succeed")
 			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("Should deny update if new object is invalid", func() {
-			By("setting up old valid object and new invalid object")
-			oldObj.Spec.Protocol = mcpProtocol
-			oldObj.Spec.TransportType = httpTransport
-			oldObj.Spec.Image = testImagePython
-			oldObj.Spec.Port = 8080
-
-			obj.Spec.Protocol = mcpProtocol
-			obj.Spec.TransportType = stdioTransport
-			obj.Spec.Image = testImageNode
-			obj.Spec.Port = 8080 // Invalid for stdio
-
-			By("validating the update")
-			_, err := validator.ValidateUpdate(ctx, oldObj, obj)
-
-			By("expecting validation to fail")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("port must not be specified for stdio transport"))
 		})
 	})
 

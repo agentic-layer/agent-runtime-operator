@@ -37,8 +37,8 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
 
 - **ToolServer CRD** (`api/v1alpha1/toolserver_types.go`): Defines the ToolServer custom resource for managing tool servers:
   - Protocol specification (mcp for Model Context Protocol)
-  - Transport type configuration (stdio, http, sse)
-  - Container image and replica configuration (for http/sse)
+  - Transport type configuration (http, sse)
+  - Container image and replica configuration
   - Environment variable configuration
   - Status tracking with conditions and service URL
 
@@ -53,9 +53,7 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
   - Handling framework-specific configurations
 
 - **ToolServer Controller** (`internal/controller/toolserver_controller.go`): Reconciles ToolServer resources by:
-  - **Transport-aware deployment**:
-    - stdio: Marks resource as ready for sidecar injection (no standalone deployment)
-    - http/sse: Creates Deployments and Services for standalone tool servers
+  - **Transport-aware deployment**: http/sse: Creates Deployments and Services for standalone tool servers
   - Managing TCP-based health probes for http/sse transports
   - Populating status URL for service discovery
   - Handling environment variable configuration

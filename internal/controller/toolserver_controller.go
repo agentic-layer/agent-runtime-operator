@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,7 +37,6 @@ import (
 
 const (
 	toolserverContainerName = "toolserver"
-	stdioTransport          = "stdio"
 	httpTransport           = "http"
 	sseTransport            = "sse"
 )
@@ -76,38 +74,22 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	log.Info("Reconciling ToolServer")
 
-	// Handle stdio transport (sidecar injection - no deployment/service)
-	if toolServer.Spec.TransportType == stdioTransport {
-		log.Info("ToolServer configured as stdio (sidecar injection), ensuring no deployment/service exists")
+	// Ensure Deployment exists and is up to date for http/sse transports
+	if err := r.ensureDeployment(ctx, &toolServer); err != nil {
+		log.Error(err, "Failed to ensure Deployment")
+		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "DeploymentFailed", err.Error()); statusErr != nil {
+			log.Error(statusErr, "Failed to update status after deployment failure")
+		}
+		return ctrl.Result{}, err
+	}
 
-		// Clean up any existing deployment/service if switching from http/sse
-		if err := r.ensureDeploymentDeleted(ctx, &toolServer); err != nil {
-			log.Error(err, "Failed to delete Deployment")
-			return ctrl.Result{}, err
+	// Ensure Service exists and is up to date for http/sse transports
+	if err := r.ensureService(ctx, &toolServer); err != nil {
+		log.Error(err, "Failed to ensure Service")
+		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "ServiceFailed", err.Error()); statusErr != nil {
+			log.Error(statusErr, "Failed to update status after service failure")
 		}
-
-		if err := r.ensureServiceDeleted(ctx, &toolServer); err != nil {
-			log.Error(err, "Failed to delete Service")
-			return ctrl.Result{}, err
-		}
-	} else {
-		// Ensure Deployment exists and is up to date for http/sse transports
-		if err := r.ensureDeployment(ctx, &toolServer); err != nil {
-			log.Error(err, "Failed to ensure Deployment")
-			if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "DeploymentFailed", err.Error()); statusErr != nil {
-				log.Error(statusErr, "Failed to update status after deployment failure")
-			}
-			return ctrl.Result{}, err
-		}
-
-		// Ensure Service exists and is up to date for http/sse transports
-		if err := r.ensureService(ctx, &toolServer); err != nil {
-			log.Error(err, "Failed to ensure Service")
-			if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "ServiceFailed", err.Error()); statusErr != nil {
-				log.Error(statusErr, "Failed to update status after service failure")
-			}
-			return ctrl.Result{}, err
-		}
+		return ctrl.Result{}, err
 	}
 
 	// Update ToolServer status to Ready (optimistic)
@@ -288,7 +270,7 @@ func (r *ToolServerReconciler) buildReadinessProbe(port int32) *corev1.Probe {
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			TCPSocket: &corev1.TCPSocketAction{
-				Port: intstr.FromInt(int(port)),
+				Port: intstr.FromInt32(port),
 			},
 		},
 		InitialDelaySeconds: 10,
@@ -297,38 +279,6 @@ func (r *ToolServerReconciler) buildReadinessProbe(port int32) *corev1.Probe {
 		SuccessThreshold:    1,
 		FailureThreshold:    10,
 	}
-}
-
-// ensureDeploymentDeleted ensures the Deployment is deleted if it exists
-func (r *ToolServerReconciler) ensureDeploymentDeleted(ctx context.Context, toolServer *runtimev1alpha1.ToolServer) error {
-	log := logf.FromContext(ctx)
-
-	deployment := &appsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Name: toolServer.Name, Namespace: toolServer.Namespace}, deployment); err == nil {
-		log.Info("Deleting Deployment as transport is stdio (sidecar injection)")
-		if err := r.Delete(ctx, deployment); err != nil {
-			return fmt.Errorf("failed to delete Deployment: %w", err)
-		}
-	} else if !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to get Deployment: %w", err)
-	}
-	return nil
-}
-
-// ensureServiceDeleted ensures the Service is deleted if it exists
-func (r *ToolServerReconciler) ensureServiceDeleted(ctx context.Context, toolServer *runtimev1alpha1.ToolServer) error {
-	log := logf.FromContext(ctx)
-
-	service := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: toolServer.Name, Namespace: toolServer.Namespace}, service); err == nil {
-		log.Info("Deleting Service as transport is stdio (sidecar injection)")
-		if err := r.Delete(ctx, service); err != nil {
-			return fmt.Errorf("failed to delete Service: %w", err)
-		}
-	} else if !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to get Service: %w", err)
-	}
-	return nil
 }
 
 // updateToolServerStatusReady sets the ToolServer status to Ready and updates the URL
