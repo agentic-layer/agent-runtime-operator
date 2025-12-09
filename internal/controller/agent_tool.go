@@ -81,7 +81,7 @@ func (r *AgentReconciler) resolveToolServerUrl(ctx context.Context, tool runtime
 
 	// Use the URL from the toolServer's status (populated by the controller)
 	if referencedToolServer.Status.Url == "" {
-		return "", fmt.Errorf("ToolServer %s/%s has no URL in its Status field (may not be ready or transport is stdio)", namespace, tool.ToolServerRef.Name)
+		return "", fmt.Errorf("ToolServer %s/%s has no URL in its Status field", namespace, tool.ToolServerRef.Name)
 	}
 
 	return referencedToolServer.Status.Url, nil

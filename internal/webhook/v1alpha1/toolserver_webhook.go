@@ -34,7 +34,6 @@ import (
 
 const (
 	mcpProtocol     = "mcp"
-	stdioTransport  = "stdio"
 	httpTransport   = "http"
 	sseTransport    = "sse"
 	defaultPort     = int32(8080)
@@ -156,46 +155,21 @@ func (v *ToolServerCustomValidator) validateToolServer(toolserver *runtimev1alph
 	var allErrs field.ErrorList
 	var warnings admission.Warnings
 
-	// Validate transportType-specific requirements
-	switch toolserver.Spec.TransportType {
-	case stdioTransport:
-		// stdio should NOT have port, path, or replicas set
-		if toolserver.Spec.Port != 0 {
-			allErrs = append(allErrs, field.Forbidden(
-				field.NewPath("spec", "port"),
-				"port must not be specified for stdio transport (sidecar injection)",
-			))
-		}
-		if toolserver.Spec.Path != "" {
-			allErrs = append(allErrs, field.Forbidden(
-				field.NewPath("spec", "path"),
-				"path must not be specified for stdio transport (sidecar injection)",
-			))
-		}
-		if toolserver.Spec.Replicas != nil {
-			allErrs = append(allErrs, field.Forbidden(
-				field.NewPath("spec", "replicas"),
-				"replicas must not be specified for stdio transport (sidecar injection)",
-			))
-		}
+	// http/sse MUST have port set (after defaults)
+	if toolserver.Spec.Port == 0 {
+		allErrs = append(allErrs, field.Required(
+			field.NewPath("spec", "port"),
+			fmt.Sprintf("port is required for %s transport", toolserver.Spec.TransportType),
+		))
+	}
 
-	case httpTransport, sseTransport:
-		// http/sse MUST have port set (after defaults)
-		if toolserver.Spec.Port == 0 {
-			allErrs = append(allErrs, field.Required(
-				field.NewPath("spec", "port"),
-				fmt.Sprintf("port is required for %s transport", toolserver.Spec.TransportType),
-			))
-		}
-
-		// Validate path format if specified
-		if toolserver.Spec.Path != "" && toolserver.Spec.Path != "/" && !isValidPathFormat(toolserver.Spec.Path) {
-			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("spec", "path"),
-				toolserver.Spec.Path,
-				"path must start with '/' and contain only valid URL path characters",
-			))
-		}
+	// Validate path format if specified
+	if toolserver.Spec.Path != "" && toolserver.Spec.Path != "/" && !isValidPathFormat(toolserver.Spec.Path) {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "path"),
+			toolserver.Spec.Path,
+			"path must start with '/' and contain only valid URL path characters",
+		))
 	}
 
 	if len(allErrs) > 0 {

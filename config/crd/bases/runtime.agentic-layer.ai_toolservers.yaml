@@ -270,13 +270,12 @@ spec:
                   Path is the URL path for http/sse transports
                   Defaults to "/mcp" for http and "/sse" for sse if not specified
                   Must start with "/" if specified
-                  Not applicable for stdio transport
                 pattern: ^/.*
                 type: string
               port:
                 description: |-
                   Port is the port number for http/sse transports
-                  Required for http and sse transports, must not be set for stdio
+                  Required for http and sse transports
                 format: int32
                 maximum: 65535
                 minimum: 1
@@ -291,7 +290,7 @@ spec:
               replicas:
                 description: |-
                   Replicas is the number of replicas for http/sse transports
-                  Only applicable for http and sse transports, ignored for stdio
+                  Only applicable for http and sse transports
                 format: int32
                 minimum: 0
                 type: integer
@@ -299,11 +298,9 @@ spec:
                 default: http
                 description: |-
                   TransportType defines how the tool server communicates
-                  - stdio: For sidecar injection into agent pods (no standalone deployment)
                   - http: HTTP transport with standalone deployment and service
                   - sse: Server-Sent Events transport with standalone deployment and service
                 enum:
-                - stdio
                 - http
                 - sse
                 type: string
