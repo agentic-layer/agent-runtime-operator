@@ -25,6 +25,7 @@ import (
 type ToolServerSpec struct {
 	// Protocol defines the tool server protocol (e.g., "mcp" for Model Context Protocol)
 	// +kubebuilder:validation:Enum=mcp
+	// +kubebuilder:default=mcp
 	Protocol string `json:"protocol"`
 
 	// TransportType defines how the tool server communicates
@@ -32,6 +33,7 @@ type ToolServerSpec struct {
 	// - http: HTTP transport with standalone deployment and service
 	// - sse: Server-Sent Events transport with standalone deployment and service
 	// +kubebuilder:validation:Enum=stdio;http;sse
+	// +kubebuilder:default=http
 	TransportType string `json:"transportType"`
 
 	// Image is the container image for the tool server

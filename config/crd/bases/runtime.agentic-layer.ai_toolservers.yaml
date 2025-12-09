@@ -282,6 +282,7 @@ spec:
                 minimum: 1
                 type: integer
               protocol:
+                default: mcp
                 description: Protocol defines the tool server protocol (e.g., "mcp"
                   for Model Context Protocol)
                 enum:
@@ -295,6 +296,7 @@ spec:
                 minimum: 0
                 type: integer
               transportType:
+                default: http
                 description: |-
                   TransportType defines how the tool server communicates
                   - stdio: For sidecar injection into agent pods (no standalone deployment)
