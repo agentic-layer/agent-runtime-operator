@@ -25,15 +25,6 @@ import (
 )
 
 var _ = Describe("Agent Probe", func() {
-	var reconciler *AgentReconciler
-
-	BeforeEach(func() {
-		reconciler = &AgentReconciler{
-			Client: k8sClient,
-			Scheme: k8sClient.Scheme(),
-		}
-	})
-
 	Describe("generateReadinessProbe", func() {
 		It("should generate HTTP probe for A2A agents with default settings", func() {
 			agent := &runtimev1alpha1.Agent{
@@ -48,7 +39,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Path).To(Equal("/" + agentCardEndpoint))
@@ -71,7 +62,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).To(BeNil())
 		})
 
@@ -84,7 +75,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(3000))
@@ -100,7 +91,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Path).To(Equal("/custom" + agentCardEndpoint))
@@ -116,7 +107,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Path).To(Equal("/agent-api" + agentCardEndpoint))
@@ -132,7 +123,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Path).To(Equal(agentCardEndpoint))
@@ -148,7 +139,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Port.IntValue()).To(Equal(7000))
@@ -163,7 +154,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			probe := reconciler.generateReadinessProbe(agent)
+			probe := generateReadinessProbe(agent)
 			Expect(probe).NotTo(BeNil())
 			Expect(probe.HTTPGet).NotTo(BeNil())
 			Expect(probe.HTTPGet.Path).To(Equal("/" + agentCardEndpoint))
@@ -181,7 +172,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			protocol := reconciler.findA2AProtocol(agent)
+			protocol := findA2AProtocol(agent)
 			Expect(protocol).NotTo(BeNil())
 			Expect(protocol.Type).To(Equal(runtimev1alpha1.A2AProtocol))
 			Expect(protocol.Port).To(Equal(int32(8000)))
@@ -195,7 +186,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			protocol := reconciler.findA2AProtocol(agent)
+			protocol := findA2AProtocol(agent)
 			Expect(protocol).To(BeNil())
 		})
 
@@ -209,7 +200,7 @@ var _ = Describe("Agent Probe", func() {
 				},
 			}
 
-			protocol := reconciler.findA2AProtocol(agent)
+			protocol := findA2AProtocol(agent)
 			Expect(protocol).NotTo(BeNil())
 			Expect(protocol.Port).To(Equal(int32(8000)))
 			Expect(protocol.Path).To(Equal("/first"))

@@ -109,7 +109,7 @@ func (r *AgentReconciler) resolveDefaultAiGateway(ctx context.Context) (*runtime
 	return &aiGateway, nil
 }
 
-func (r *AgentReconciler) buildAiGatewayServiceUrl(aiGateway runtimev1alpha1.AiGateway) string {
+func buildAiGatewayServiceUrl(aiGateway runtimev1alpha1.AiGateway) string {
 	return fmt.Sprintf("http://%s.%s.svc.cluster.local.:%d", aiGateway.Name, aiGateway.Namespace, aiGateway.Spec.Port)
 }
 

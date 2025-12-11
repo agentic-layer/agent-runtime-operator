@@ -26,12 +26,6 @@ import (
 )
 
 var _ = Describe("Agent Config", func() {
-	var reconciler *AgentReconciler
-
-	BeforeEach(func() {
-		reconciler = &AgentReconciler{}
-	})
-
 	Describe("buildTemplateEnvironmentVars", func() {
 		It("should handle empty agent fields gracefully", func() {
 			agent := &runtimev1alpha1.Agent{
@@ -42,8 +36,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{},
-				nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(envVars).To(HaveLen(6))
 
@@ -106,7 +99,7 @@ var _ = Describe("Agent Config", func() {
 				"tool2": "http://tool-server-2.default.svc.cluster.local:8080/sse",
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(envVars).To(HaveLen(6))
 
@@ -150,7 +143,7 @@ var _ = Describe("Agent Config", func() {
 				"test-sub": {Url: "https://example.com/sub.json", InteractionType: "tool_call"},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, resolvedSubAgents, map[string]string{}, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, map[string]string{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify JSON structure is valid
@@ -176,7 +169,7 @@ var _ = Describe("Agent Config", func() {
 				"test-tool": "http://tool-server-1.default.svc.cluster.local:8080/sse",
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, resolvedTools, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, resolvedTools, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify JSON structure is valid
@@ -201,8 +194,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{},
-				nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
@@ -219,8 +211,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{},
-				nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
@@ -239,7 +230,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			gatewayUrl := "http://ai-gateway.ai-gateway-ns.svc.cluster.local:4000"
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should have base variables (6) + LiteLLM variables (3) = 9 total
@@ -270,7 +261,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should only have base variables (6), no LiteLLM variables
@@ -292,7 +283,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			gatewayUrl := "http://ai-gateway.default.svc.cluster.local:4000"
-			templateVars, err := reconciler.buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
+			templateVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			userVars := []corev1.EnvVar{
@@ -300,7 +291,7 @@ var _ = Describe("Agent Config", func() {
 				{Name: "USE_LITELLM_PROXY", Value: "False"},
 			}
 
-			result := reconciler.mergeEnvironmentVariables(templateVars, userVars)
+			result := mergeEnvironmentVariables(templateVars, userVars)
 
 			// User overrides should take precedence
 			proxyKeyVar := findEnvVar(result, "LITELLM_PROXY_API_KEY")
@@ -331,7 +322,7 @@ var _ = Describe("Agent Config", func() {
 				{Name: "USER_ONLY", Value: "user-value"},   // New variable
 			}
 
-			result := reconciler.mergeEnvironmentVariables(templateVars, userVars)
+			result := mergeEnvironmentVariables(templateVars, userVars)
 
 			// Should have all unique variables
 			Expect(result).To(HaveLen(4))
@@ -359,21 +350,21 @@ var _ = Describe("Agent Config", func() {
 
 		It("should handle empty input slices", func() {
 			// Empty template vars
-			result := reconciler.mergeEnvironmentVariables([]corev1.EnvVar{}, []corev1.EnvVar{
+			result := mergeEnvironmentVariables([]corev1.EnvVar{}, []corev1.EnvVar{
 				{Name: "USER_VAR", Value: "value"},
 			})
 			Expect(result).To(HaveLen(1))
 			Expect(result[0].Name).To(Equal("USER_VAR"))
 
 			// Empty user vars
-			result = reconciler.mergeEnvironmentVariables([]corev1.EnvVar{
+			result = mergeEnvironmentVariables([]corev1.EnvVar{
 				{Name: "TEMPLATE_VAR", Value: "value"},
 			}, []corev1.EnvVar{})
 			Expect(result).To(HaveLen(1))
 			Expect(result[0].Name).To(Equal("TEMPLATE_VAR"))
 
 			// Both empty
-			result = reconciler.mergeEnvironmentVariables([]corev1.EnvVar{}, []corev1.EnvVar{})
+			result = mergeEnvironmentVariables([]corev1.EnvVar{}, []corev1.EnvVar{})
 			Expect(result).To(BeEmpty())
 		})
 
@@ -389,7 +380,7 @@ var _ = Describe("Agent Config", func() {
 				{Name: "VAR_D", Value: "d"},
 			}
 
-			result := reconciler.mergeEnvironmentVariables(templateVars, userVars)
+			result := mergeEnvironmentVariables(templateVars, userVars)
 
 			// Result should be sorted alphabetically by name
 			Expect(result).To(HaveLen(4))
@@ -407,7 +398,7 @@ var _ = Describe("Agent Config", func() {
 	Describe("sanitizeAgentName", func() {
 		DescribeTable("sanitize agent names",
 			func(input, expected string) {
-				result := reconciler.sanitizeAgentName(input)
+				result := sanitizeAgentName(input)
 				Expect(result).To(Equal(expected))
 			},
 			Entry("valid alphanumeric name", "test123", "test123"),
@@ -441,7 +432,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			url := reconciler.buildA2AAgentCardUrl(agent)
+			url := buildA2AAgentCardUrl(agent)
 			Expect(url).To(Equal("http://test-agent.test-ns.svc.cluster.local:8000/.well-known/agent-card.json"))
 		})
 
@@ -462,7 +453,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			url := reconciler.buildA2AAgentCardUrl(agent)
+			url := buildA2AAgentCardUrl(agent)
 			Expect(url).To(Equal("http://test-agent.test-ns.svc.cluster.local:9090/.well-known/agent-card.json"))
 		})
 
@@ -483,7 +474,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			url := reconciler.buildA2AAgentCardUrl(agent)
+			url := buildA2AAgentCardUrl(agent)
 			Expect(url).To(Equal("http://test-agent.test-ns.svc.cluster.local:8000/api/v1/.well-known/agent-card.json"))
 		})
 
@@ -498,7 +489,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			url := reconciler.buildA2AAgentCardUrl(agent)
+			url := buildA2AAgentCardUrl(agent)
 			Expect(url).To(Equal(""))
 		})
 
@@ -524,7 +515,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			url := reconciler.buildA2AAgentCardUrl(agent)
+			url := buildA2AAgentCardUrl(agent)
 			Expect(url).To(Equal("http://test-agent.test-ns.svc.cluster.local:8000/first/.well-known/agent-card.json"))
 		})
 	})

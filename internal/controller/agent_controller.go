@@ -175,16 +175,16 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		// Build template environment variables
 		var aiGatewayUrl *string
 		if aiGateway != nil {
-			url := r.buildAiGatewayServiceUrl(*aiGateway)
+			url := buildAiGatewayServiceUrl(*aiGateway)
 			aiGatewayUrl = &url
 		}
-		templateEnvVars, err := r.buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools, aiGatewayUrl)
+		templateEnvVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools, aiGatewayUrl)
 		if err != nil {
 			return fmt.Errorf("failed to build template environment variables: %w", err)
 		}
 
 		// Merge template and user environment variables
-		allEnvVars := r.mergeEnvironmentVariables(templateEnvVars, agent.Spec.Env)
+		allEnvVars := mergeEnvironmentVariables(templateEnvVars, agent.Spec.Env)
 
 		// Set immutable fields only on creation
 		if deployment.CreationTimestamp.IsZero() {
@@ -239,7 +239,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		container.Env = allEnvVars
 		container.EnvFrom = agent.Spec.EnvFrom
 		container.VolumeMounts = agent.Spec.VolumeMounts
-		container.ReadinessProbe = r.generateReadinessProbe(agent)
+		container.ReadinessProbe = generateReadinessProbe(agent)
 
 		// Update pod volumes
 		deployment.Spec.Template.Spec.Volumes = agent.Spec.Volumes

@@ -51,16 +51,14 @@ import (
 // Returns:
 //   - []corev1.EnvVar: Slice of environment variables for template configuration
 //   - error: JSON marshaling error if SubAgents or Tools contain invalid data
-func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent,
-	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar,
-	error) {
+func buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar, error) {
 	var templateEnvVars []corev1.EnvVar
 	var err error
 
 	// Always set AGENT_NAME (sanitized to meet environment variable requirements)
 	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 		Name:  "AGENT_NAME",
-		Value: r.sanitizeAgentName(agent.Name),
+		Value: sanitizeAgentName(agent.Name),
 	})
 
 	// AGENT_DESCRIPTION - always set, even if empty
@@ -82,7 +80,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 	})
 
 	// AGENT_A2A_RPC_URL - construct URL from A2A protocol if present
-	a2aUrl := r.buildA2AAgentRpcUrl(agent)
+	a2aUrl := buildA2AAgentRpcUrl(agent)
 	if a2aUrl != "" {
 		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 			Name:  "AGENT_A2A_RPC_URL",
@@ -115,7 +113,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 			if resolved.InteractionType == "" {
 				return nil, fmt.Errorf("subAgent %q has no interactionType set (CRD defaulting failed)", name)
 			}
-			subAgentsMap[r.sanitizeAgentName(name)] = map[string]string{
+			subAgentsMap[sanitizeAgentName(name)] = map[string]string{
 				"url":              resolved.Url,
 				"interaction_type": resolved.InteractionType,
 			}
@@ -180,7 +178,7 @@ func (r *AgentReconciler) buildTemplateEnvironmentVars(agent *runtimev1alpha1.Ag
 //
 // Returns:
 //   - []corev1.EnvVar: Merged environment variables with user precedence
-func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars []corev1.EnvVar) []corev1.EnvVar {
+func mergeEnvironmentVariables(templateEnvVars, userEnvVars []corev1.EnvVar) []corev1.EnvVar {
 	// Create a map for efficient lookups of user environment variables
 	userEnvMap := make(map[string]corev1.EnvVar)
 	for _, env := range userEnvVars {
@@ -218,7 +216,7 @@ func (r *AgentReconciler) mergeEnvironmentVariables(templateEnvVars, userEnvVars
 // sanitizeAgentName sanitizes the agent name to meet environment variable naming requirements.
 // Environment variable names should start with a letter (a-z, A-Z) or underscore (_),
 // and can only contain letters, digits (0-9), and underscores.
-func (r *AgentReconciler) sanitizeAgentName(name string) string {
+func sanitizeAgentName(name string) string {
 	var result strings.Builder
 
 	// Process each character
@@ -258,8 +256,8 @@ func (r *AgentReconciler) sanitizeAgentName(name string) string {
 // buildA2AAgentCardUrl constructs the fully qualified Kubernetes internal URL for the A2A agent card.
 // The URL format is: http://{agent.Name}.{agent.Namespace}.svc.cluster.local:{port}{path}/.well-known/agent-card.json
 // Returns empty string if no A2A protocol is configured.
-func (r *AgentReconciler) buildA2AAgentCardUrl(agent *runtimev1alpha1.Agent) string {
-	rpcUrl := r.buildA2AAgentRpcUrl(agent)
+func buildA2AAgentCardUrl(agent *runtimev1alpha1.Agent) string {
+	rpcUrl := buildA2AAgentRpcUrl(agent)
 
 	if rpcUrl == "" {
 		return ""
@@ -271,7 +269,7 @@ func (r *AgentReconciler) buildA2AAgentCardUrl(agent *runtimev1alpha1.Agent) str
 // buildA2AAgentCardUrl constructs the fully qualified Kubernetes internal URL for the A2A agent card.
 // The URL format is: http://{agent.Name}.{agent.Namespace}.svc.cluster.local:{port}{path}/.well-known/agent-card.json
 // Returns empty string if no A2A protocol is configured.
-func (r *AgentReconciler) buildA2AAgentRpcUrl(agent *runtimev1alpha1.Agent) string {
+func buildA2AAgentRpcUrl(agent *runtimev1alpha1.Agent) string {
 	// Find the A2A protocol
 	for _, protocol := range agent.Spec.Protocols {
 		if protocol.Type == runtimev1alpha1.A2AProtocol {

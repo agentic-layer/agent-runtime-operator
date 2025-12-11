@@ -23,7 +23,7 @@ import (
 )
 
 // findA2AProtocol returns the first A2A protocol configuration found
-func (r *AgentReconciler) findA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
+func findA2AProtocol(agent *runtimev1alpha1.Agent) *runtimev1alpha1.AgentProtocol {
 	for _, protocol := range agent.Spec.Protocols {
 		if protocol.Type == runtimev1alpha1.A2AProtocol {
 			return &protocol
@@ -33,9 +33,9 @@ func (r *AgentReconciler) findA2AProtocol(agent *runtimev1alpha1.Agent) *runtime
 }
 
 // generateReadinessProbe generates appropriate readiness probe based on agent protocols
-func (r *AgentReconciler) generateReadinessProbe(agent *runtimev1alpha1.Agent) *corev1.Probe {
+func generateReadinessProbe(agent *runtimev1alpha1.Agent) *corev1.Probe {
 	// Use A2A agent card endpoint for health check
-	protocol := r.findA2AProtocol(agent)
+	protocol := findA2AProtocol(agent)
 	if protocol != nil {
 		return &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

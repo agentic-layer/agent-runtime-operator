@@ -33,7 +33,7 @@ func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *run
 	log := logf.FromContext(ctx)
 	log.V(1).Info("Updating agent status to Ready")
 	// Compute the A2A URL if the agent has an A2A protocol
-	agent.Status.Url = r.buildA2AAgentCardUrl(agent)
+	agent.Status.Url = buildA2AAgentCardUrl(agent)
 
 	// Set AiGatewayRef if an AI Gateway is being used
 	if aiGateway != nil {

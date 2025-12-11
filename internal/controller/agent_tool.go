@@ -67,7 +67,7 @@ func (r *AgentReconciler) resolveToolServerUrl(ctx context.Context, tool runtime
 	}
 
 	// Use namespace from ObjectReference, or default to parent namespace
-	namespace := GetNamespaceWithDefault(tool.ToolServerRef, parentNamespace)
+	namespace := getNamespaceWithDefault(tool.ToolServerRef, parentNamespace)
 
 	var referencedToolServer runtimev1alpha1.ToolServer
 	err := r.Get(ctx, types.NamespacedName{
@@ -113,7 +113,7 @@ func (r *AgentReconciler) findAgentsReferencingToolServer(ctx context.Context, o
 			// Check if this agent references the updated ToolServer
 			if tool.ToolServerRef.Name == updatedToolServer.Name {
 				// Use helper to get namespace
-				toolServerNamespace := GetNamespaceWithDefault(tool.ToolServerRef, agent.Namespace)
+				toolServerNamespace := getNamespaceWithDefault(tool.ToolServerRef, agent.Namespace)
 
 				if toolServerNamespace == updatedToolServer.Namespace {
 					// This agent references the updated ToolServer - enqueue it
