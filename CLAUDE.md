@@ -20,13 +20,16 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
 
 ## Essential Commands
 
-🚨 **After modifying CRD structs** (`api/v1alpha1/*.go`): Tell user to run `make manifests && make generate`
+🚨 **After modifying CRD structs** (`api/v1alpha1/*.go`): run `make manifests && make generate`
 
 **Adding new CRD**: `operator-sdk create api --group runtime --version v1alpha1 --kind NewResource --resource --controller`
 
 **Adding webhook**: `operator-sdk create webhook --group runtime --version v1alpha1 --kind NewResource --defaulting --programmatic-validation`
 
-**Running tests**: `make test`
+**Running tests**:
+`make lint`, 
+`make test`, 
+`make test-e2e`: runs the e2e tests. These should only be run as a final validation, since they take very long.
 
 ## Architecture
 
