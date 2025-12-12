@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Project Overview and Developer Documentation
-- @README.md
+- @README.md: audience is human developer only - consult only after explicitly asking user
 
 User Guides and How-To Guides
 - @docs/modules/agent-runtime/partials/how-to-guide.adoc
@@ -17,6 +17,19 @@ Reference Documentation
 
 Documentation in AsciiDoc format is located in the `docs/` directory.
 This folder is hosted as a separate [documentation site](https://docs.agentic-layer.ai/agent-runtime-operator/index.html).
+
+## Essential Commands
+
+🚨 **After modifying CRD structs** (`api/v1alpha1/*.go`): run `make manifests && make generate`
+
+**Adding new CRD**: `operator-sdk create api --group runtime --version v1alpha1 --kind NewResource --resource --controller`
+
+**Adding webhook**: `operator-sdk create webhook --group runtime --version v1alpha1 --kind NewResource --defaulting --programmatic-validation`
+
+**Running tests**:
+`make lint`, 
+`make test`, 
+`make test-e2e`: runs the e2e tests. These should only be run as a final validation, since they take very long.
 
 ## Architecture
 
@@ -110,3 +123,21 @@ The project uses a three-tier testing approach, prioritized from simplest to mos
 2. **Prefer simpler tests**: Unit test > Integration test > E2E test
 3. **Prefer real APIs over mocking**: Use envtest integration tests instead of extensive mocking
 4. **E2E tests are blackbox**: Implementation details should be tested in unit/integration tests
+
+## Update Policy
+
+Updates to this CLAUDE.md should be rare. **Trigger a CLAUDE.md update suggestion when:**
+
+**Essential Commands**:
+- New critical make targets or operator-sdk commands needed for development
+- Command syntax changes
+
+**Architecture**:
+- New CRDs or controllers added
+- Significant behavior changes to existing components
+
+**Project Structure**:
+- Major directory reorganization
+
+**Testing Strategy**:
+- Testing approach or framework changes
