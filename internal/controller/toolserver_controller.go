@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -197,6 +198,7 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 		container.Env = toolServer.Spec.Env
 		container.EnvFrom = toolServer.Spec.EnvFrom
 		container.ReadinessProbe = r.buildReadinessProbe(toolServer.Spec.Port)
+		container.Resources = getOrDefaultToolServerResourceRequirements(toolServer)
 
 		// Set owner reference
 		return ctrl.SetControllerReference(toolServer, deployment, r.Scheme)
@@ -323,4 +325,24 @@ func (r *ToolServerReconciler) updateToolServerStatusNotReady(ctx context.Contex
 	}
 
 	return nil
+}
+
+// getOrDefaultToolServerResourceRequirements returns the tool server's resource requirements if specified,
+// otherwise returns default values optimized for cost efficiency in GKE Auto Pilot.
+// Defaults: 300Mi/500Mi memory, 0.1/0.5 CPU (requests/limits)
+func getOrDefaultToolServerResourceRequirements(toolServer *runtimev1alpha1.ToolServer) corev1.ResourceRequirements {
+	if toolServer.Spec.Resources != nil {
+		return *toolServer.Spec.Resources
+	}
+
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("300Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("500Mi"),
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+		},
+	}
 }
