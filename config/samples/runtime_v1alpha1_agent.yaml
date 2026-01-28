@@ -2,7 +2,7 @@
 #
 # This sample demonstrates basic Agent functionality for end-to-end testing:
 # 1. Simple minimal agent
-# 2. Complex agent with volumes and environment variables
+# 2. Complex agent with volumes, environment variables, and resource configuration
 
 ---
 # Namespace for agent tests
@@ -82,3 +82,10 @@ spec:
     - name: config-volume
       configMap:
         name: agent-config
+  resources:
+    requests:
+      memory: "300Mi"
+      cpu: "100m"
+    limits:
+      memory: "500Mi"
+      cpu: "500m"

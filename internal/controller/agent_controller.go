@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -240,6 +241,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		container.EnvFrom = agent.Spec.EnvFrom
 		container.VolumeMounts = agent.Spec.VolumeMounts
 		container.ReadinessProbe = generateReadinessProbe(agent)
+		container.Resources = getOrDefaultResourceRequirements(agent)
 
 		// Update pod volumes
 		deployment.Spec.Template.Spec.Volumes = agent.Spec.Volumes
@@ -367,4 +369,24 @@ func isAiGatewayCRDInstalled(mgr ctrl.Manager) bool {
 	gvk := runtimev1alpha1.GroupVersion.WithKind("AiGateway")
 	_, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
 	return err == nil
+}
+
+// getOrDefaultResourceRequirements returns the agent's resource requirements if specified,
+// otherwise returns default values optimized for cost efficiency in GKE Auto Pilot.
+// Defaults: 300Mi/500Mi memory, 0.1/0.5 CPU (requests/limits)
+func getOrDefaultResourceRequirements(agent *runtimev1alpha1.Agent) corev1.ResourceRequirements {
+	if agent.Spec.Resources != nil {
+		return *agent.Spec.Resources
+	}
+
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("300Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("500Mi"),
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+		},
+	}
 }
