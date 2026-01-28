@@ -78,6 +78,10 @@ type ToolServerSpec struct {
 	// EnvFrom defines sources to populate environment variables from
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// Resources defines the compute resource requirements for the tool server container.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ToolServerStatus defines the observed state of ToolServer.
