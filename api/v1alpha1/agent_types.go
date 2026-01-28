@@ -171,6 +171,10 @@ type AgentSpec struct {
 	// Volume names starting with "agent-operator-" are reserved for operator use and will be rejected.
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Resources defines the compute resource requirements for the agent container.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent.
