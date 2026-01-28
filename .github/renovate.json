@@ -5,7 +5,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^internal/controller/agent_controller\\.go$"],
+      "managerFilePatterns": [
+        "/^internal/controller/agent_controller\\.go$/"
+      ],
       "matchStrings": [
         "defaultTemplateImageAdk\\s*=\\s*\"(?<depName>ghcr\\.io/agentic-layer/[^:]+):(?<currentValue>[^\"]+)\""
       ],
