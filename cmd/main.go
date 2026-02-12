@@ -225,10 +225,6 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "AgentGateway")
 			os.Exit(1)
 		}
-		if err := webhookv1alpha1.SetupToolGatewayWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ToolGateway")
-			os.Exit(1)
-		}
 	}
 	if err := (&controller.AgenticWorkforceReconciler{
 		Client: mgr.GetClient(),

@@ -50,26 +50,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-runtime-agentic-layer-ai-v1alpha1-toolgateway
-  failurePolicy: Fail
-  name: mtoolgateway-v1alpha1.kb.io
-  rules:
-  - apiGroups:
-    - runtime.agentic-layer.ai
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - toolgateways
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /mutate-runtime-agentic-layer-ai-v1alpha1-toolserver
   failurePolicy: Fail
   name: mtoolserver-v1alpha1.kb.io
