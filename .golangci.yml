@@ -30,7 +30,6 @@ linters:
     generated: lax
     rules:
       - linters:
-          - dupl
           - lll
         path: api/*
       - linters:
