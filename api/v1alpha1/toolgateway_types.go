@@ -27,15 +27,6 @@ type ToolGatewaySpec struct {
 	// This is only needed if multiple gateway classes are defined in the cluster.
 	ToolGatewayClassName string `json:"toolGatewayClassName,omitempty"`
 
-	// Replicas is the number of gateway replicas
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Timeout specifies the gateway timeout for requests
-	// +kubebuilder:default="360s"
-	Timeout *metav1.Duration `json:"timeout,omitempty"`
-
 	// Environment variables to pass to the ToolGateway container.
 	// These can include configuration values, credentials, or feature flags.
 	// +optional

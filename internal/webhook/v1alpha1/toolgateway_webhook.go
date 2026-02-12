@@ -19,9 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,8 +35,7 @@ var toolgatewaylog = logf.Log.WithName("toolgateway-resource")
 func SetupToolGatewayWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.ToolGateway{}).
 		WithDefaulter(&ToolGatewayCustomDefaulter{
-			DefaultReplicas: 1,
-			Recorder:        mgr.GetEventRecorderFor("toolgateway-defaulter-webhook"),
+			Recorder: mgr.GetEventRecorderFor("toolgateway-defaulter-webhook"),
 		}).
 		Complete()
 }
@@ -51,8 +48,7 @@ func SetupToolGatewayWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
 type ToolGatewayCustomDefaulter struct {
-	DefaultReplicas int32
-	Recorder        record.EventRecorder
+	Recorder record.EventRecorder
 }
 
 var _ webhook.CustomDefaulter = &ToolGatewayCustomDefaulter{}
@@ -66,21 +62,6 @@ func (d *ToolGatewayCustomDefaulter) Default(_ context.Context, obj runtime.Obje
 	}
 	toolgatewaylog.Info("Defaulting for ToolGateway", "name", toolgateway.GetName())
 
-	d.applyDefaults(toolgateway)
-
+	// No defaults to apply currently
 	return nil
-}
-
-// applyDefaults applies default values to the ToolGateway.
-func (d *ToolGatewayCustomDefaulter) applyDefaults(toolgateway *runtimev1alpha1.ToolGateway) {
-	// Set default replicas if not specified
-	if toolgateway.Spec.Replicas == nil {
-		toolgateway.Spec.Replicas = new(int32)
-		*toolgateway.Spec.Replicas = d.DefaultReplicas
-	}
-
-	// Set default timeout if not specified
-	if toolgateway.Spec.Timeout == nil {
-		toolgateway.Spec.Timeout = &metav1.Duration{Duration: 360 * time.Second}
-	}
 }

@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,41 +32,12 @@ var _ = Describe("ToolGateway Webhook", func() {
 
 	BeforeEach(func() {
 		defaulter = &ToolGatewayCustomDefaulter{
-			DefaultReplicas: 1,
-			Recorder:        &record.FakeRecorder{},
+			Recorder: &record.FakeRecorder{},
 		}
 	})
 
 	Context("When applying defaults", func() {
-		It("Should set default replicas when not specified", func() {
-			gateway := &runtimev1alpha1.ToolGateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-gateway",
-				},
-				Spec: runtimev1alpha1.ToolGatewaySpec{},
-			}
-
-			err := defaulter.Default(context.Background(), gateway)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(gateway.Spec.Replicas).NotTo(BeNil())
-			Expect(*gateway.Spec.Replicas).To(Equal(int32(1)))
-		})
-
-		It("Should set default timeout when not specified", func() {
-			gateway := &runtimev1alpha1.ToolGateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-gateway",
-				},
-				Spec: runtimev1alpha1.ToolGatewaySpec{},
-			}
-
-			err := defaulter.Default(context.Background(), gateway)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(gateway.Spec.Timeout).NotTo(BeNil())
-			Expect(gateway.Spec.Timeout.Duration).To(Equal(360 * time.Second))
-		})
-
-		It("Should not set default for ToolGatewayClassName", func() {
+		It("Should not modify ToolGatewayClassName when not specified", func() {
 			gateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-gateway",
@@ -81,43 +51,18 @@ var _ = Describe("ToolGateway Webhook", func() {
 		})
 
 		It("Should not override existing values", func() {
-			replicas := int32(3)
-			timeout, _ := time.ParseDuration("120s")
 			gateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-gateway",
 				},
 				Spec: runtimev1alpha1.ToolGatewaySpec{
 					ToolGatewayClassName: "custom",
-					Replicas:             &replicas,
-					Timeout:              &metav1.Duration{Duration: timeout},
 				},
 			}
 
 			err := defaulter.Default(context.Background(), gateway)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(gateway.Spec.ToolGatewayClassName).To(Equal("custom"))
-			Expect(*gateway.Spec.Replicas).To(Equal(int32(3)))
-			Expect(gateway.Spec.Timeout.Duration).To(Equal(120 * time.Second))
-		})
-
-		It("Should handle partial configuration correctly", func() {
-			gateway := &runtimev1alpha1.ToolGateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-gateway",
-				},
-				Spec: runtimev1alpha1.ToolGatewaySpec{
-					ToolGatewayClassName: "krakend",
-				},
-			}
-
-			err := defaulter.Default(context.Background(), gateway)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(gateway.Spec.ToolGatewayClassName).To(Equal("krakend"))
-			Expect(gateway.Spec.Replicas).NotTo(BeNil())
-			Expect(*gateway.Spec.Replicas).To(Equal(int32(1)))
-			Expect(gateway.Spec.Timeout).NotTo(BeNil())
-			Expect(gateway.Spec.Timeout.Duration).To(Equal(360 * time.Second))
 		})
 	})
 })
