@@ -58,4 +58,23 @@ resources:
   kind: AiGatewayClass
   path: github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: agentic-layer.ai
+  group: runtime
+  kind: ToolGateway
+  path: github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: false
+  domain: agentic-layer.ai
+  group: runtime
+  kind: ToolGatewayClass
+  path: github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

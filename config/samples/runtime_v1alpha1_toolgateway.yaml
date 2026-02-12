@@ -1,0 +1,17 @@
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolGateway
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: toolgateway-sample
+spec:
+  # toolGatewayClassName: krakend  # Optional: specify a gateway class
+  replicas: 1
+  timeout: 360s
+  # env:  # Optional: environment variables
+  #   - name: LOG_LEVEL
+  #     value: info
+  # envFrom:  # Optional: environment variables from ConfigMaps or Secrets
+  #   - configMapRef:
+  #       name: toolgateway-config
