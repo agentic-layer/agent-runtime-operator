@@ -57,32 +57,20 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 	}
 
 	AfterEach(func() {
-		// Clean up all tool servers in default namespace
-		toolServerList := &runtimev1alpha1.ToolServerList{}
-		_ = k8sClient.List(ctx, toolServerList, &client.ListOptions{Namespace: "default"})
-		for i := range toolServerList.Items {
-			_ = k8sClient.Delete(ctx, &toolServerList.Items[i])
+		// Clean up ALL tool servers across all namespaces to avoid test pollution
+		// This is important because other test files (like agent_tool_test.go) may create
+		// tool servers in various namespaces that can interfere with our tests
+		allToolServerList := &runtimev1alpha1.ToolServerList{}
+		_ = k8sClient.List(ctx, allToolServerList)
+		for i := range allToolServerList.Items {
+			_ = k8sClient.Delete(ctx, &allToolServerList.Items[i])
 		}
 
-		// Clean up all ToolGateways in tool-gateway namespace (don't delete namespace)
-		toolGatewayList := &runtimev1alpha1.ToolGatewayList{}
-		_ = k8sClient.List(ctx, toolGatewayList, &client.ListOptions{Namespace: "tool-gateway"})
-		for i := range toolGatewayList.Items {
-			_ = k8sClient.Delete(ctx, &toolGatewayList.Items[i])
-		}
-
-		// Clean up resources in other-namespace (don't delete namespace to avoid termination issues)
-		otherNsToolServerList := &runtimev1alpha1.ToolServerList{}
-		_ = k8sClient.List(ctx, otherNsToolServerList, &client.ListOptions{Namespace: "other-namespace"})
-		for i := range otherNsToolServerList.Items {
-			_ = k8sClient.Delete(ctx, &otherNsToolServerList.Items[i])
-		}
-
-		// Clean up ToolGateways in other-namespace
-		otherNsToolGatewayList := &runtimev1alpha1.ToolGatewayList{}
-		_ = k8sClient.List(ctx, otherNsToolGatewayList, &client.ListOptions{Namespace: "other-namespace"})
-		for i := range otherNsToolGatewayList.Items {
-			_ = k8sClient.Delete(ctx, &otherNsToolGatewayList.Items[i])
+		// Clean up ALL ToolGateways across all namespaces
+		allToolGatewayList := &runtimev1alpha1.ToolGatewayList{}
+		_ = k8sClient.List(ctx, allToolGatewayList)
+		for i := range allToolGatewayList.Items {
+			_ = k8sClient.Delete(ctx, &allToolGatewayList.Items[i])
 		}
 	})
 
