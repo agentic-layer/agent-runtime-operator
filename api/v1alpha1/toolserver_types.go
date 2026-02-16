@@ -82,6 +82,13 @@ type ToolServerSpec struct {
 	// Resources defines the compute resource requirements for the tool server container.
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// ToolGatewayRef references a ToolGateway resource that this tool server should use for routing.
+	// If not specified, the operator will attempt to find the default ToolGateway in the cluster.
+	// If no default ToolGateway exists, the tool server will run without a Tool Gateway.
+	// If Namespace is not specified, defaults to the same namespace as the ToolServer.
+	// +optional
+	ToolGatewayRef *corev1.ObjectReference `json:"toolGatewayRef,omitempty"`
 }
 
 // ToolServerStatus defines the observed state of ToolServer.
@@ -93,12 +100,19 @@ type ToolServerStatus struct {
 	// Format: http://{name}.{namespace}.svc.cluster.local:{port}{path}
 	// +optional
 	Url string `json:"url,omitempty"`
+
+	// ToolGatewayRef references the ToolGateway resource that this tool server is connected to.
+	// This field is automatically populated by the controller when a Tool Gateway is being used.
+	// If nil, the tool server is not connected to any Tool Gateway.
+	// +optional
+	ToolGatewayRef *corev1.ObjectReference `json:"toolGatewayRef,omitempty"`
 }
 
 // ToolServer is the Schema for the toolservers API.
 //
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Tool Gateway",type=string,JSONPath=".status.toolGatewayRef.name"
 type ToolServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
