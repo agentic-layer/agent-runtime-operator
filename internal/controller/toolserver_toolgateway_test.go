@@ -111,6 +111,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -146,6 +147,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -184,6 +186,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -206,6 +209,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -225,6 +229,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -292,6 +297,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -330,6 +336,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: testToolGatewayNamespace,
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -368,6 +375,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -403,6 +411,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -436,6 +445,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
@@ -454,6 +464,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Namespace: "default",
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
 					Image:         "test-image:latest",
 					TransportType: "http",
 					Port:          8080,
