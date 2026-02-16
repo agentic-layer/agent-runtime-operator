@@ -35,15 +35,12 @@ var toolGatewaySpec = runtimev1alpha1.ToolGatewaySpec{
 var _ = Describe("ToolServer ToolGateway Resolution", func() {
 	ctx := context.Background()
 	var reconciler *ToolServerReconciler
-	var testToolGatewayNamespace string
 
 	BeforeEach(func() {
 		reconciler = &ToolServerReconciler{
 			Client: k8sClient,
 			Scheme: k8sClient.Scheme(),
 		}
-		// Use a unique namespace name for each test to avoid conflicts
-		testToolGatewayNamespace = "tool-gateway"
 	})
 
 	// Helper function to create namespace if it doesn't exist
@@ -92,13 +89,13 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 	Describe("resolveToolGateway", func() {
 		It("should resolve explicit ToolGatewayRef with specified namespace", func() {
 			// Create or get tool-gateway namespace
-			createNamespaceIfNotExists(testToolGatewayNamespace)
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
 
 			// Create ToolGateway in tool-gateway namespace
 			toolGateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: toolGatewaySpec,
 			}
@@ -117,7 +114,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Port:          8080,
 					ToolGatewayRef: &corev1.ObjectReference{
 						Name:      "test-gateway",
-						Namespace: testToolGatewayNamespace,
+						Namespace: defaultToolGatewayNamespace,
 					},
 				},
 			}
@@ -126,7 +123,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolvedGateway).NotTo(BeNil())
 			Expect(resolvedGateway.Name).To(Equal("test-gateway"))
-			Expect(resolvedGateway.Namespace).To(Equal(testToolGatewayNamespace))
+			Expect(resolvedGateway.Namespace).To(Equal(defaultToolGatewayNamespace))
 		})
 
 		It("should default to tool server's namespace when ToolGatewayRef namespace is not specified", func() {
@@ -167,13 +164,13 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 
 		It("should resolve default ToolGateway when no ToolGatewayRef is specified", func() {
 			// Create or get tool-gateway namespace
-			createNamespaceIfNotExists(testToolGatewayNamespace)
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
 
 			// Create ToolGateway in tool-gateway namespace (default location)
 			toolGateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default-gateway",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: toolGatewaySpec,
 			}
@@ -198,7 +195,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolvedGateway).NotTo(BeNil())
 			Expect(resolvedGateway.Name).To(Equal("default-gateway"))
-			Expect(resolvedGateway.Namespace).To(Equal(testToolGatewayNamespace))
+			Expect(resolvedGateway.Namespace).To(Equal(defaultToolGatewayNamespace))
 		})
 
 		It("should return nil when no ToolGatewayRef specified and no default gateway exists", func() {
@@ -249,13 +246,13 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 	Describe("resolveDefaultToolGateway", func() {
 		It("should find ToolGateway in tool-gateway namespace", func() {
 			// Create or get tool-gateway namespace
-			createNamespaceIfNotExists(testToolGatewayNamespace)
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
 
 			// Create ToolGateway in tool-gateway namespace
 			toolGateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default-gateway",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: toolGatewaySpec,
 			}
@@ -265,7 +262,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolvedGateway).NotTo(BeNil())
 			Expect(resolvedGateway.Name).To(Equal("default-gateway"))
-			Expect(resolvedGateway.Namespace).To(Equal(testToolGatewayNamespace))
+			Expect(resolvedGateway.Namespace).To(Equal(defaultToolGatewayNamespace))
 		})
 
 		It("should return nil when no ToolGateway exists in tool-gateway namespace", func() {
@@ -278,13 +275,13 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 	Describe("findToolServersReferencingToolGateway", func() {
 		It("should identify tool servers with explicit ToolGatewayRef", func() {
 			// Create or get necessary namespaces
-			createNamespaceIfNotExists(testToolGatewayNamespace)
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
 
 			// Create ToolGateway
 			toolGateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: toolGatewaySpec,
 			}
@@ -303,7 +300,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Port:          8080,
 					ToolGatewayRef: &corev1.ObjectReference{
 						Name:      "test-gateway",
-						Namespace: testToolGatewayNamespace,
+						Namespace: defaultToolGatewayNamespace,
 					},
 				},
 			}
@@ -317,13 +314,13 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 
 		It("should match with namespace defaulting in ToolGatewayRef", func() {
 			// Create or get tool-gateway namespace
-			createNamespaceIfNotExists(testToolGatewayNamespace)
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
 
 			// Create ToolGateway in tool-gateway namespace
 			toolGateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: toolGatewaySpec,
 			}
@@ -333,7 +330,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 			toolServer := &runtimev1alpha1.ToolServer{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-toolserver",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: runtimev1alpha1.ToolServerSpec{
 					Protocol:      "mcp",
@@ -351,18 +348,18 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 			requests := reconciler.findToolServersReferencingToolGateway(ctx, toolGateway)
 			Expect(requests).To(HaveLen(1))
 			Expect(requests[0].Name).To(Equal("test-toolserver"))
-			Expect(requests[0].Namespace).To(Equal(testToolGatewayNamespace))
+			Expect(requests[0].Namespace).To(Equal(defaultToolGatewayNamespace))
 		})
 
 		It("should identify tool servers using default gateway resolution", func() {
 			// Create or get tool-gateway namespace
-			createNamespaceIfNotExists(testToolGatewayNamespace)
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
 
 			// Create ToolGateway in tool-gateway namespace
 			toolGateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default-gateway",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: toolGatewaySpec,
 			}
@@ -426,13 +423,13 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 
 		It("should handle multiple tool servers correctly", func() {
 			// Create or get necessary namespaces
-			createNamespaceIfNotExists(testToolGatewayNamespace)
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
 
 			// Create ToolGateway in tool-gateway namespace
 			toolGateway := &runtimev1alpha1.ToolGateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "shared-gateway",
-					Namespace: testToolGatewayNamespace,
+					Namespace: defaultToolGatewayNamespace,
 				},
 				Spec: toolGatewaySpec,
 			}
@@ -451,7 +448,7 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 					Port:          8080,
 					ToolGatewayRef: &corev1.ObjectReference{
 						Name:      "shared-gateway",
-						Namespace: testToolGatewayNamespace,
+						Namespace: defaultToolGatewayNamespace,
 					},
 				},
 			}
