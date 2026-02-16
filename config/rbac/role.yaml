@@ -64,6 +64,7 @@ rules:
   - runtime.agentic-layer.ai
   resources:
   - aigateways
+  - toolgateways
   verbs:
   - get
   - list
