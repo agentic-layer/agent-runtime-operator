@@ -157,27 +157,6 @@ var _ = Describe("Agent Webhook - Volume Validation", func() {
 				Expect(warnings).To(BeEmpty())
 			})
 
-			It("should accept hostPath when explicitly allowed", func() {
-				validator.AllowHostPath = true
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "host-data",
-						VolumeSource: corev1.VolumeSource{
-							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/data",
-							},
-						},
-					},
-				}
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "host-data", MountPath: "/host-data"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(warnings).To(BeEmpty())
-			})
-
 			It("should accept agent with volumes but no volumeMounts", func() {
 				obj.Spec.Volumes = []corev1.Volume{
 					{
@@ -281,31 +260,6 @@ var _ = Describe("Agent Webhook - Volume Validation", func() {
 
 				warnings, err := validator.validateAgent(obj)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(warnings).To(BeEmpty())
-			})
-		})
-
-		Describe("Volume source validation", func() {
-			It("should reject hostPath by default", func() {
-				validator.AllowHostPath = false
-				obj.Spec.Volumes = []corev1.Volume{
-					{
-						Name: "host",
-						VolumeSource: corev1.VolumeSource{
-							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/",
-							},
-						},
-					},
-				}
-				obj.Spec.VolumeMounts = []corev1.VolumeMount{
-					{Name: "host", MountPath: "/host-root"},
-				}
-
-				warnings, err := validator.validateAgent(obj)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("hostPath volumes are not allowed"))
-				Expect(err.Error()).To(ContainSubstring("security reasons"))
 				Expect(warnings).To(BeEmpty())
 			})
 		})

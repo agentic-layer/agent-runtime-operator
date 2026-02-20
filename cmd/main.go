@@ -229,9 +229,7 @@ func main() {
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := webhookv1alpha1.SetupAgentWebhookWithManager(mgr, webhookv1alpha1.AgentWebhookConfig{
-			AllowHostPath: allowHostPath,
-		}); err != nil {
+		if err := webhookv1alpha1.SetupAgentWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Agent")
 			os.Exit(1)
 		}

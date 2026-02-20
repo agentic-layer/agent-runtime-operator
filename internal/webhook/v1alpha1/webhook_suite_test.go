@@ -109,9 +109,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = SetupAgentWebhookWithManager(mgr, AgentWebhookConfig{
-		AllowHostPath: false, // Use secure default for tests
-	})
+	err = SetupAgentWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = SetupToolServerWebhookWithManager(mgr)
