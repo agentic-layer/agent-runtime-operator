@@ -213,19 +213,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Agent")
 		os.Exit(1)
 	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := webhookv1alpha1.SetupAgentWebhookWithManager(mgr, webhookv1alpha1.AgentWebhookConfig{
-			AllowHostPath: allowHostPath,
-		}); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Agent")
-			os.Exit(1)
-		}
-		if err := webhookv1alpha1.SetupAgentGatewayWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "AgentGateway")
-			os.Exit(1)
-		}
-	}
 	if err := (&controller.AgenticWorkforceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -242,8 +229,23 @@ func main() {
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1alpha1.SetupAgentWebhookWithManager(mgr, webhookv1alpha1.AgentWebhookConfig{
+			AllowHostPath: allowHostPath,
+		}); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Agent")
+			os.Exit(1)
+		}
+		if err := webhookv1alpha1.SetupAgentGatewayWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "AgentGateway")
+			os.Exit(1)
+		}
 		if err := webhookv1alpha1.SetupToolServerWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ToolServer")
+			os.Exit(1)
+		}
+
+		if err := mgr.AddReadyzCheck("webhook", webhookServer.StartedChecker()); err != nil {
+			setupLog.Error(err, "unable to set up webhook ready check")
 			os.Exit(1)
 		}
 	}
