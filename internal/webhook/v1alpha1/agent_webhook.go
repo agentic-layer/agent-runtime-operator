@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
@@ -50,7 +49,7 @@ type AgentWebhookConfig struct {
 }
 
 // SetupAgentWebhookWithManager registers the webhook for Agent in the manager.
-func SetupAgentWebhookWithManager(mgr ctrl.Manager, config AgentWebhookConfig) error {
+func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.Agent{}).
 		WithDefaulter(&AgentCustomDefaulter{
 			DefaultFramework:     googleAdkFramework,
@@ -59,9 +58,7 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager, config AgentWebhookConfig) e
 			DefaultPortGoogleAdk: 8000,
 			Recorder:             mgr.GetEventRecorderFor("agent-defaulter-webhook"),
 		}).
-		WithValidator(&AgentCustomValidator{
-			AllowHostPath: config.AllowHostPath,
-		}).
+		WithValidator(&AgentCustomValidator{}).
 		Complete()
 }
 
@@ -146,8 +143,6 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type AgentCustomValidator struct {
-	// AllowHostPath controls whether hostPath volumes are allowed.
-	AllowHostPath bool
 }
 
 var _ webhook.CustomValidator = &AgentCustomValidator{}
@@ -208,13 +203,6 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 	// Validate VolumeMounts reference existing Volumes
 	if errs := v.validateVolumeMounts(agent); len(errs) > 0 {
 		allErrs = append(allErrs, errs...)
-	}
-
-	// Validate Volume sources
-	for i, volume := range agent.Spec.Volumes {
-		if errs := v.validateVolumeSource(volume, i); len(errs) > 0 {
-			allErrs = append(allErrs, errs...)
-		}
 	}
 
 	if len(allErrs) > 0 {
@@ -413,30 +401,6 @@ func (v *AgentCustomValidator) validateVolumeMounts(agent *runtimev1alpha1.Agent
 					fmt.Sprintf("mountPath %q is nested under %q (index %d)", path1, path2, j)))
 			}
 		}
-	}
-
-	return errs
-}
-
-// validateVolumeSource validates volume source configurations.
-//
-// This webhook implements only operator-specific security policies:
-//   - hostPath volume blocking (security policy)
-//
-// The following validations are intentionally NOT implemented here because Kubernetes API server
-// already validates them when creating the underlying Deployment:
-//   - Empty ConfigMap/Secret/PVC names (K8s required field validation)
-//   - Volume source configuration format (K8s schema validation)
-func (v *AgentCustomValidator) validateVolumeSource(volume corev1.Volume, index int) []*field.Error {
-	var errs []*field.Error
-	basePath := field.NewPath("spec", "volumes").Index(index)
-
-	// Block hostPath unless explicitly allowed (operator-specific security policy)
-	if volume.HostPath != nil && !v.AllowHostPath {
-		errs = append(errs, field.Forbidden(
-			basePath.Child("hostPath"),
-			"hostPath volumes are not allowed for security reasons. "+
-				"Contact your cluster administrator if you need this feature."))
 	}
 
 	return errs
