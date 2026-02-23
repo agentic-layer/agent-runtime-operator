@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -428,7 +429,7 @@ func isNoMatchError(err error) bool {
 		return false
 	}
 	// Check for "no matches for kind" error which occurs when CRD is not installed
-	return errors.IsNotFound(err) || err.Error() == "no matches for kind \"OperatorConfiguration\" in version \"runtime.agentic-layer.ai/v1alpha1\""
+	return meta.IsNoMatchError(err)
 }
 
 // getTemplateImage returns the appropriate template image for the given framework.
