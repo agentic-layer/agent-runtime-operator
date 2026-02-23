@@ -58,6 +58,7 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/status,verbs=get
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=aigateways,verbs=get;list;watch
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=operatorconfigurations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
@@ -81,6 +82,13 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	log.V(1).Info("Reconciling Agent")
+
+	// Get operator configuration (optional - returns nil if not found)
+	operatorConfig, err := r.getOperatorConfiguration(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get OperatorConfiguration")
+		return ctrl.Result{}, err
+	}
 
 	// Resolve subAgents early - fail fast if any cannot be resolved
 	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, &agent)
@@ -108,7 +116,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway)
+		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway, operatorConfig)
 	}); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -132,7 +140,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
 func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent,
-	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string, aiGateway *runtimev1alpha1.AiGateway) error {
+	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string,
+	aiGateway *runtimev1alpha1.AiGateway, operatorConfig *runtimev1alpha1.OperatorConfiguration) error {
 	log := logf.FromContext(ctx)
 
 	log.V(1).Info("Ensuring Deployment for Agent")
@@ -227,14 +236,8 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		if agent.Spec.Image != "" {
 			container.Image = agent.Spec.Image
 		} else {
-			switch agent.Spec.Framework {
-			case googleAdkFramework:
-				container.Image = defaultTemplateImageAdk
-			default:
-				// Validation will catch unsupported frameworks without images
-				// This shouldn't be reached due to validation, but set template as fallback
-				container.Image = defaultTemplateImageFallback
-			}
+			// Use image from operator configuration if available, otherwise use built-in defaults
+			container.Image = r.getTemplateImage(agent.Spec.Framework, operatorConfig)
 		}
 		container.Ports = containerPorts
 		container.Env = allEnvVars
@@ -388,5 +391,66 @@ func getOrDefaultResourceRequirements(agent *runtimev1alpha1.Agent) corev1.Resou
 			corev1.ResourceMemory: resource.MustParse("500Mi"),
 			corev1.ResourceCPU:    resource.MustParse("500m"),
 		},
+	}
+}
+
+// getOperatorConfiguration retrieves the operator configuration from the cluster.
+// It looks for any OperatorConfiguration resource in the cluster.
+// Returns nil if no configuration is found (will use built-in defaults).
+func (r *AgentReconciler) getOperatorConfiguration(ctx context.Context) (*runtimev1alpha1.OperatorConfiguration, error) {
+	log := logf.FromContext(ctx)
+
+	var configList runtimev1alpha1.OperatorConfigurationList
+	if err := r.List(ctx, &configList); err != nil {
+		// If the CRD is not installed, return nil (will use built-in defaults)
+		if errors.IsNotFound(err) || isNoMatchError(err) {
+			log.V(1).Info("No OperatorConfiguration found, using built-in defaults")
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to list OperatorConfiguration: %w", err)
+	}
+
+	if len(configList.Items) == 0 {
+		log.V(1).Info("No OperatorConfiguration found, using built-in defaults")
+		return nil, nil
+	}
+
+	// Use the first configuration found
+	// In the future, we could add logic to prefer a specific named configuration
+	config := &configList.Items[0]
+	log.V(1).Info("Using OperatorConfiguration", "name", config.Name)
+	return config, nil
+}
+
+// isNoMatchError checks if an error is a "no matches for kind" error
+func isNoMatchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for "no matches for kind" error which occurs when CRD is not installed
+	return errors.IsNotFound(err) || err.Error() == "no matches for kind \"OperatorConfiguration\" in version \"runtime.agentic-layer.ai/v1alpha1\""
+}
+
+// getTemplateImage returns the appropriate template image for the given framework.
+// Resolution priority: OperatorConfiguration → built-in defaults
+func (r *AgentReconciler) getTemplateImage(framework string, config *runtimev1alpha1.OperatorConfiguration) string {
+	// Try to get image from operator configuration
+	if config != nil && config.Spec.AgentTemplateImages != nil {
+		switch framework {
+		case googleAdkFramework:
+			if config.Spec.AgentTemplateImages.GoogleAdk != "" {
+				return config.Spec.AgentTemplateImages.GoogleAdk
+			}
+		}
+	}
+
+	// Fall back to built-in defaults
+	switch framework {
+	case googleAdkFramework:
+		return defaultTemplateImageAdk
+	default:
+		// Validation will catch unsupported frameworks without images
+		// This shouldn't be reached due to validation, but set template as fallback
+		return defaultTemplateImageFallback
 	}
 }

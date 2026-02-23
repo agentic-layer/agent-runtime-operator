@@ -8,6 +8,7 @@ resources:
 - bases/runtime.agentic-layer.ai_agents.yaml
 - bases/runtime.agentic-layer.ai_aigateways.yaml
 - bases/runtime.agentic-layer.ai_aigatewayclasses.yaml
+- bases/runtime.agentic-layer.ai_operatorconfigurations.yaml
 - bases/runtime.agentic-layer.ai_toolgatewayclasses.yaml
 - bases/runtime.agentic-layer.ai_toolgateways.yaml
 - bases/runtime.agentic-layer.ai_toolservers.yaml

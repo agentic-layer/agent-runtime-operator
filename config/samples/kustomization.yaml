@@ -2,5 +2,6 @@
 resources:
 - runtime_v1alpha1_agent.yaml
 - runtime_v1alpha1_agenticworkforce.yaml
+- runtime_v1alpha1_operatorconfiguration.yaml
 - runtime_v1alpha1_toolserver.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
