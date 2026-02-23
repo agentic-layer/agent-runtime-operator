@@ -353,6 +353,10 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&runtimev1alpha1.ToolServer{},
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingToolServer),
+		).
+		Watches(
+			&runtimev1alpha1.AgentRuntimeConfiguration{},
+			handler.EnqueueRequestsFromMapFunc(r.findAllAgentsForRuntimeConfiguration),
 		)
 
 	// Only watch AiGateway if the CRD is installed
@@ -367,6 +371,32 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return builder.Named("agent").Complete(r)
+}
+
+// findAllAgentsForRuntimeConfiguration enqueues all agents when an AgentRuntimeConfiguration changes,
+// since the configuration may affect the template image used by any agent.
+func (r *AgentReconciler) findAllAgentsForRuntimeConfiguration(ctx context.Context, obj client.Object) []ctrl.Request {
+	var agentList runtimev1alpha1.AgentList
+	if err := r.List(ctx, &agentList); err != nil {
+		logf.FromContext(ctx).Error(err, "Failed to list agents for AgentRuntimeConfiguration watch")
+		return nil
+	}
+
+	requests := make([]ctrl.Request, 0, len(agentList.Items))
+	for _, agent := range agentList.Items {
+		requests = append(requests, ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      agent.Name,
+				Namespace: agent.Namespace,
+			},
+		})
+	}
+
+	logf.FromContext(ctx).Info("Enqueuing all agents due to AgentRuntimeConfiguration change",
+		"config", obj.GetName(),
+		"agentCount", len(requests))
+
+	return requests
 }
 
 // isAiGatewayCRDInstalled checks if the AiGateway CRD is installed in the cluster
