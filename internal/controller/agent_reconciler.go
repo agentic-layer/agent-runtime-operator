@@ -20,11 +20,13 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"os"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,6 +60,7 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/status,verbs=get
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=aigateways,verbs=get;list;watch
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agentruntimeconfigurations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
@@ -81,6 +84,13 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	log.V(1).Info("Reconciling Agent")
+
+	// Get agent runtime configuration (optional - returns nil if not found)
+	runtimeConfig, err := r.getAgentRuntimeConfiguration(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get AgentRuntimeConfiguration")
+		return ctrl.Result{}, err
+	}
 
 	// Resolve subAgents early - fail fast if any cannot be resolved
 	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, &agent)
@@ -108,7 +118,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway)
+		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway, runtimeConfig)
 	}); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -132,7 +142,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
 func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent,
-	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string, aiGateway *runtimev1alpha1.AiGateway) error {
+	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string,
+	aiGateway *runtimev1alpha1.AiGateway, runtimeConfig *runtimev1alpha1.AgentRuntimeConfiguration) error {
 	log := logf.FromContext(ctx)
 
 	log.V(1).Info("Ensuring Deployment for Agent")
@@ -227,14 +238,8 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		if agent.Spec.Image != "" {
 			container.Image = agent.Spec.Image
 		} else {
-			switch agent.Spec.Framework {
-			case googleAdkFramework:
-				container.Image = defaultTemplateImageAdk
-			default:
-				// Validation will catch unsupported frameworks without images
-				// This shouldn't be reached due to validation, but set template as fallback
-				container.Image = defaultTemplateImageFallback
-			}
+			// Use image from runtime configuration if available, otherwise use built-in defaults
+			container.Image = r.getTemplateImage(agent.Spec.Framework, runtimeConfig)
 		}
 		container.Ports = containerPorts
 		container.Env = allEnvVars
@@ -388,5 +393,75 @@ func getOrDefaultResourceRequirements(agent *runtimev1alpha1.Agent) corev1.Resou
 			corev1.ResourceMemory: resource.MustParse("500Mi"),
 			corev1.ResourceCPU:    resource.MustParse("500m"),
 		},
+	}
+}
+
+// getAgentRuntimeConfiguration retrieves the agent runtime configuration from the operator's namespace.
+// It looks for any AgentRuntimeConfiguration resource in the same namespace as the controller.
+// Returns nil if no configuration is found (will use built-in defaults).
+func (r *AgentReconciler) getAgentRuntimeConfiguration(ctx context.Context) (*runtimev1alpha1.AgentRuntimeConfiguration, error) {
+	log := logf.FromContext(ctx)
+
+	// Get the operator namespace from environment variable
+	operatorNamespace := os.Getenv("POD_NAMESPACE")
+	if operatorNamespace == "" {
+		return nil, fmt.Errorf("POD_NAMESPACE environment variable is not set - cannot determine operator namespace")
+	}
+
+	var configList runtimev1alpha1.AgentRuntimeConfigurationList
+	if err := r.List(ctx, &configList, client.InNamespace(operatorNamespace)); err != nil {
+		// If the CRD is not installed, return nil (will use built-in defaults)
+		if errors.IsNotFound(err) || isNoMatchError(err) {
+			log.V(1).Info("No AgentRuntimeConfiguration found, using built-in defaults", "namespace", operatorNamespace)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to list AgentRuntimeConfiguration: %w", err)
+	}
+
+	if len(configList.Items) == 0 {
+		log.V(1).Info("No AgentRuntimeConfiguration found, using built-in defaults", "namespace", operatorNamespace)
+		return nil, nil
+	}
+
+	// Error if multiple configurations exist
+	if len(configList.Items) > 1 {
+		return nil, fmt.Errorf("multiple AgentRuntimeConfiguration resources found in namespace %s - only one is allowed", operatorNamespace)
+	}
+
+	config := &configList.Items[0]
+	log.V(1).Info("Using AgentRuntimeConfiguration", "name", config.Name, "namespace", config.Namespace)
+	return config, nil
+}
+
+// isNoMatchError checks if an error is a "no matches for kind" error
+func isNoMatchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for "no matches for kind" error which occurs when CRD is not installed
+	return meta.IsNoMatchError(err)
+}
+
+// getTemplateImage returns the appropriate template image for the given framework.
+// Resolution priority: AgentRuntimeConfiguration → built-in defaults
+func (r *AgentReconciler) getTemplateImage(framework string, config *runtimev1alpha1.AgentRuntimeConfiguration) string {
+	// Try to get image from runtime configuration
+	if config != nil && config.Spec.AgentTemplateImages != nil {
+		switch framework {
+		case googleAdkFramework:
+			if config.Spec.AgentTemplateImages.GoogleAdk != "" {
+				return config.Spec.AgentTemplateImages.GoogleAdk
+			}
+		}
+	}
+
+	// Fall back to built-in defaults
+	switch framework {
+	case googleAdkFramework:
+		return defaultTemplateImageAdk
+	default:
+		// Validation will catch unsupported frameworks without images
+		// This shouldn't be reached due to validation, but set template as fallback
+		return defaultTemplateImageFallback
 	}
 }

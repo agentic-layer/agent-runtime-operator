@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,6 +38,8 @@ var _ = Describe("Agent Status", func() {
 			Client: k8sClient,
 			Scheme: k8sClient.Scheme(),
 		}
+		// Set POD_NAMESPACE for tests
+		Expect(os.Setenv("POD_NAMESPACE", "default")).To(Succeed())
 	})
 
 	AfterEach(func() {

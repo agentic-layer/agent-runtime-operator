@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
@@ -41,14 +41,23 @@ var _ = Describe("Agent Controller", func() {
 			Client: k8sClient,
 			Scheme: k8sClient.Scheme(),
 		}
+		// Set POD_NAMESPACE for tests to use default namespace
+		Expect(os.Setenv("POD_NAMESPACE", "default")).To(Succeed())
 	})
 
 	AfterEach(func() {
-		// Clean up all agents in the default namespace after each test
+		// Clean up all agents across all namespaces
 		agentList := &runtimev1alpha1.AgentList{}
-		Expect(k8sClient.List(ctx, agentList, &client.ListOptions{Namespace: "default"})).To(Succeed())
+		Expect(k8sClient.List(ctx, agentList)).To(Succeed())
 		for i := range agentList.Items {
 			_ = k8sClient.Delete(ctx, &agentList.Items[i])
+		}
+
+		// Clean up all agent runtime configurations
+		configList := &runtimev1alpha1.AgentRuntimeConfigurationList{}
+		Expect(k8sClient.List(ctx, configList)).To(Succeed())
+		for i := range configList.Items {
+			_ = k8sClient.Delete(ctx, &configList.Items[i])
 		}
 	})
 
@@ -249,7 +258,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -288,14 +297,14 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
 			// Create initial deployment
-			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Update agent image
 			agent.Spec.Image = "test-image:v2"
 
 			// Update deployment
-			err = reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			err = reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -320,7 +329,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
 			// Create deployment without AiGateway
-			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -341,7 +350,7 @@ var _ = Describe("Agent Controller", func() {
 				},
 			}
 
-			err = reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, aiGateway)
+			err = reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, aiGateway, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get updated deployment
@@ -378,7 +387,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -410,7 +419,7 @@ var _ = Describe("Agent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
 
-			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			err := reconciler.ensureDeployment(ctx, agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			deployment := &appsv1.Deployment{}
@@ -529,6 +538,164 @@ var _ = Describe("Agent Controller", func() {
 			service := &corev1.Service{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-update-service", Namespace: "default"}, service)).To(Succeed())
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(9000)))
+		})
+	})
+
+	Describe("AgentRuntimeConfiguration support", func() {
+		It("should use built-in default image when no AgentRuntimeConfiguration exists", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-no-config",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-no-config", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-no-config", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("ghcr.io/agentic-layer/agent-template-adk:0.6.1"))
+		})
+
+		It("should use custom image from AgentRuntimeConfiguration in operator namespace", func() {
+			customImage := "custom-registry.io/agent-template-adk:1.0.0"
+			config := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					AgentTemplateImages: &runtimev1alpha1.AgentTemplateImages{
+						GoogleAdk: customImage,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, config)).To(Succeed())
+
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-with-config",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-with-config", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-with-config", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(customImage))
+		})
+
+		It("should prioritize Agent.Spec.Image over AgentRuntimeConfiguration", func() {
+			configImage := "config-registry.io/agent-template-adk:1.0.0"
+			config := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config-priority",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					AgentTemplateImages: &runtimev1alpha1.AgentTemplateImages{
+						GoogleAdk: configImage,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, config)).To(Succeed())
+
+			agentImage := "agent-specific.io/custom-image:2.0.0"
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-priority",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     agentImage,
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-priority", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-priority", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(agentImage))
+		})
+
+		It("should fail reconciliation when multiple AgentRuntimeConfigurations exist", func() {
+			config1 := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config-1",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					AgentTemplateImages: &runtimev1alpha1.AgentTemplateImages{
+						GoogleAdk: "image1:tag",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, config1)).To(Succeed())
+
+			config2 := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config-2",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					AgentTemplateImages: &runtimev1alpha1.AgentTemplateImages{
+						GoogleAdk: "image2:tag",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, config2)).To(Succeed())
+
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-multiple-configs",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-multiple-configs", Namespace: "default"},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("multiple AgentRuntimeConfiguration resources found"))
 		})
 	})
 })

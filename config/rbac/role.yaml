@@ -63,6 +63,7 @@ rules:
 - apiGroups:
   - runtime.agentic-layer.ai
   resources:
+  - agentruntimeconfigurations
   - aigateways
   - toolgateways
   verbs:
