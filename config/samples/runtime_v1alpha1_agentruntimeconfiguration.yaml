@@ -1,7 +1,8 @@
 apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: OperatorConfiguration
+kind: AgentRuntimeConfiguration
 metadata:
   name: default
+  namespace: agent-runtime-operator-system
 spec:
   agentTemplateImages:
     # Customize the default template image for Google ADK framework agents

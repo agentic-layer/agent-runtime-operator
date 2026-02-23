@@ -4,15 +4,15 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: operatorconfigurations.runtime.agentic-layer.ai
+  name: agentruntimeconfigurations.runtime.agentic-layer.ai
 spec:
   group: runtime.agentic-layer.ai
   names:
-    kind: OperatorConfiguration
-    listKind: OperatorConfigurationList
-    plural: operatorconfigurations
-    singular: operatorconfiguration
-  scope: Cluster
+    kind: AgentRuntimeConfiguration
+    listKind: AgentRuntimeConfigurationList
+    plural: agentruntimeconfigurations
+    singular: agentruntimeconfiguration
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .spec.agentTemplateImages.googleAdk
@@ -25,8 +25,8 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          OperatorConfiguration is the Schema for the operatorconfigurations API.
-          It provides cluster-wide configuration for the agent-runtime-operator.
+          AgentRuntimeConfiguration is the Schema for the agentruntimeconfigurations API.
+          It provides namespace-scoped configuration for the agent-runtime-operator.
         properties:
           apiVersion:
             description: |-
@@ -46,7 +46,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: OperatorConfigurationSpec defines the desired state of OperatorConfiguration.
+            description: AgentRuntimeConfigurationSpec defines the desired state of
+              AgentRuntimeConfiguration.
             properties:
               agentTemplateImages:
                 description: |-
@@ -61,8 +62,8 @@ spec:
                 type: object
             type: object
           status:
-            description: OperatorConfigurationStatus defines the observed state of
-              OperatorConfiguration.
+            description: AgentRuntimeConfigurationStatus defines the observed state
+              of AgentRuntimeConfiguration.
             properties:
               conditions:
                 description: Conditions represent the latest available observations

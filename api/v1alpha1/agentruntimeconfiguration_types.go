@@ -20,8 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// OperatorConfigurationSpec defines the desired state of OperatorConfiguration.
-type OperatorConfigurationSpec struct {
+// AgentRuntimeConfigurationSpec defines the desired state of AgentRuntimeConfiguration.
+type AgentRuntimeConfigurationSpec struct {
 	// AgentTemplateImages defines the default template images for different agent frameworks.
 	// These images are used when an Agent resource does not specify a custom image.
 	// +optional
@@ -40,8 +40,8 @@ type AgentTemplateImages struct {
 	// CrewAI string `json:"crewAi,omitempty"`
 }
 
-// OperatorConfigurationStatus defines the observed state of OperatorConfiguration.
-type OperatorConfigurationStatus struct {
+// AgentRuntimeConfigurationStatus defines the observed state of AgentRuntimeConfiguration.
+type AgentRuntimeConfigurationStatus struct {
 	// Conditions represent the latest available observations of the configuration's state.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
@@ -49,29 +49,28 @@ type OperatorConfigurationStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Google ADK Image",type=string,JSONPath=`.spec.agentTemplateImages.googleAdk`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// OperatorConfiguration is the Schema for the operatorconfigurations API.
-// It provides cluster-wide configuration for the agent-runtime-operator.
-type OperatorConfiguration struct {
+// AgentRuntimeConfiguration is the Schema for the agentruntimeconfigurations API.
+// It provides namespace-scoped configuration for the agent-runtime-operator.
+type AgentRuntimeConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OperatorConfigurationSpec   `json:"spec,omitempty"`
-	Status OperatorConfigurationStatus `json:"status,omitempty"`
+	Spec   AgentRuntimeConfigurationSpec   `json:"spec,omitempty"`
+	Status AgentRuntimeConfigurationStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// OperatorConfigurationList contains a list of OperatorConfiguration.
-type OperatorConfigurationList struct {
+// AgentRuntimeConfigurationList contains a list of AgentRuntimeConfiguration.
+type AgentRuntimeConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OperatorConfiguration `json:"items"`
+	Items           []AgentRuntimeConfiguration `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&OperatorConfiguration{}, &OperatorConfigurationList{})
+	SchemeBuilder.Register(&AgentRuntimeConfiguration{}, &AgentRuntimeConfigurationList{})
 }

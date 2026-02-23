@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"os"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,6 +46,7 @@ const (
 	googleAdkFramework           = "google-adk"
 	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.6.1"
 	defaultTemplateImageFallback = "invalid"
+	defaultOperatorNamespace     = "agent-runtime-operator-system"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -59,7 +61,7 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/status,verbs=get
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=aigateways,verbs=get;list;watch
-// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=operatorconfigurations,verbs=get;list;watch
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agentruntimeconfigurations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
@@ -84,10 +86,10 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	log.V(1).Info("Reconciling Agent")
 
-	// Get operator configuration (optional - returns nil if not found)
-	operatorConfig, err := r.getOperatorConfiguration(ctx)
+	// Get agent runtime configuration (optional - returns nil if not found)
+	runtimeConfig, err := r.getAgentRuntimeConfiguration(ctx)
 	if err != nil {
-		log.Error(err, "Failed to get OperatorConfiguration")
+		log.Error(err, "Failed to get AgentRuntimeConfiguration")
 		return ctrl.Result{}, err
 	}
 
@@ -117,7 +119,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway, operatorConfig)
+		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway, runtimeConfig)
 	}); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -142,7 +144,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
 func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent,
 	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string,
-	aiGateway *runtimev1alpha1.AiGateway, operatorConfig *runtimev1alpha1.OperatorConfiguration) error {
+	aiGateway *runtimev1alpha1.AiGateway, runtimeConfig *runtimev1alpha1.AgentRuntimeConfiguration) error {
 	log := logf.FromContext(ctx)
 
 	log.V(1).Info("Ensuring Deployment for Agent")
@@ -237,8 +239,8 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		if agent.Spec.Image != "" {
 			container.Image = agent.Spec.Image
 		} else {
-			// Use image from operator configuration if available, otherwise use built-in defaults
-			container.Image = r.getTemplateImage(agent.Spec.Framework, operatorConfig)
+			// Use image from runtime configuration if available, otherwise use built-in defaults
+			container.Image = r.getTemplateImage(agent.Spec.Framework, runtimeConfig)
 		}
 		container.Ports = containerPorts
 		container.Env = allEnvVars
@@ -395,31 +397,37 @@ func getOrDefaultResourceRequirements(agent *runtimev1alpha1.Agent) corev1.Resou
 	}
 }
 
-// getOperatorConfiguration retrieves the operator configuration from the cluster.
-// It looks for any OperatorConfiguration resource in the cluster.
+// getAgentRuntimeConfiguration retrieves the agent runtime configuration from the operator's namespace.
+// It looks for any AgentRuntimeConfiguration resource in the same namespace as the controller.
 // Returns nil if no configuration is found (will use built-in defaults).
-func (r *AgentReconciler) getOperatorConfiguration(ctx context.Context) (*runtimev1alpha1.OperatorConfiguration, error) {
+func (r *AgentReconciler) getAgentRuntimeConfiguration(ctx context.Context) (*runtimev1alpha1.AgentRuntimeConfiguration, error) {
 	log := logf.FromContext(ctx)
 
-	var configList runtimev1alpha1.OperatorConfigurationList
-	if err := r.List(ctx, &configList); err != nil {
+	// Get the operator namespace from environment variable or use default
+	operatorNamespace := os.Getenv("POD_NAMESPACE")
+	if operatorNamespace == "" {
+		operatorNamespace = defaultOperatorNamespace
+	}
+
+	var configList runtimev1alpha1.AgentRuntimeConfigurationList
+	if err := r.List(ctx, &configList, client.InNamespace(operatorNamespace)); err != nil {
 		// If the CRD is not installed, return nil (will use built-in defaults)
 		if errors.IsNotFound(err) || isNoMatchError(err) {
-			log.V(1).Info("No OperatorConfiguration found, using built-in defaults")
+			log.V(1).Info("No AgentRuntimeConfiguration found, using built-in defaults", "namespace", operatorNamespace)
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to list OperatorConfiguration: %w", err)
+		return nil, fmt.Errorf("failed to list AgentRuntimeConfiguration: %w", err)
 	}
 
 	if len(configList.Items) == 0 {
-		log.V(1).Info("No OperatorConfiguration found, using built-in defaults")
+		log.V(1).Info("No AgentRuntimeConfiguration found, using built-in defaults", "namespace", operatorNamespace)
 		return nil, nil
 	}
 
 	// Use the first configuration found
 	// In the future, we could add logic to prefer a specific named configuration
 	config := &configList.Items[0]
-	log.V(1).Info("Using OperatorConfiguration", "name", config.Name)
+	log.V(1).Info("Using AgentRuntimeConfiguration", "name", config.Name, "namespace", config.Namespace)
 	return config, nil
 }
 
@@ -433,9 +441,9 @@ func isNoMatchError(err error) bool {
 }
 
 // getTemplateImage returns the appropriate template image for the given framework.
-// Resolution priority: OperatorConfiguration → built-in defaults
-func (r *AgentReconciler) getTemplateImage(framework string, config *runtimev1alpha1.OperatorConfiguration) string {
-	// Try to get image from operator configuration
+// Resolution priority: AgentRuntimeConfiguration → built-in defaults
+func (r *AgentReconciler) getTemplateImage(framework string, config *runtimev1alpha1.AgentRuntimeConfiguration) string {
+	// Try to get image from runtime configuration
 	if config != nil && config.Spec.AgentTemplateImages != nil {
 		switch framework {
 		case googleAdkFramework:
