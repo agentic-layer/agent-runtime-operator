@@ -42,6 +42,10 @@ type ToolGatewaySpec struct {
 type ToolGatewayStatus struct {
 	// Conditions represent the latest available observations of the gateway's state
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// Url is the cluster-local URL where this tool gateway can be accessed
+	// +optional
+	Url string `json:"url,omitempty"`
 }
 
 // +kubebuilder:object:root=true

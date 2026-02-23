@@ -314,6 +314,10 @@ spec:
                   - type
                   type: object
                 type: array
+              url:
+                description: Url is the cluster-local URL where this tool gateway
+                  can be accessed
+                type: string
             type: object
         type: object
     served: true
