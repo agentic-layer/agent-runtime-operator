@@ -46,7 +46,6 @@ const (
 	googleAdkFramework           = "google-adk"
 	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.6.1"
 	defaultTemplateImageFallback = "invalid"
-	defaultOperatorNamespace     = "agent-runtime-operator-system"
 )
 
 // AgentReconciler reconciles a Agent object
@@ -403,10 +402,10 @@ func getOrDefaultResourceRequirements(agent *runtimev1alpha1.Agent) corev1.Resou
 func (r *AgentReconciler) getAgentRuntimeConfiguration(ctx context.Context) (*runtimev1alpha1.AgentRuntimeConfiguration, error) {
 	log := logf.FromContext(ctx)
 
-	// Get the operator namespace from environment variable or use default
+	// Get the operator namespace from environment variable
 	operatorNamespace := os.Getenv("POD_NAMESPACE")
 	if operatorNamespace == "" {
-		operatorNamespace = defaultOperatorNamespace
+		return nil, fmt.Errorf("POD_NAMESPACE environment variable is not set - cannot determine operator namespace")
 	}
 
 	var configList runtimev1alpha1.AgentRuntimeConfigurationList
@@ -424,8 +423,11 @@ func (r *AgentReconciler) getAgentRuntimeConfiguration(ctx context.Context) (*ru
 		return nil, nil
 	}
 
-	// Use the first configuration found
-	// In the future, we could add logic to prefer a specific named configuration
+	// Error if multiple configurations exist
+	if len(configList.Items) > 1 {
+		return nil, fmt.Errorf("multiple AgentRuntimeConfiguration resources found in namespace %s - only one is allowed", operatorNamespace)
+	}
+
 	config := &configList.Items[0]
 	log.V(1).Info("Using AgentRuntimeConfiguration", "name", config.Name, "namespace", config.Namespace)
 	return config, nil

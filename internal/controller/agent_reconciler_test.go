@@ -649,5 +649,53 @@ var _ = Describe("Agent Controller", func() {
 			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(agentImage))
 		})
+
+		It("should fail reconciliation when multiple AgentRuntimeConfigurations exist", func() {
+			config1 := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config-1",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					AgentTemplateImages: &runtimev1alpha1.AgentTemplateImages{
+						GoogleAdk: "image1:tag",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, config1)).To(Succeed())
+
+			config2 := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config-2",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					AgentTemplateImages: &runtimev1alpha1.AgentTemplateImages{
+						GoogleAdk: "image2:tag",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, config2)).To(Succeed())
+
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-multiple-configs",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-multiple-configs", Namespace: "default"},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("multiple AgentRuntimeConfiguration resources found"))
+		})
 	})
 })
