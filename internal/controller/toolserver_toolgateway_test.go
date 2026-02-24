@@ -465,4 +465,157 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 			Expect(toolServerNames).To(ConsistOf("explicit-toolserver", "default-toolserver"))
 		})
 	})
+
+	Describe("GatewayUrl Population", func() {
+		It("should populate GatewayUrl when ToolGateway has Status.Url", func() {
+			// Create or get tool-gateway namespace
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
+
+			// Create ToolGateway with Status.Url
+			toolGateway := &runtimev1alpha1.ToolGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway-with-url",
+					Namespace: defaultToolGatewayNamespace,
+				},
+				Spec: toolGatewaySpec,
+			}
+			Expect(k8sClient.Create(ctx, toolGateway)).To(Succeed())
+
+			// Set the gateway's status URL (simulating what a gateway controller would do)
+			toolGateway.Status.Url = "http://tool-gateway.tool-gateway.svc.cluster.local:8080"
+			Expect(k8sClient.Status().Update(ctx, toolGateway)).To(Succeed())
+
+			// Create ToolServer with explicit ToolGatewayRef
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-toolserver",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					Image:         "test-image:latest",
+					TransportType: "http",
+					Port:          8080,
+					Path:          "/mcp",
+					ToolGatewayRef: &corev1.ObjectReference{
+						Name:      "gateway-with-url",
+						Namespace: defaultToolGatewayNamespace,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+
+			// Simulate the reconciler updating the status
+			err := reconciler.updateToolServerStatusReady(ctx, toolServer, toolGateway)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify GatewayUrl is populated correctly
+			expectedGatewayUrl := "http://tool-gateway.tool-gateway.svc.cluster.local:8080/toolserver/default/test-toolserver"
+			Expect(toolServer.Status.GatewayUrl).To(Equal(expectedGatewayUrl))
+			Expect(toolServer.Status.ToolGatewayRef).NotTo(BeNil())
+			Expect(toolServer.Status.ToolGatewayRef.Name).To(Equal("gateway-with-url"))
+		})
+
+		It("should not populate GatewayUrl when ToolGateway Status.Url is empty", func() {
+			// Create or get tool-gateway namespace
+			createNamespaceIfNotExists(defaultToolGatewayNamespace)
+
+			// Create ToolGateway without Status.Url
+			toolGateway := &runtimev1alpha1.ToolGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gateway-without-url",
+					Namespace: defaultToolGatewayNamespace,
+				},
+				Spec: toolGatewaySpec,
+			}
+			Expect(k8sClient.Create(ctx, toolGateway)).To(Succeed())
+
+			// Create ToolServer with explicit ToolGatewayRef
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-toolserver-no-gateway-url",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					Image:         "test-image:latest",
+					TransportType: "http",
+					Port:          8080,
+					Path:          "/mcp",
+					ToolGatewayRef: &corev1.ObjectReference{
+						Name:      "gateway-without-url",
+						Namespace: defaultToolGatewayNamespace,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+
+			// Simulate the reconciler updating the status
+			err := reconciler.updateToolServerStatusReady(ctx, toolServer, toolGateway)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify GatewayUrl is NOT populated when gateway URL is empty
+			Expect(toolServer.Status.GatewayUrl).To(BeEmpty())
+			Expect(toolServer.Status.ToolGatewayRef).NotTo(BeNil())
+			Expect(toolServer.Status.ToolGatewayRef.Name).To(Equal("gateway-without-url"))
+		})
+
+		It("should clear GatewayUrl when ToolGateway is nil", func() {
+			// Create ToolServer
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-toolserver-no-gateway",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					Image:         "test-image:latest",
+					TransportType: "http",
+					Port:          8080,
+					Path:          "/mcp",
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+
+			// Simulate the reconciler updating the status without a gateway
+			err := reconciler.updateToolServerStatusReady(ctx, toolServer, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify GatewayUrl is empty and ToolGatewayRef is nil
+			Expect(toolServer.Status.GatewayUrl).To(BeEmpty())
+			Expect(toolServer.Status.ToolGatewayRef).To(BeNil())
+		})
+
+		It("should clear GatewayUrl when status is set to not ready", func() {
+			// Create ToolServer with pre-existing GatewayUrl
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-toolserver-not-ready",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					Image:         "test-image:latest",
+					TransportType: "http",
+					Port:          8080,
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+
+			// Set pre-existing status
+			toolServer.Status.GatewayUrl = "http://old-gateway-url/path"
+			toolServer.Status.ToolGatewayRef = &corev1.ObjectReference{
+				Name: "old-gateway",
+			}
+			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+
+			// Simulate the reconciler setting status to not ready
+			err := reconciler.updateToolServerStatusNotReady(ctx, toolServer, "TestReason", "Test message")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify GatewayUrl and ToolGatewayRef are cleared
+			Expect(toolServer.Status.GatewayUrl).To(BeEmpty())
+			Expect(toolServer.Status.ToolGatewayRef).To(BeNil())
+		})
+	})
 })
