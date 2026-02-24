@@ -518,6 +518,15 @@ spec:
                       description: Name is the unique identifier for this tool
                       minLength: 1
                       type: string
+                    propagatedHeaders:
+                      description: |-
+                        PropagatedHeaders is a list of HTTP header names that should be propagated from incoming
+                        A2A requests to this MCP tool server. This enables authentication and authorization
+                        scenarios where the MCP server needs to access external APIs on behalf of users.
+                        Header names are case-insensitive. If not specified or empty, no headers are propagated.
+                      items:
+                        type: string
+                      type: array
                     toolServerRef:
                       description: |-
                         ToolServerRef references a ToolServer resource in the cluster.

@@ -105,6 +105,14 @@ spec:
     - name: web_fetcher
       url: "https://mcp.example.com/web-fetch"
 
+    # Optional: Propagate specific headers to the MCP server for authentication
+    # Headers from incoming A2A requests are passed to the tool server
+    - name: authenticated_api
+      url: "https://api.example.com/mcp"
+      propagatedHeaders:
+        - Authorization
+        - X-API-Key
+
   # Sub-agents this agent can delegate to
   subAgents:
     - name: summarizer_agent
@@ -144,6 +152,35 @@ subAgents:
     url: "https://agents.example.com/specialist-agent.json"
     interactionType: "transfer"
 ----
+
+==== Tool Header Propagation
+
+The `propagatedHeaders` field allows you to pass specific HTTP headers from incoming A2A requests to MCP tool servers. This enables authentication and authorization scenarios where tools need to access external APIs on behalf of users.
+
+[source,yaml]
+----
+tools:
+  - name: github_api
+    url: "https://github-mcp.example.com/mcp"
+    propagatedHeaders:
+      - Authorization      # Pass the Authorization header
+      - X-GitHub-Token     # Pass custom headers
+
+  - name: public_tool
+    url: "https://public-mcp.example.com/mcp"
+    # No propagatedHeaders - no headers are passed
+----
+
+*Key features:*
+
+* *Per-server configuration*: Each MCP server can receive different headers
+* *Security*: Headers are only sent to servers explicitly configured to receive them
+* *Case-insensitive matching*: Header names are matched case-insensitively
+* *Default behavior*: When `propagatedHeaders` is not specified or is empty, no headers are passed
+
+*Example usage:* When a user makes an A2A request with an `Authorization` header, only the MCP servers configured with `propagatedHeaders: [Authorization]` will receive that header.
+
+NOTE: Header propagation is only supported for MCP tool servers, not for sub-agents.
 
 == Custom Image Agents
 

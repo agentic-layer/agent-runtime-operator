@@ -44,7 +44,7 @@ const (
 	agentContainerName           = "agent"
 	agentCardEndpoint            = "/.well-known/agent-card.json"
 	googleAdkFramework           = "google-adk"
-	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.6.1"
+	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.8.0"
 	defaultTemplateImageFallback = "invalid"
 )
 
@@ -142,7 +142,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date
 func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1alpha1.Agent,
-	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string,
+	resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]ResolvedTool,
 	aiGateway *runtimev1alpha1.AiGateway, runtimeConfig *runtimev1alpha1.AgentRuntimeConfiguration) error {
 	log := logf.FromContext(ctx)
 

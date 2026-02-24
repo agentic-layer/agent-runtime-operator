@@ -244,8 +244,8 @@ var _ = Describe("Agent Tool", func() {
 			By("verifying both tools are resolved correctly")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolved).To(HaveLen(2))
-			Expect(resolved["tool1"]).To(Equal(toolServer1.Status.Url))
-			Expect(resolved["tool2"]).To(Equal(toolServer2.Status.Url))
+			Expect(resolved["tool1"].Url).To(Equal(toolServer1.Status.Url))
+			Expect(resolved["tool2"].Url).To(Equal(toolServer2.Status.Url))
 		})
 
 		It("should collect all resolution errors", func() {
@@ -293,7 +293,7 @@ var _ = Describe("Agent Tool", func() {
 
 			By("verifying partial results contain the working tool")
 			Expect(resolved).To(HaveLen(1))
-			Expect(resolved["working-tool"]).To(Equal(workingToolServer.Status.Url))
+			Expect(resolved["working-tool"].Url).To(Equal(workingToolServer.Status.Url))
 		})
 
 		It("should resolve mixed toolServerRef and direct URLs", func() {
@@ -312,8 +312,8 @@ var _ = Describe("Agent Tool", func() {
 			By("verifying both tool types are resolved correctly")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resolved).To(HaveLen(2))
-			Expect(resolved["local-tool"]).To(Equal(toolServer.Status.Url))
-			Expect(resolved["remote-tool"]).To(Equal("https://mcp.example.com/tools"))
+			Expect(resolved["local-tool"].Url).To(Equal(toolServer.Status.Url))
+			Expect(resolved["remote-tool"].Url).To(Equal("https://mcp.example.com/tools"))
 		})
 	})
 
