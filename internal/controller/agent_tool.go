@@ -62,7 +62,7 @@ func (r *AgentReconciler) resolveAllTools(ctx context.Context, agent *runtimev1a
 
 // resolveToolServerUrl resolves a Tool configuration to its actual URL.
 // For remote tools (with URL): returns the URL directly
-// For cluster tools (with toolServerRef): looks up the ToolServer resource and uses its status.url
+// For cluster tools (with toolServerRef): looks up the ToolServer resource and uses its status.gatewayUrl if available, otherwise status.url
 // If namespace is not specified in toolServerRef, defaults to the parent agent's namespace
 func (r *AgentReconciler) resolveToolServerUrl(ctx context.Context, tool runtimev1alpha1.AgentTool, parentNamespace string) (string, error) {
 	// If URL is provided, this is a remote tool - use URL directly
@@ -88,7 +88,12 @@ func (r *AgentReconciler) resolveToolServerUrl(ctx context.Context, tool runtime
 		return "", fmt.Errorf("failed to resolve ToolServer %s/%s: %w", namespace, tool.ToolServerRef.Name, err)
 	}
 
-	// Use the URL from the toolServer's status (populated by the controller)
+	// Use the GatewayUrl from the toolServer's status if available (populated when ToolGateway is attached)
+	// Otherwise fall back to the direct URL
+	if referencedToolServer.Status.GatewayUrl != "" {
+		return referencedToolServer.Status.GatewayUrl, nil
+	}
+
 	if referencedToolServer.Status.Url == "" {
 		return "", fmt.Errorf("ToolServer %s/%s has no URL in its Status field", namespace, tool.ToolServerRef.Name)
 	}

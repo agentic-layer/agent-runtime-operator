@@ -479,6 +479,13 @@ spec:
                   - type
                   type: object
                 type: array
+              gatewayUrl:
+                description: |-
+                  GatewayUrl is the URL to access this tool server through a ToolGateway.
+                  Only populated when this tool server is attached to a ToolGateway.
+                  This URL includes the gateway's base URL plus the path for this specific ToolServer.
+                  When present, agents should prefer this URL over the direct Url.
+                type: string
               toolGatewayRef:
                 description: |-
                   ToolGatewayRef references the ToolGateway resource that this tool server is connected to.
