@@ -255,7 +255,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 
 		It("should find agent in different namespace when specified", func() {
 			// Use a unique namespace name to avoid conflicts with terminating namespaces
-			testNamespace := "test-ns-" + string(types.UID(metav1.Now().Format("20060102-150405")))
+			testNamespace := "test-ns-" + metav1.Now().Format("20060102-150405")
 
 			// Create namespace
 			ns := &corev1.Namespace{
