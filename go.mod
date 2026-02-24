@@ -1,6 +1,6 @@
 module github.com/agentic-layer/agent-runtime-operator
 
-go 1.24.0
+go 1.26.0
 
 require (
 	github.com/onsi/ginkgo/v2 v2.28.1
