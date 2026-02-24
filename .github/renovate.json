@@ -2,6 +2,12 @@
   "extends": [
     "github>agentic-layer/renovate-config"
   ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["example.com/agent-runtime-operator"],
+      "enabled": false
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
