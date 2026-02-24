@@ -41,17 +41,18 @@ import (
 //
 // JSON Structure:
 //   - SubAgents: {"agentName": {"url": "https://...", "interaction_type": "transfer|tool_call"}}
-//   - Tools: {"toolName": {"url": "https://..."}}
+//   - Tools: {"toolName": {"url": "https://...", "propagate_headers": ["Header1", "Header2"]}}
 //
 // Parameters:
 //   - agent: The Agent resource to generate template variables for
 //   - resolvedSubAgents: Map of subAgent name to ResolvedSubAgent (URL and interactionType)
+//   - resolvedTools: Map of tool name to ResolvedTool (URL and propagatedHeaders)
 //   - aiGatewayUrl: URL of the resolved AiGateway (nil if not found)
 //
 // Returns:
 //   - []corev1.EnvVar: Slice of environment variables for template configuration
 //   - error: JSON marshaling error if SubAgents or Tools contain invalid data
-func buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]string, aiGatewayUrl *string) ([]corev1.EnvVar, error) {
+func buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgents map[string]ResolvedSubAgent, resolvedTools map[string]ResolvedTool, aiGatewayUrl *string) ([]corev1.EnvVar, error) {
 	var templateEnvVars []corev1.EnvVar
 	var err error
 
@@ -134,11 +135,16 @@ func buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgent
 	// AGENT_TOOLS - always set, with empty object if no tools
 	var toolsJSON []byte
 	if len(resolvedTools) > 0 {
-		toolsMap := make(map[string]map[string]string)
-		for name, url := range resolvedTools {
-			toolsMap[name] = map[string]string{
-				"url": url,
+		toolsMap := make(map[string]map[string]interface{})
+		for name, resolved := range resolvedTools {
+			toolConfig := map[string]interface{}{
+				"url": resolved.Url,
 			}
+			// Only include propagate_headers if non-empty
+			if len(resolved.PropagatedHeaders) > 0 {
+				toolConfig["propagate_headers"] = resolved.PropagatedHeaders
+			}
+			toolsMap[name] = toolConfig
 		}
 		toolsJSON, err = json.Marshal(toolsMap)
 	} else {

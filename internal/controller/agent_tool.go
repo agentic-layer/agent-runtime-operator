@@ -28,11 +28,17 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// resolveAllTools resolves all tool ToolServer URLs and returns a map of name to URL.
+// ResolvedTool represents a fully resolved tool with its URL and propagated headers
+type ResolvedTool struct {
+	Url               string
+	PropagatedHeaders []string
+}
+
+// resolveAllTools resolves all tool ToolServer URLs and returns a map of name to ResolvedTool.
 // Collects all resolution errors and returns them together, allowing the caller to see
 // all missing tools at once rather than failing on the first error.
-func (r *AgentReconciler) resolveAllTools(ctx context.Context, agent *runtimev1alpha1.Agent) (map[string]string, error) {
-	resolved := make(map[string]string)
+func (r *AgentReconciler) resolveAllTools(ctx context.Context, agent *runtimev1alpha1.Agent) (map[string]ResolvedTool, error) {
+	resolved := make(map[string]ResolvedTool)
 	var issues []string
 
 	for _, tool := range agent.Spec.Tools {
@@ -40,7 +46,10 @@ func (r *AgentReconciler) resolveAllTools(ctx context.Context, agent *runtimev1a
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("tool %q: %v", tool.Name, err))
 		} else {
-			resolved[tool.Name] = url
+			resolved[tool.Name] = ResolvedTool{
+				Url:               url,
+				PropagatedHeaders: tool.PropagatedHeaders,
+			}
 		}
 	}
 

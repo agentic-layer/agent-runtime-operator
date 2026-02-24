@@ -36,7 +36,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(envVars).To(HaveLen(6))
 
@@ -94,9 +94,9 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			// Simulate resolved tools (from ToolServer references)
-			resolvedTools := map[string]string{
-				"tool1": "http://tool-server-1.default.svc.cluster.local:8080/sse",
-				"tool2": "http://tool-server-2.default.svc.cluster.local:8080/sse",
+			resolvedTools := map[string]ResolvedTool{
+				"tool1": {Url: "http://tool-server-1.default.svc.cluster.local:8080/sse"},
+				"tool2": {Url: "http://tool-server-2.default.svc.cluster.local:8080/sse"},
 			}
 
 			envVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools, nil)
@@ -143,7 +143,7 @@ var _ = Describe("Agent Config", func() {
 				"test-sub": {Url: "https://example.com/sub.json", InteractionType: "tool_call"},
 			}
 
-			envVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, map[string]string{}, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify JSON structure is valid
@@ -165,8 +165,8 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			// Simulate resolved tools (from ToolServer references)
-			resolvedTools := map[string]string{
-				"test-tool": "http://tool-server-1.default.svc.cluster.local:8080/sse",
+			resolvedTools := map[string]ResolvedTool{
+				"test-tool": {Url: "http://tool-server-1.default.svc.cluster.local:8080/sse"},
 			}
 
 			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, resolvedTools, nil)
@@ -175,6 +175,64 @@ var _ = Describe("Agent Config", func() {
 			// Verify JSON structure is valid
 			toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
 			Expect(toolsVar.Value).To(MatchJSON(`{"test-tool":{"url":"http://tool-server-1.default.svc.cluster.local:8080/sse"}}`))
+		})
+
+		It("should include propagate_headers in AGENT_TOOLS when specified", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-with-propagated-headers",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Tools: []runtimev1alpha1.AgentTool{
+						{Name: "auth-tool", ToolServerRef: &corev1.ObjectReference{Name: "tool-server-1"}},
+					},
+				},
+			}
+
+			// Simulate resolved tools with propagated headers
+			resolvedTools := map[string]ResolvedTool{
+				"auth-tool": {
+					Url:               "http://tool-server-1.default.svc.cluster.local:8080/mcp",
+					PropagatedHeaders: []string{"Authorization", "X-API-Key"},
+				},
+			}
+
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, resolvedTools, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify JSON structure includes propagate_headers
+			toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
+			Expect(toolsVar.Value).To(MatchJSON(`{"auth-tool":{"url":"http://tool-server-1.default.svc.cluster.local:8080/mcp","propagate_headers":["Authorization","X-API-Key"]}}`))
+		})
+
+		It("should not include propagate_headers in AGENT_TOOLS when empty", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "agent-without-propagated-headers",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Tools: []runtimev1alpha1.AgentTool{
+						{Name: "public-tool", ToolServerRef: &corev1.ObjectReference{Name: "tool-server-1"}},
+					},
+				},
+			}
+
+			// Simulate resolved tools without propagated headers
+			resolvedTools := map[string]ResolvedTool{
+				"public-tool": {
+					Url:               "http://tool-server-1.default.svc.cluster.local:8080/mcp",
+					PropagatedHeaders: []string{}, // Empty list
+				},
+			}
+
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, resolvedTools, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify JSON structure does NOT include propagate_headers when empty
+			toolsVar := findEnvVar(envVars, "AGENT_TOOLS")
+			Expect(toolsVar.Value).To(MatchJSON(`{"public-tool":{"url":"http://tool-server-1.default.svc.cluster.local:8080/mcp"}}`))
 		})
 
 		It("should generate AGENT_A2A_RPC_URL when A2A protocol is present", func() {
@@ -194,7 +252,7 @@ var _ = Describe("Agent Config", func() {
 				},
 			}
 
-			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
@@ -211,7 +269,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			a2aUrlVar := findEnvVar(envVars, "AGENT_A2A_RPC_URL")
@@ -230,7 +288,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			gatewayUrl := "http://ai-gateway.ai-gateway-ns.svc.cluster.local:4000"
-			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should have base variables (6) + LiteLLM variables (3) = 9 total
@@ -261,7 +319,7 @@ var _ = Describe("Agent Config", func() {
 				Spec: runtimev1alpha1.AgentSpec{},
 			}
 
-			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, nil)
+			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should only have base variables (6), no LiteLLM variables
@@ -283,7 +341,7 @@ var _ = Describe("Agent Config", func() {
 			}
 
 			gatewayUrl := "http://ai-gateway.default.svc.cluster.local:4000"
-			templateVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]string{}, &gatewayUrl)
+			templateVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			userVars := []corev1.EnvVar{

@@ -92,6 +92,13 @@ type AgentTool struct {
 	// +optional
 	// +kubebuilder:validation:Format=uri
 	Url string `json:"url,omitempty"`
+
+	// PropagatedHeaders is a list of HTTP header names that should be propagated from incoming
+	// A2A requests to this MCP tool server. This enables authentication and authorization
+	// scenarios where the MCP server needs to access external APIs on behalf of users.
+	// Header names are case-insensitive. If not specified or empty, no headers are propagated.
+	// +optional
+	PropagatedHeaders []string `json:"propagatedHeaders,omitempty"`
 }
 
 // AgentSpec defines the desired state of Agent.
