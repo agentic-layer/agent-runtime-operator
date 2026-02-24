@@ -22,11 +22,9 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
@@ -47,7 +45,7 @@ var toolserverlog = logf.Log.WithName("toolserver-resource")
 
 // SetupToolServerWebhookWithManager registers the webhook for ToolServer in the manager.
 func SetupToolServerWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.ToolServer{}).
+	return ctrl.NewWebhookManagedBy(mgr, &runtimev1alpha1.ToolServer{}).
 		WithValidator(&ToolServerCustomValidator{}).
 		WithDefaulter(&ToolServerCustomDefaulter{}).
 		Complete()
@@ -62,15 +60,8 @@ func SetupToolServerWebhookWithManager(mgr ctrl.Manager) error {
 // as it is used only for temporary operations and does not need to be deeply copied.
 type ToolServerCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &ToolServerCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind ToolServer.
-func (d *ToolServerCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	toolserver, ok := obj.(*runtimev1alpha1.ToolServer)
-
-	if !ok {
-		return fmt.Errorf("expected an ToolServer object but got %T", obj)
-	}
+func (d *ToolServerCustomDefaulter) Default(_ context.Context, toolserver *runtimev1alpha1.ToolServer) error {
 	toolserverlog.Info("Defaulting for ToolServer", "name", toolserver.GetName())
 
 	d.applyDefaults(toolserver)
@@ -120,32 +111,22 @@ func (d *ToolServerCustomDefaulter) applyDefaults(toolserver *runtimev1alpha1.To
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type ToolServerCustomValidator struct{}
 
-var _ webhook.CustomValidator = &ToolServerCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type ToolServer.
-func (v *ToolServerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	toolserver, ok := obj.(*runtimev1alpha1.ToolServer)
-	if !ok {
-		return nil, fmt.Errorf("expected a ToolServer object but got %T", obj)
-	}
+func (v *ToolServerCustomValidator) ValidateCreate(_ context.Context, toolserver *runtimev1alpha1.ToolServer) (admission.Warnings, error) {
 	toolserverlog.Info("Validation for ToolServer upon creation", "name", toolserver.GetName())
 
 	return v.validateToolServer(toolserver)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type ToolServer.
-func (v *ToolServerCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	toolserver, ok := newObj.(*runtimev1alpha1.ToolServer)
-	if !ok {
-		return nil, fmt.Errorf("expected a ToolServer object for the newObj but got %T", newObj)
-	}
-	toolserverlog.Info("Validation for ToolServer upon update", "name", toolserver.GetName())
+func (v *ToolServerCustomValidator) ValidateUpdate(_ context.Context, _, newToolServer *runtimev1alpha1.ToolServer) (admission.Warnings, error) {
+	toolserverlog.Info("Validation for ToolServer upon update", "name", newToolServer.GetName())
 
-	return v.validateToolServer(toolserver)
+	return v.validateToolServer(newToolServer)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type ToolServer.
-func (v *ToolServerCustomValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+func (v *ToolServerCustomValidator) ValidateDelete(_ context.Context, _ *runtimev1alpha1.ToolServer) (admission.Warnings, error) {
 	// No validation needed on delete
 	return nil, nil
 }

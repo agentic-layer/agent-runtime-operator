@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
@@ -214,32 +213,6 @@ var _ = Describe("Agent Webhook", func() {
 	})
 
 	Context("When creating or updating Agent under Validating Webhook", func() {
-		Context("When handling invalid objects", func() {
-			It("Should return error for non-Agent objects", func() {
-				By("passing a non-Agent object")
-				invalidObj := &corev1.Pod{}
-
-				By("calling the Default method")
-				err := defaulter.Default(ctx, invalidObj)
-
-				By("verifying that an error is returned")
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("expected an Agent object but got"))
-			})
-
-			It("Should handle nil runtime.Object gracefully", func() {
-				By("passing a nil object")
-				var nilObj runtime.Object
-
-				By("calling the Default method")
-				err := defaulter.Default(ctx, nilObj)
-
-				By("verifying that an error is returned")
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("expected an Agent object but got"))
-			})
-		})
-
 		Context("When handling complex scenarios", func() {
 			It("Should apply all defaults for completely empty agent", func() {
 				By("having a completely empty agent spec")
@@ -382,19 +355,6 @@ var _ = Describe("Agent Webhook", func() {
 
 				By("verifying that no validation is performed")
 				Expect(err).NotTo(HaveOccurred())
-				Expect(warnings).To(BeEmpty())
-			})
-
-			It("Should return error for non-Agent objects in validation", func() {
-				By("passing a non-Agent object")
-				invalidObj := &corev1.Pod{}
-
-				By("calling the ValidateCreate method")
-				warnings, err := validator.ValidateCreate(ctx, invalidObj)
-
-				By("verifying that an error is returned")
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("expected an Agent object but got"))
 				Expect(warnings).To(BeEmpty())
 			})
 		})
