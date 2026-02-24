@@ -222,6 +222,45 @@ var _ = Describe("Agent Tool", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("has neither url nor toolServerRef specified"))
 		})
+
+		It("should prefer GatewayUrl over Url when both are present", func() {
+			By("creating a ToolServer with both Url and GatewayUrl")
+			toolServer := createToolServer(ctx, k8sClient, "gateway-toolserver", DefaultNamespace)
+			toolServer.Status.Url = "http://gateway-toolserver.default.svc.cluster.local:8080"
+			toolServer.Status.GatewayUrl = "http://tool-gateway.tool-gateway.svc.cluster.local:8080/toolserver/default/gateway-toolserver"
+			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
+
+			By("creating a tool reference to the ToolServer")
+			tool := runtimev1alpha1.AgentTool{
+				Name: "gateway-tool",
+				ToolServerRef: &corev1.ObjectReference{
+					Name: toolServer.Name,
+				},
+			}
+
+			By("verifying GatewayUrl is preferred over Url")
+			url, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(Equal(toolServer.Status.GatewayUrl))
+		})
+
+		It("should fall back to Url when GatewayUrl is not set", func() {
+			By("creating a ToolServer with only Url (no GatewayUrl)")
+			toolServer := createToolServerWithURL(ctx, k8sClient, "direct-toolserver", DefaultNamespace)
+
+			By("creating a tool reference to the ToolServer")
+			tool := runtimev1alpha1.AgentTool{
+				Name: "direct-tool",
+				ToolServerRef: &corev1.ObjectReference{
+					Name: toolServer.Name,
+				},
+			}
+
+			By("verifying Url is used when GatewayUrl is empty")
+			url, err := reconciler.resolveToolServerUrl(ctx, tool, DefaultNamespace)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(url).To(Equal(toolServer.Status.Url))
+		})
 	})
 
 	Describe("resolveAllTools", func() {

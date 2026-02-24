@@ -315,7 +315,7 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 		toolServer.Status.Url = ""
 	}
 
-	// Set ToolGatewayRef if a Tool Gateway is being used
+	// Set ToolGatewayRef and GatewayUrl if a Tool Gateway is being used
 	if toolGateway != nil {
 		toolServer.Status.ToolGatewayRef = &corev1.ObjectReference{
 			Kind:       "ToolGateway",
@@ -323,8 +323,19 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 			Name:       toolGateway.Name,
 			APIVersion: runtimev1alpha1.GroupVersion.String(),
 		}
+
+		// Populate GatewayUrl if the ToolGateway has a URL in its status
+		if toolGateway.Status.Url != "" {
+			// Construct the gateway URL for this specific tool server
+			// Format: {gatewayBaseUrl}/toolserver/{namespace}/{name}
+			toolServer.Status.GatewayUrl = fmt.Sprintf("%s/toolserver/%s/%s",
+				toolGateway.Status.Url, toolServer.Namespace, toolServer.Name)
+		} else {
+			toolServer.Status.GatewayUrl = ""
+		}
 	} else {
 		toolServer.Status.ToolGatewayRef = nil
+		toolServer.Status.GatewayUrl = ""
 	}
 
 	// Set Ready condition to True
@@ -345,8 +356,9 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 
 // updateToolServerStatusNotReady sets the ToolServer status to not Ready
 func (r *ToolServerReconciler) updateToolServerStatusNotReady(ctx context.Context, toolServer *runtimev1alpha1.ToolServer, reason, message string) error {
-	// Clear the ToolGatewayRef since the tool server is not ready
+	// Clear the ToolGatewayRef and GatewayUrl since the tool server is not ready
 	toolServer.Status.ToolGatewayRef = nil
+	toolServer.Status.GatewayUrl = ""
 
 	// Set Ready condition to False
 	meta.SetStatusCondition(&toolServer.Status.Conditions, metav1.Condition{

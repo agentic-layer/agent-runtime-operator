@@ -101,6 +101,13 @@ type ToolServerStatus struct {
 	// +optional
 	Url string `json:"url,omitempty"`
 
+	// GatewayUrl is the URL to access this tool server through a ToolGateway.
+	// Only populated when this tool server is attached to a ToolGateway.
+	// This URL includes the gateway's base URL plus the path for this specific ToolServer.
+	// When present, agents should prefer this URL over the direct Url.
+	// +optional
+	GatewayUrl string `json:"gatewayUrl,omitempty"`
+
 	// ToolGatewayRef references the ToolGateway resource that this tool server is connected to.
 	// This field is automatically populated by the controller when a Tool Gateway is being used.
 	// If nil, the tool server is not connected to any Tool Gateway.
