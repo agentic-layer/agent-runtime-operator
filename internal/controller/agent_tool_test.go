@@ -227,7 +227,7 @@ var _ = Describe("Agent Tool", func() {
 			By("creating a ToolServer with both Url and GatewayUrl")
 			toolServer := createToolServer(ctx, k8sClient, "gateway-toolserver", DefaultNamespace)
 			toolServer.Status.Url = "http://gateway-toolserver.default.svc.cluster.local:8080"
-			toolServer.Status.GatewayUrl = "http://tool-gateway.tool-gateway.svc.cluster.local:8080/toolserver/default/gateway-toolserver"
+			toolServer.Status.GatewayUrl = "http://tool-gateway.tool-gateway.svc.cluster.local:8080/default/gateway-toolserver"
 			Expect(k8sClient.Status().Update(ctx, toolServer)).To(Succeed())
 
 			By("creating a tool reference to the ToolServer")

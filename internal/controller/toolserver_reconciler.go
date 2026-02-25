@@ -327,8 +327,8 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 		// Populate GatewayUrl if the ToolGateway has a URL in its status
 		if toolGateway.Status.Url != "" {
 			// Construct the gateway URL for this specific tool server
-			// Format: {gatewayBaseUrl}/toolserver/{namespace}/{name}/mcp
-			toolServer.Status.GatewayUrl = fmt.Sprintf("%s/toolserver/%s/%s/mcp",
+			// Format: {gatewayBaseUrl}/{namespace}/{name}/mcp
+			toolServer.Status.GatewayUrl = fmt.Sprintf("%s/%s/%s/mcp",
 				toolGateway.Status.Url, toolServer.Namespace, toolServer.Name)
 		} else {
 			toolServer.Status.GatewayUrl = ""
