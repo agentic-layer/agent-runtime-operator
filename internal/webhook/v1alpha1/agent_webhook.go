@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -54,7 +54,7 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 			DefaultReplicas:      1,
 			DefaultPort:          8080,
 			DefaultPortGoogleAdk: 8000,
-			Recorder:             mgr.GetEventRecorderFor("agent-defaulter-webhook"),
+			Recorder:             mgr.GetEventRecorder("agent-defaulter-webhook"),
 		}).
 		WithValidator(&AgentCustomValidator{}).
 		Complete()
@@ -72,7 +72,7 @@ type AgentCustomDefaulter struct {
 	DefaultReplicas      int32
 	DefaultPort          int32
 	DefaultPortGoogleAdk int32
-	Recorder             record.EventRecorder
+	Recorder             events.EventRecorder
 }
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Agent.

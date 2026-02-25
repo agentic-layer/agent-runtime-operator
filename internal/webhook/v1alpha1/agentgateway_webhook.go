@@ -21,7 +21,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -35,7 +35,7 @@ func SetupAgentGatewayWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &runtimev1alpha1.AgentGateway{}).
 		WithDefaulter(&AgentGatewayCustomDefaulter{
 			DefaultReplicas: 1,
-			Recorder:        mgr.GetEventRecorderFor("agentgateway-defaulter-webhook"),
+			Recorder:        mgr.GetEventRecorder("agentgateway-defaulter-webhook"),
 		}).
 		Complete()
 }
@@ -49,7 +49,7 @@ func SetupAgentGatewayWebhookWithManager(mgr ctrl.Manager) error {
 // as it is used only for temporary operations and does not need to be deeply copied.
 type AgentGatewayCustomDefaulter struct {
 	DefaultReplicas int32
-	Recorder        record.EventRecorder
+	Recorder        events.EventRecorder
 }
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind AgentGateway.

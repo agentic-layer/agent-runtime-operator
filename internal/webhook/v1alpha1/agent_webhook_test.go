@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
@@ -39,7 +39,7 @@ var _ = Describe("Agent Webhook", func() {
 		validator AgentCustomValidator
 		defaulter AgentCustomDefaulter
 		ctx       context.Context
-		recorder  *record.FakeRecorder
+		recorder  *events.FakeRecorder
 	)
 
 	BeforeEach(func() {
@@ -52,7 +52,7 @@ var _ = Describe("Agent Webhook", func() {
 		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
 		ctx = context.Background()
-		recorder = record.NewFakeRecorder(10)
+		recorder = events.NewFakeRecorder(10)
 		defaulter = AgentCustomDefaulter{
 			DefaultReplicas:      1,
 			DefaultPort:          8080,
