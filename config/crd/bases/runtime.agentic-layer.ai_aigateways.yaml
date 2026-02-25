@@ -273,7 +273,7 @@ spec:
                   type: object
                 type: array
               port:
-                default: 4000
+                default: 80
                 description: Port on which the AI gateway will be exposed.
                 format: int32
                 maximum: 65535

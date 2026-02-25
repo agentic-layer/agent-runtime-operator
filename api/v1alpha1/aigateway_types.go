@@ -30,7 +30,7 @@ type AiGatewaySpec struct {
 	// Port on which the AI gateway will be exposed.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=4000
+	// +kubebuilder:default=80
 	Port int32 `json:"port,omitempty"`
 
 	// List of AI models to be made available through the gateway.

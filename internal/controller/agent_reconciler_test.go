@@ -230,7 +230,7 @@ var _ = Describe("Agent Controller", func() {
 			container := deployment.Spec.Template.Spec.Containers[0]
 			proxyBaseVar := findEnvVar(container.Env, "LITELLM_PROXY_API_BASE")
 			Expect(proxyBaseVar).NotTo(BeNil())
-			Expect(proxyBaseVar.Value).To(Equal("http://test-reconcile-gateway.ai-gateway.svc.cluster.local.:4000"))
+			Expect(proxyBaseVar.Value).To(Equal("http://test-reconcile-gateway.ai-gateway.svc.cluster.local.:80"))
 
 			// Clean up ai-gateway namespace resources
 			Expect(k8sClient.Delete(ctx, aiGateway)).To(Succeed())
