@@ -23,12 +23,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
@@ -50,13 +48,13 @@ type AgentWebhookConfig struct {
 
 // SetupAgentWebhookWithManager registers the webhook for Agent in the manager.
 func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.Agent{}).
+	return ctrl.NewWebhookManagedBy(mgr, &runtimev1alpha1.Agent{}).
 		WithDefaulter(&AgentCustomDefaulter{
 			DefaultFramework:     googleAdkFramework,
 			DefaultReplicas:      1,
 			DefaultPort:          8080,
 			DefaultPortGoogleAdk: 8000,
-			Recorder:             mgr.GetEventRecorderFor("agent-defaulter-webhook"),
+			Recorder:             mgr.GetEventRecorder("agent-defaulter-webhook"),
 		}).
 		WithValidator(&AgentCustomValidator{}).
 		Complete()
@@ -74,18 +72,11 @@ type AgentCustomDefaulter struct {
 	DefaultReplicas      int32
 	DefaultPort          int32
 	DefaultPortGoogleAdk int32
-	Recorder             record.EventRecorder
+	Recorder             events.EventRecorder
 }
 
-var _ webhook.CustomDefaulter = &AgentCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Agent.
-func (d *AgentCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	agent, ok := obj.(*runtimev1alpha1.Agent)
-
-	if !ok {
-		return fmt.Errorf("expected an Agent object but got %T", obj)
-	}
+func (d *AgentCustomDefaulter) Default(_ context.Context, agent *runtimev1alpha1.Agent) error {
 	agentlog.Info("Defaulting for Agent", "name", agent.GetName())
 
 	d.applyDefaults(agent)
@@ -145,30 +136,20 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 type AgentCustomValidator struct {
 }
 
-var _ webhook.CustomValidator = &AgentCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
-func (v *AgentCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	agent, ok := obj.(*runtimev1alpha1.Agent)
-	if !ok {
-		return nil, fmt.Errorf("expected an Agent object but got %T", obj)
-	}
+func (v *AgentCustomValidator) ValidateCreate(_ context.Context, agent *runtimev1alpha1.Agent) (admission.Warnings, error) {
 	agentlog.Info("Validating Agent on create", "name", agent.GetName())
 	return v.validateAgent(agent)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
-func (v *AgentCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	agent, ok := newObj.(*runtimev1alpha1.Agent)
-	if !ok {
-		return nil, fmt.Errorf("expected an Agent object but got %T", newObj)
-	}
-	agentlog.Info("Validating Agent on update", "name", agent.GetName())
-	return v.validateAgent(agent)
+func (v *AgentCustomValidator) ValidateUpdate(_ context.Context, _, newAgent *runtimev1alpha1.Agent) (admission.Warnings, error) {
+	agentlog.Info("Validating Agent on update", "name", newAgent.GetName())
+	return v.validateAgent(newAgent)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the Kind Agent.
-func (v *AgentCustomValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+func (v *AgentCustomValidator) ValidateDelete(_ context.Context, _ *runtimev1alpha1.Agent) (admission.Warnings, error) {
 	// No validation needed on delete
 	return nil, nil
 }

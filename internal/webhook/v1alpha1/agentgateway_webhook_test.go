@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
@@ -34,7 +34,7 @@ var _ = Describe("AgentGateway Webhook", func() {
 	BeforeEach(func() {
 		defaulter = &AgentGatewayCustomDefaulter{
 			DefaultReplicas: 1,
-			Recorder:        &record.FakeRecorder{},
+			Recorder:        &events.FakeRecorder{},
 		}
 	})
 

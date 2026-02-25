@@ -18,15 +18,12 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
@@ -35,10 +32,10 @@ var agentgatewaylog = logf.Log.WithName("agentgateway-resource")
 
 // SetupAgentGatewayWebhookWithManager registers the webhook for AgentGateway in the manager.
 func SetupAgentGatewayWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&runtimev1alpha1.AgentGateway{}).
+	return ctrl.NewWebhookManagedBy(mgr, &runtimev1alpha1.AgentGateway{}).
 		WithDefaulter(&AgentGatewayCustomDefaulter{
 			DefaultReplicas: 1,
-			Recorder:        mgr.GetEventRecorderFor("agentgateway-defaulter-webhook"),
+			Recorder:        mgr.GetEventRecorder("agentgateway-defaulter-webhook"),
 		}).
 		Complete()
 }
@@ -52,18 +49,11 @@ func SetupAgentGatewayWebhookWithManager(mgr ctrl.Manager) error {
 // as it is used only for temporary operations and does not need to be deeply copied.
 type AgentGatewayCustomDefaulter struct {
 	DefaultReplicas int32
-	Recorder        record.EventRecorder
+	Recorder        events.EventRecorder
 }
 
-var _ webhook.CustomDefaulter = &AgentGatewayCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind AgentGateway.
-func (d *AgentGatewayCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	agentgateway, ok := obj.(*runtimev1alpha1.AgentGateway)
-
-	if !ok {
-		return fmt.Errorf("expected an AgentGateway object but got %T", obj)
-	}
+func (d *AgentGatewayCustomDefaulter) Default(_ context.Context, agentgateway *runtimev1alpha1.AgentGateway) error {
 	agentgatewaylog.Info("Defaulting for AgentGateway", "name", agentgateway.GetName())
 
 	d.applyDefaults(agentgateway)
