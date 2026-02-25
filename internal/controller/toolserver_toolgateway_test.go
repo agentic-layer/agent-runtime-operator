@@ -510,7 +510,8 @@ var _ = Describe("ToolServer ToolGateway Resolution", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify GatewayUrl is populated correctly
-			expectedGatewayUrl := "http://tool-gateway.tool-gateway.svc.cluster.local:8080/toolserver/default/test-toolserver"
+			expectedGatewayUrl := "http://tool-gateway.tool-gateway.svc.cluster.local:8080" +
+				"/toolserver/default/test-toolserver/mcp"
 			Expect(toolServer.Status.GatewayUrl).To(Equal(expectedGatewayUrl))
 			Expect(toolServer.Status.ToolGatewayRef).NotTo(BeNil())
 			Expect(toolServer.Status.ToolGatewayRef.Name).To(Equal("gateway-with-url"))
