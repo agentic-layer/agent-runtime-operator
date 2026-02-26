@@ -1,0 +1,147 @@
+= Create a Tool Gateway
+
+This guide walks you through deploying an instance of the `ToolGateway` custom resource.
+
+A `ToolGateway` is like a Kubernetes https://kubernetes.io/docs/concepts/services-networking/gateway/#api-kind-gateway[Gateway] in that there might be many different implementations (also known as "classes"). Example implementations of the Kubernetes Gateway specification include Envoy Gateway, Cilium, or `amazon-vpc-lattice`).
+
+TIP: Before following this guide, make sure you have some kind of Tool Gateway Operator installed.
+
+== How Tool Gateways Work
+
+A `ToolGateway` acts as a unified entry point for accessing tool servers. Instead of agents connecting directly to individual tool servers, they connect through the gateway, which handles routing, authentication, and other cross-cutting concerns.
+
+Tool servers are automatically attached to a `ToolGateway` through a resolution strategy:
+
+1. If the `ToolServer` has an explicit `toolGatewayRef`, that specific `ToolGateway` is used
+2. If no explicit reference is set, the operator looks for a default `ToolGateway` in the `tool-gateway` namespace
+3. If no `ToolGateway` is found, the tool server runs without a gateway (direct access only)
+
+When a tool server is attached to a gateway, its `status.gatewayUrl` is populated with the URL to access it through the gateway.
+
+== Create a ToolGateway Resource
+
+. Create a ToolGateway resource file:
++
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolGateway
+metadata:
+  name: tool-gateway
+  namespace: tool-gateway
+spec:
+  toolGatewayClassName: my-gateway-class
+----
++
+Note: The `toolGatewayClassName` is optional and only needed if multiple gateway classes are defined in the cluster.
+
+. Apply the configuration:
++
+[source,bash]
+----
+kubectl apply -f my-toolgateway.yaml
+----
+
+== Verify the Deployment
+
+. Check the ToolGateway status:
++
+[source,bash]
+----
+kubectl get toolgateways tool-gateway -n tool-gateway
+----
+
+. Verify the created resources:
++
+[source,bash]
+----
+# Check the deployment created by the operator
+kubectl get deployments -l app=tool-gateway -A
+
+# Check the service
+kubectl get services -l app=tool-gateway -A
+----
+
+. Check the pod logs:
++
+[source,bash]
+----
+kubectl logs -l app=tool-gateway -n tool-gateway
+----
+
+== Connect Tool Servers to the Gateway
+
+=== Automatic (Default) Resolution
+
+If your `ToolGateway` is deployed in the `tool-gateway` namespace, tool servers will automatically discover and attach to it without any additional configuration:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: my-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  image: ghcr.io/agentic-layer/echo-mcp-server:0.3.0
+  port: 8000
+  # No toolGatewayRef needed - automatically resolves to the default gateway
+----
+
+=== Explicit Reference
+
+To connect a tool server to a specific `ToolGateway`, use the `toolGatewayRef` field:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: my-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  image: ghcr.io/agentic-layer/echo-mcp-server:0.3.0
+  port: 8000
+  toolGatewayRef:
+    name: tool-gateway
+    namespace: tool-gateway  # Optional: defaults to the ToolServer's namespace
+----
+
+=== Verify the Connection
+
+Once a tool server is attached to a gateway, you can verify the connection:
+
+[source,bash]
+----
+# Check the tool server status - look for the gatewayUrl and toolGatewayRef fields
+kubectl get toolserver my-toolserver -o yaml
+
+# The "Tool Gateway" column shows the attached gateway name
+kubectl get toolservers
+----
+
+The tool server's `status.gatewayUrl` will contain the URL to access the tool server through the gateway. When present, agents should prefer this URL over the direct `status.url`.
+
+== Configure Environment Variables
+
+You can pass environment variables and load them from ConfigMaps or Secrets:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolGateway
+metadata:
+  name: tool-gateway
+  namespace: tool-gateway
+spec:
+  env:
+    - name: LOG_LEVEL
+      value: "INFO"
+  envFrom:
+    - secretRef:
+        name: gateway-credentials
+    - configMapRef:
+        name: gateway-config
+----
