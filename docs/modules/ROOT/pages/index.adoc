@@ -15,6 +15,7 @@ For advanced routing and gateway patterns:
 
 * xref:agent-runtime-operator:agent-gateways:how-to-guide.adoc[] - Set up agent gateways to manage routing to agents
 * xref:agent-runtime-operator:ai-gateways:how-to-guide.adoc[] - Set up AI gateways to manage routing from agents to LLMs
+* xref:agent-runtime-operator:tool-gateways:how-to-guide.adoc[] - Set up tool gateways to manage routing from agents to tools
 
 == Reference
 
