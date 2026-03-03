@@ -59,6 +59,24 @@ spec:
                 items:
                   type: string
                 type: array
+              commonMetadata:
+                description: |-
+                  CommonMetadata defines labels and annotations to be applied to the Deployment and Service
+                  resources created for this tool server, as well as the pod template.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               env:
                 description: Env defines additional environment variables to be injected
                   into the tool server container
@@ -276,6 +294,24 @@ spec:
                   Must start with "/" if specified
                 pattern: ^/.*
                 type: string
+              podMetadata:
+                description: |-
+                  PodMetadata defines labels and annotations to be applied only to the pod template
+                  of the Deployment created for this tool server.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               port:
                 description: |-
                   Port is the port number for http/sse transports

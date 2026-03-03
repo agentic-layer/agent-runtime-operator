@@ -209,8 +209,12 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 			}
 		}
 
-		// Set selector labels for the pod template respectively
-		deployment.Spec.Template.Labels = selectorLabels
+		// Build pod template labels: user commonMetadata + user podMetadata, then enforce selector labels
+		podTemplateLabels, podTemplateAnnotations := buildPodTemplateMetadata(
+			selectorLabels, agent.Spec.CommonMetadata, agent.Spec.PodMetadata,
+		)
+		deployment.Spec.Template.Labels = podTemplateLabels
+		deployment.Spec.Template.Annotations = podTemplateAnnotations
 
 		// Set replicas
 		if deployment.Spec.Replicas == nil {
@@ -220,10 +224,11 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 			*deployment.Spec.Replicas = *agent.Spec.Replicas
 		}
 
-		// Merge managed labels (preserving unmanaged labels)
+		// Merge managed labels and user commonMetadata labels (preserving unmanaged labels)
 		if deployment.Labels == nil {
 			deployment.Labels = make(map[string]string)
 		}
+		applyCommonMetadataToObjectMeta(&deployment.ObjectMeta, agent.Spec.CommonMetadata)
 		maps.Copy(deployment.Labels, managedLabels)
 
 		// Update agent container fields
@@ -316,10 +321,11 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 			})
 		}
 
-		// Merge managed labels (preserving unmanaged labels)
+		// Merge managed labels and user commonMetadata labels (preserving unmanaged labels)
 		if service.Labels == nil {
 			service.Labels = make(map[string]string)
 		}
+		applyCommonMetadataToObjectMeta(&service.ObjectMeta, agent.Spec.CommonMetadata)
 		maps.Copy(service.Labels, managedLabels)
 
 		// Update service spec

@@ -39,6 +39,24 @@ spec:
           spec:
             description: ToolGatewaySpec defines the desired state of ToolGateway
             properties:
+              commonMetadata:
+                description: |-
+                  CommonMetadata defines labels and annotations to be applied to the Deployment and Service
+                  resources created for this gateway, as well as the pod template.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               env:
                 description: |-
                   Environment variables to pass to the ToolGateway container.
@@ -247,6 +265,24 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
+              podMetadata:
+                description: |-
+                  PodMetadata defines labels and annotations to be applied only to the pod template
+                  of the Deployment created for this gateway.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               toolGatewayClassName:
                 description: |-
                   ToolGatewayClassName specifies which ToolGatewayClass to use for this gateway instance.

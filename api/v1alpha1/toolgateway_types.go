@@ -36,6 +36,16 @@ type ToolGatewaySpec struct {
 	// This allows loading variables from ConfigMaps and Secrets.
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// CommonMetadata defines labels and annotations to be applied to the Deployment and Service
+	// resources created for this gateway, as well as the pod template.
+	// +optional
+	CommonMetadata *EmbeddedMetadata `json:"commonMetadata,omitempty"`
+
+	// PodMetadata defines labels and annotations to be applied only to the pod template
+	// of the Deployment created for this gateway.
+	// +optional
+	PodMetadata *EmbeddedMetadata `json:"podMetadata,omitempty"`
 }
 
 // ToolGatewayStatus defines the observed state of ToolGateway
