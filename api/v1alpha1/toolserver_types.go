@@ -89,6 +89,16 @@ type ToolServerSpec struct {
 	// If Namespace is not specified, defaults to the same namespace as the ToolServer.
 	// +optional
 	ToolGatewayRef *corev1.ObjectReference `json:"toolGatewayRef,omitempty"`
+
+	// CommonMetadata defines labels and annotations to be applied to the Deployment and Service
+	// resources created for this tool server, as well as the pod template.
+	// +optional
+	CommonMetadata *EmbeddedMetadata `json:"commonMetadata,omitempty"`
+
+	// PodMetadata defines labels and annotations to be applied only to the pod template
+	// of the Deployment created for this tool server.
+	// +optional
+	PodMetadata *EmbeddedMetadata `json:"podMetadata,omitempty"`
 }
 
 // ToolServerStatus defines the observed state of ToolServer.

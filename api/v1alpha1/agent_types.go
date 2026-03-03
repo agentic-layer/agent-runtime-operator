@@ -182,6 +182,16 @@ type AgentSpec struct {
 	// Resources defines the compute resource requirements for the agent container.
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// CommonMetadata defines labels and annotations to be applied to the Deployment and Service
+	// resources created for this agent, as well as the pod template.
+	// +optional
+	CommonMetadata *EmbeddedMetadata `json:"commonMetadata,omitempty"`
+
+	// PodMetadata defines labels and annotations to be applied only to the pod template
+	// of the Deployment created for this agent.
+	// +optional
+	PodMetadata *EmbeddedMetadata `json:"podMetadata,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent.

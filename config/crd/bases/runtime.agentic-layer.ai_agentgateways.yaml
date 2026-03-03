@@ -44,6 +44,24 @@ spec:
                   AgentGatewayClassName specifies which AgentGatewayClass to use for this gateway instance.
                   This is only needed if multiple gateway classes are defined in the cluster.
                 type: string
+              commonMetadata:
+                description: |-
+                  CommonMetadata defines labels and annotations to be applied to the Deployment and Service
+                  resources created for this gateway, as well as the pod template.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               env:
                 description: |-
                   Environment variables to pass to the AgentGateway container.
@@ -252,6 +270,24 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
+              podMetadata:
+                description: |-
+                  PodMetadata defines labels and annotations to be applied only to the pod template
+                  of the Deployment created for this gateway.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               replicas:
                 default: 1
                 description: Replicas is the number of gateway replicas

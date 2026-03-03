@@ -185,8 +185,12 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 			}
 		}
 
-		// Set selector labels for the pod template
-		deployment.Spec.Template.Labels = selectorLabels
+		// Build pod template labels: user commonMetadata + user podMetadata, then enforce selector labels
+		podTemplateLabels, podTemplateAnnotations := buildPodTemplateMetadata(
+			selectorLabels, toolServer.Spec.CommonMetadata, toolServer.Spec.PodMetadata,
+		)
+		deployment.Spec.Template.Labels = podTemplateLabels
+		deployment.Spec.Template.Annotations = podTemplateAnnotations
 
 		// Set/update replicas
 		if deployment.Spec.Replicas == nil {
@@ -198,10 +202,11 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 			*deployment.Spec.Replicas = 1
 		}
 
-		// Merge managed labels (preserving unmanaged labels)
+		// Merge managed labels and user commonMetadata labels (preserving unmanaged labels)
 		if deployment.Labels == nil {
 			deployment.Labels = make(map[string]string)
 		}
+		applyCommonMetadataToObjectMeta(&deployment.ObjectMeta, toolServer.Spec.CommonMetadata)
 		maps.Copy(deployment.Labels, managedLabels)
 
 		// Update toolserver container fields
@@ -273,6 +278,7 @@ func (r *ToolServerReconciler) ensureService(ctx context.Context, toolServer *ru
 		if service.Labels == nil {
 			service.Labels = make(map[string]string)
 		}
+		applyCommonMetadataToObjectMeta(&service.ObjectMeta, toolServer.Spec.CommonMetadata)
 		maps.Copy(service.Labels, managedLabels)
 
 		// Update service spec

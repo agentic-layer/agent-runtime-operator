@@ -90,6 +90,24 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              commonMetadata:
+                description: |-
+                  CommonMetadata defines labels and annotations to be applied to the Deployment and Service
+                  resources created for this agent, as well as the pod template.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               description:
                 description: |-
                   Description provides a description of the agent.
@@ -329,6 +347,24 @@ spec:
                   This is passed as AGENT_MODEL environment variable to the agent.
                   Defaults to the agents default model if not specified.
                 type: string
+              podMetadata:
+                description: |-
+                  PodMetadata defines labels and annotations to be applied only to the pod template
+                  of the Deployment created for this agent.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is a map of key/value pairs to be applied
+                      to the resource.
+                    type: object
+                type: object
               protocols:
                 description: Protocols defines the protocols supported by the agent
                 items:
