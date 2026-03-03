@@ -129,10 +129,25 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.updateAgentStatusReady(ctx, &agent, aiGateway)
-	}); err != nil {
-		return ctrl.Result{}, err
+	// Fetch the managed deployment to reflect its actual readiness in the Agent status
+	deployment := &appsv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deployment); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get deployment for status check: %w", err)
+	}
+
+	deploymentReady, notReadyReason, notReadyMessage := getDeploymentReadiness(deployment)
+	if deploymentReady {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.updateAgentStatusReady(ctx, &agent, aiGateway)
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.updateAgentStatusDeploymentNotReady(ctx, &agent, aiGateway, notReadyReason, notReadyMessage)
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	log.V(1).Info("Reconciled Agent")

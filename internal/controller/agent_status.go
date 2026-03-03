@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +54,77 @@ func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *run
 		Status:             metav1.ConditionTrue,
 		Reason:             "Reconciled",
 		Message:            "Agent is ready",
+		ObservedGeneration: agent.Generation,
+	})
+
+	if err := r.Status().Update(ctx, agent); err != nil {
+		return fmt.Errorf("failed to update agent status: %w", err)
+	}
+
+	return nil
+}
+
+// getDeploymentReadiness inspects the deployment status conditions and returns an aggregated
+// readiness state. Returns (true, "", "") when the deployment is available, or (false, reason,
+// message) with a user-friendly, aggregated message when it is not.
+func getDeploymentReadiness(deployment *appsv1.Deployment) (bool, string, string) {
+	// ReplicaFailure indicates pod creation failures (e.g. missing referenced Secrets/ConfigMaps)
+	for _, condition := range deployment.Status.Conditions {
+		if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
+			return false, "DeploymentNotReady", "Deployment not ready: Referenced resources missing"
+		}
+	}
+
+	// ProgressDeadlineExceeded indicates the deployment could not complete within the deadline
+	for _, condition := range deployment.Status.Conditions {
+		if condition.Type == appsv1.DeploymentProgressing &&
+			condition.Status == corev1.ConditionFalse &&
+			condition.Reason == "ProgressDeadlineExceeded" {
+			return false, "DeploymentNotReady", "Deployment not ready: Deployment failed to progress"
+		}
+	}
+
+	// Available condition reports whether minimum replicas are up
+	for _, condition := range deployment.Status.Conditions {
+		if condition.Type == appsv1.DeploymentAvailable {
+			if condition.Status == corev1.ConditionTrue {
+				return true, "", ""
+			}
+			return false, "DeploymentNotReady", "Deployment not ready: Insufficient replicas available"
+		}
+	}
+
+	// No conditions yet – deployment was just created and has not been evaluated
+	return false, "DeploymentNotReady", "Deployment not ready: Waiting for deployment to become available"
+}
+
+// updateAgentStatusDeploymentNotReady sets the Ready condition to False due to a deployment-level
+// issue while still populating the URL and AiGatewayRef so that the agent remains discoverable.
+func (r *AgentReconciler) updateAgentStatusDeploymentNotReady(ctx context.Context, agent *runtimev1alpha1.Agent, aiGateway *runtimev1alpha1.AiGateway, reason, message string) error {
+	log := logf.FromContext(ctx)
+	log.V(1).Info("Updating agent status: deployment not ready", "reason", reason)
+
+	// Keep the A2A URL so the agent remains discoverable (spec is valid, pods just aren't ready)
+	agent.Status.Url = buildA2AAgentCardUrl(agent)
+
+	// Keep AiGatewayRef – the gateway association is still valid
+	if aiGateway != nil {
+		agent.Status.AiGatewayRef = &corev1.ObjectReference{
+			APIVersion: aiGateway.APIVersion,
+			Kind:       aiGateway.Kind,
+			Name:       aiGateway.Name,
+			Namespace:  aiGateway.Namespace,
+		}
+	} else {
+		agent.Status.AiGatewayRef = nil
+	}
+
+	// Set Ready condition to False with the deployment-specific reason
+	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionFalse,
+		Reason:             reason,
+		Message:            message,
 		ObservedGeneration: agent.Generation,
 	})
 

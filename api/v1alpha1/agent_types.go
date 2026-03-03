@@ -203,6 +203,7 @@ type AgentStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="AI Gateway",type=string,JSONPath=".status.aiGatewayRef.name"
 
 // Agent is the Schema for the agents API.
