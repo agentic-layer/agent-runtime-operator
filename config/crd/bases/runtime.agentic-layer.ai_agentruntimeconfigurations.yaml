@@ -18,6 +18,9 @@ spec:
     - jsonPath: .spec.agentTemplateImages.googleAdk
       name: Google ADK Image
       type: string
+    - jsonPath: .spec.agentTemplateImages.msaf
+      name: MSAF Image
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -57,6 +60,11 @@ spec:
                   googleAdk:
                     description: |-
                       GoogleAdk is the template image for the Google ADK framework.
+                      If not specified, the operator's built-in default will be used.
+                    type: string
+                  msaf:
+                    description: |-
+                      Msaf is the template image for the Microsoft Agent Framework (MSAF).
                       If not specified, the operator's built-in default will be used.
                     type: string
                 type: object

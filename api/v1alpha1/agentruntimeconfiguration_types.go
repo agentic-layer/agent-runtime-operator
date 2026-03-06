@@ -35,9 +35,10 @@ type AgentTemplateImages struct {
 	// +optional
 	GoogleAdk string `json:"googleAdk,omitempty"`
 
-	// Additional framework images can be added here in the future, e.g.:
-	// LangChain string `json:"langChain,omitempty"`
-	// CrewAI string `json:"crewAi,omitempty"`
+	// Msaf is the template image for the Microsoft Agent Framework (MSAF).
+	// If not specified, the operator's built-in default will be used.
+	// +optional
+	Msaf string `json:"msaf,omitempty"`
 }
 
 // AgentRuntimeConfigurationStatus defines the observed state of AgentRuntimeConfiguration.
@@ -50,6 +51,7 @@ type AgentRuntimeConfigurationStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Google ADK Image",type=string,JSONPath=`.spec.agentTemplateImages.googleAdk`
+// +kubebuilder:printcolumn:name="MSAF Image",type=string,JSONPath=`.spec.agentTemplateImages.msaf`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // AgentRuntimeConfiguration is the Schema for the agentruntimeconfigurations API.

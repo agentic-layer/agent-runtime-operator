@@ -319,7 +319,7 @@ var _ = Describe("Agent Webhook", func() {
 				By("verifying that validation fails")
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("framework \"custom\" requires a custom image"))
-				Expect(err.Error()).To(ContainSubstring("Template agents are only supported for \"google-adk\" framework"))
+				Expect(err.Error()).To(ContainSubstring("Template agents are only supported for frameworks: google-adk, msaf"))
 				Expect(warnings).To(BeEmpty())
 			})
 

@@ -104,7 +104,7 @@ type AgentTool struct {
 // AgentSpec defines the desired state of Agent.
 type AgentSpec struct {
 	// Framework defines the supported agent frameworks
-	// +kubebuilder:validation:Enum=google-adk;custom
+	// +kubebuilder:validation:Enum=google-adk;msaf;custom
 	// +optional
 	Framework string `json:"framework,omitempty"`
 

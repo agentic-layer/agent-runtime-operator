@@ -34,6 +34,7 @@ import (
 
 const (
 	googleAdkFramework = "google-adk"
+	msafFramework      = "msaf"
 )
 
 // agentlog is for logging in this package.
@@ -54,6 +55,7 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 			DefaultReplicas:      1,
 			DefaultPort:          8080,
 			DefaultPortGoogleAdk: 8000,
+			DefaultPortMsaf:      8000,
 			Recorder:             mgr.GetEventRecorder("agent-defaulter-webhook"),
 		}).
 		WithValidator(&AgentCustomValidator{}).
@@ -72,6 +74,7 @@ type AgentCustomDefaulter struct {
 	DefaultReplicas      int32
 	DefaultPort          int32
 	DefaultPortGoogleAdk int32
+	DefaultPortMsaf      int32
 	Recorder             events.EventRecorder
 }
 
@@ -119,6 +122,8 @@ func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
 	switch framework {
 	case googleAdkFramework:
 		return d.DefaultPortGoogleAdk
+	case msafFramework:
+		return d.DefaultPortMsaf
 	default:
 		return d.DefaultPort // Default port for unknown frameworks
 	}
@@ -159,11 +164,15 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 	var allErrs field.ErrorList
 
 	// Validate framework and image combination
-	if agent.Spec.Image == "" && agent.Spec.Framework != googleAdkFramework {
+	templateFrameworks := map[string]bool{
+		googleAdkFramework: true,
+		msafFramework:      true,
+	}
+	if agent.Spec.Image == "" && !templateFrameworks[agent.Spec.Framework] {
 		allErrs = append(allErrs, field.Invalid(
 			field.NewPath("spec", "framework"),
 			agent.Spec.Framework,
-			fmt.Sprintf("framework %q requires a custom image. Template agents are only supported for %q framework", agent.Spec.Framework, googleAdkFramework),
+			fmt.Sprintf("framework %q requires a custom image. Template agents are only supported for frameworks: %s", agent.Spec.Framework, "google-adk, msaf"),
 		))
 	}
 

@@ -44,7 +44,9 @@ const (
 	agentContainerName           = "agent"
 	agentCardEndpoint            = "/.well-known/agent-card.json"
 	googleAdkFramework           = "google-adk"
+	msafFramework                = "msaf"
 	defaultTemplateImageAdk      = "ghcr.io/agentic-layer/agent-template-adk:0.8.0"
+	defaultTemplateImageMsaf     = "ghcr.io/agentic-layer/agent-template-msaf:0.1.0"
 	defaultTemplateImageFallback = "invalid"
 )
 
@@ -490,6 +492,10 @@ func (r *AgentReconciler) getTemplateImage(framework string, config *runtimev1al
 			if config.Spec.AgentTemplateImages.GoogleAdk != "" {
 				return config.Spec.AgentTemplateImages.GoogleAdk
 			}
+		case msafFramework:
+			if config.Spec.AgentTemplateImages.Msaf != "" {
+				return config.Spec.AgentTemplateImages.Msaf
+			}
 		}
 	}
 
@@ -497,6 +503,8 @@ func (r *AgentReconciler) getTemplateImage(framework string, config *runtimev1al
 	switch framework {
 	case googleAdkFramework:
 		return defaultTemplateImageAdk
+	case msafFramework:
+		return defaultTemplateImageMsaf
 	default:
 		// Validation will catch unsupported frameworks without images
 		// This shouldn't be reached due to validation, but set template as fallback

@@ -8,3 +8,5 @@ spec:
     # Customize the default template image for Google ADK framework agents
     # This will be used when an Agent resource does not specify a custom image
     googleAdk: "ghcr.io/agentic-layer/agent-template-adk:0.8.0"
+    # Customize the default template image for Microsoft Agent Framework (MSAF) agents
+    msaf: "ghcr.io/agentic-layer/agent-template-msaf:0.1.0"

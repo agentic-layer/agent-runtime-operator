@@ -329,6 +329,7 @@ spec:
                 description: Framework defines the supported agent frameworks
                 enum:
                 - google-adk
+                - msaf
                 - custom
                 type: string
               image:
