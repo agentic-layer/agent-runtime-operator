@@ -54,10 +54,9 @@ var _ = Describe("Agent Webhook", func() {
 		ctx = context.Background()
 		recorder = events.NewFakeRecorder(10)
 		defaulter = AgentCustomDefaulter{
-			DefaultReplicas:      1,
-			DefaultPort:          8080,
-			DefaultPortGoogleAdk: 8000,
-			Recorder:             recorder,
+			DefaultReplicas: 1,
+			DefaultPort:     8000,
+			Recorder:        recorder,
 		}
 		validator = AgentCustomValidator{}
 		obj = &runtimev1alpha1.Agent{
@@ -124,7 +123,7 @@ var _ = Describe("Agent Webhook", func() {
 
 			By("verifying that default port is set")
 			Expect(obj.Spec.Protocols).To(HaveLen(1))
-			Expect(obj.Spec.Protocols[0].Port).To(Equal(int32(8080)))
+			Expect(obj.Spec.Protocols[0].Port).To(Equal(int32(8000)))
 		})
 
 		It("Should not override existing port", func() {
@@ -145,7 +144,7 @@ var _ = Describe("Agent Webhook", func() {
 		It("Should set default protocol name when not specified", func() {
 			By("setting up a protocol without name")
 			obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
-				{Type: runtimev1alpha1.A2AProtocol, Port: 8080},
+				{Type: runtimev1alpha1.A2AProtocol, Port: 8000},
 			}
 
 			By("calling the Default method")
@@ -153,13 +152,13 @@ var _ = Describe("Agent Webhook", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying that protocol name is generated with lowercase")
-			Expect(obj.Spec.Protocols[0].Name).To(Equal("a2a-8080"))
+			Expect(obj.Spec.Protocols[0].Name).To(Equal("a2a-8000"))
 		})
 
 		It("Should not override existing protocol name", func() {
 			By("setting up a protocol with custom name")
 			obj.Spec.Protocols = []runtimev1alpha1.AgentProtocol{
-				{Type: runtimev1alpha1.A2AProtocol, Port: 8080, Name: "custom-name"},
+				{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Name: "custom-name"},
 			}
 
 			By("calling the Default method")
@@ -227,6 +226,9 @@ var _ = Describe("Agent Webhook", func() {
 				err := defaulter.Default(ctx, emptyAgent)
 				Expect(err).NotTo(HaveOccurred())
 
+				By("verifying that framework is NOT defaulted (resolved at controller time)")
+				Expect(emptyAgent.Spec.Framework).To(BeEmpty())
+
 				By("verifying that default replicas are set")
 				Expect(emptyAgent.Spec.Replicas).NotTo(BeNil())
 				Expect(*emptyAgent.Spec.Replicas).To(Equal(int32(1)))
@@ -234,8 +236,9 @@ var _ = Describe("Agent Webhook", func() {
 				By("verifying that protocol list is populated with default protocol")
 				Expect(emptyAgent.Spec.Protocols).To(HaveLen(1))
 				Expect(emptyAgent.Spec.Protocols[0].Type).To(Equal(runtimev1alpha1.A2AProtocol))
-				Expect(emptyAgent.Spec.Protocols[0].Name).To(Equal("a2a-8080"))
-				Expect(emptyAgent.Spec.Protocols[0].Port).To(Equal(int32(8080)))
+				// Port is resolved using the fallback default framework (google-adk) for port defaulting
+				Expect(emptyAgent.Spec.Protocols[0].Name).To(Equal("a2a-8000"))
+				Expect(emptyAgent.Spec.Protocols[0].Port).To(Equal(int32(8000)))
 			})
 
 			It("Should handle multiple protocols with mixed configurations", func() {

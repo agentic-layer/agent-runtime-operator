@@ -22,6 +22,14 @@ import (
 
 // AgentRuntimeConfigurationSpec defines the desired state of AgentRuntimeConfiguration.
 type AgentRuntimeConfigurationSpec struct {
+	// DefaultFramework defines the default agent framework to use when an Agent resource
+	// does not specify a framework. When this value changes, all agents without an explicit
+	// framework will be updated to use the new default.
+	// If not specified, the operator defaults to "google-adk".
+	// +kubebuilder:validation:Enum=google-adk;msaf
+	// +optional
+	DefaultFramework string `json:"defaultFramework,omitempty"`
+
 	// AgentTemplateImages defines the default template images for different agent frameworks.
 	// These images are used when an Agent resource does not specify a custom image.
 	// +optional
@@ -50,6 +58,7 @@ type AgentRuntimeConfigurationStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Default Framework",type=string,JSONPath=`.spec.defaultFramework`
 // +kubebuilder:printcolumn:name="Google ADK Image",type=string,JSONPath=`.spec.agentTemplateImages.googleAdk`
 // +kubebuilder:printcolumn:name="MSAF Image",type=string,JSONPath=`.spec.agentTemplateImages.msaf`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"

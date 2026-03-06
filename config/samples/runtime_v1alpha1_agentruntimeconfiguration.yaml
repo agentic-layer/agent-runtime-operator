@@ -4,6 +4,10 @@ metadata:
   name: default
   namespace: agent-runtime-operator-system
 spec:
+  # Default framework used for agents that don't specify one explicitly.
+  # When changed, all agents without an explicit framework will be updated.
+  # Supported values: google-adk, msaf, custom
+  defaultFramework: "google-adk"
   agentTemplateImages:
     # Customize the default template image for Google ADK framework agents
     # This will be used when an Agent resource does not specify a custom image

@@ -51,12 +51,9 @@ type AgentWebhookConfig struct {
 func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &runtimev1alpha1.Agent{}).
 		WithDefaulter(&AgentCustomDefaulter{
-			DefaultFramework:     googleAdkFramework,
-			DefaultReplicas:      1,
-			DefaultPort:          8080,
-			DefaultPortGoogleAdk: 8000,
-			DefaultPortMsaf:      8000,
-			Recorder:             mgr.GetEventRecorder("agent-defaulter-webhook"),
+			DefaultReplicas: 1,
+			DefaultPort:     8000,
+			Recorder:        mgr.GetEventRecorder("agent-defaulter-webhook"),
 		}).
 		WithValidator(&AgentCustomValidator{}).
 		Complete()
@@ -70,12 +67,9 @@ func SetupAgentWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
 type AgentCustomDefaulter struct {
-	DefaultFramework     string
-	DefaultReplicas      int32
-	DefaultPort          int32
-	DefaultPortGoogleAdk int32
-	DefaultPortMsaf      int32
-	Recorder             events.EventRecorder
+	DefaultReplicas int32
+	DefaultPort     int32
+	Recorder        events.EventRecorder
 }
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Agent.
@@ -89,10 +83,9 @@ func (d *AgentCustomDefaulter) Default(_ context.Context, agent *runtimev1alpha1
 
 // applyDefaults applies default values to the Agent.
 func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
-	// Set default framework if not specified
-	if agent.Spec.Framework == "" {
-		agent.Spec.Framework = d.DefaultFramework
-	}
+	// Note: Framework is intentionally NOT defaulted here. When left empty, the controller
+	// resolves the effective framework from AgentRuntimeConfiguration.spec.defaultFramework.
+	// This allows changing the default framework in the config to propagate to all agents.
 
 	// Set default replicas if not specified
 	if agent.Spec.Replicas == nil {
@@ -110,22 +103,11 @@ func (d *AgentCustomDefaulter) applyDefaults(agent *runtimev1alpha1.Agent) {
 	// Set default ports for protocols if not specified
 	for i, protocol := range agent.Spec.Protocols {
 		if protocol.Port == 0 {
-			agent.Spec.Protocols[i].Port = d.frameworkDefaultPort(agent.Spec.Framework)
+			agent.Spec.Protocols[i].Port = d.DefaultPort
 		}
 		if protocol.Name == "" {
 			agent.Spec.Protocols[i].Name = fmt.Sprintf("%s-%d", sanitizeForPortName(protocol.Type), agent.Spec.Protocols[i].Port)
 		}
-	}
-}
-
-func (d *AgentCustomDefaulter) frameworkDefaultPort(framework string) int32 {
-	switch framework {
-	case googleAdkFramework:
-		return d.DefaultPortGoogleAdk
-	case msafFramework:
-		return d.DefaultPortMsaf
-	default:
-		return d.DefaultPort // Default port for unknown frameworks
 	}
 }
 
@@ -164,11 +146,12 @@ func (v *AgentCustomValidator) validateAgent(agent *runtimev1alpha1.Agent) (admi
 	var allErrs field.ErrorList
 
 	// Validate framework and image combination
+	// Empty framework is allowed - the controller resolves it from AgentRuntimeConfiguration.
 	templateFrameworks := map[string]bool{
 		googleAdkFramework: true,
 		msafFramework:      true,
 	}
-	if agent.Spec.Image == "" && !templateFrameworks[agent.Spec.Framework] {
+	if agent.Spec.Framework != "" && agent.Spec.Image == "" && !templateFrameworks[agent.Spec.Framework] {
 		allErrs = append(allErrs, field.Invalid(
 			field.NewPath("spec", "framework"),
 			agent.Spec.Framework,

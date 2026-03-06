@@ -15,6 +15,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.defaultFramework
+      name: Default Framework
+      type: string
     - jsonPath: .spec.agentTemplateImages.googleAdk
       name: Google ADK Image
       type: string
@@ -68,6 +71,16 @@ spec:
                       If not specified, the operator's built-in default will be used.
                     type: string
                 type: object
+              defaultFramework:
+                description: |-
+                  DefaultFramework defines the default agent framework to use when an Agent resource
+                  does not specify a framework. When this value changes, all agents without an explicit
+                  framework will be updated to use the new default.
+                  If not specified, the operator defaults to "google-adk".
+                enum:
+                - google-adk
+                - msaf
+                type: string
             type: object
           status:
             description: AgentRuntimeConfigurationStatus defines the observed state

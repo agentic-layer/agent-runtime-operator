@@ -650,6 +650,113 @@ var _ = Describe("Agent Controller", func() {
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(agentImage))
 		})
 
+		It("should use default framework from AgentRuntimeConfiguration when agent has no framework", func() {
+			config := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config-default-fw",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					DefaultFramework: "msaf",
+				},
+			}
+			Expect(k8sClient.Create(ctx, config)).To(Succeed())
+
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-default-fw",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					// No framework specified - should use config's defaultFramework
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-default-fw", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-default-fw", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			// Should use MSAF template image since defaultFramework is msaf
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(defaultTemplateImageMsaf))
+			// Labels should reflect the effective framework
+			Expect(deployment.Labels["framework"]).To(Equal("msaf"))
+		})
+
+		It("should fall back to google-adk when agent has no framework and config has no defaultFramework", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-fallback-fw",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					// No framework specified, no config exists
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-fallback-fw", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-fallback-fw", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			// Should fall back to google-adk built-in default
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(defaultTemplateImageAdk))
+			Expect(deployment.Labels["framework"]).To(Equal("google-adk"))
+		})
+
+		It("should use agent's explicit framework even when config has a different default", func() {
+			config := &runtimev1alpha1.AgentRuntimeConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config-explicit-fw",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentRuntimeConfigurationSpec{
+					DefaultFramework: "msaf",
+				},
+			}
+			Expect(k8sClient.Create(ctx, config)).To(Succeed())
+
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent-explicit-fw",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk", // Explicit framework should override config default
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/", Name: "a2a"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-agent-explicit-fw", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-explicit-fw", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			// Should use google-adk image since agent explicitly specifies it
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(defaultTemplateImageAdk))
+			Expect(deployment.Labels["framework"]).To(Equal("google-adk"))
+		})
+
 		It("should fail reconciliation when multiple AgentRuntimeConfigurations exist", func() {
 			config1 := &runtimev1alpha1.AgentRuntimeConfiguration{
 				ObjectMeta: metav1.ObjectMeta{

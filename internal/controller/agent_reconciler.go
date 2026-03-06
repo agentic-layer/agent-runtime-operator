@@ -166,11 +166,14 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		},
 	}
 
+	// Resolve the effective framework (from agent spec or config default)
+	effectiveFramework := resolveEffectiveFramework(agent, runtimeConfig)
+
 	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
 			"app":       agent.Name,
-			"framework": agent.Spec.Framework,
+			"framework": effectiveFramework,
 		}
 
 		// Selector labels (immutable)
@@ -248,7 +251,7 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 			container.Image = agent.Spec.Image
 		} else {
 			// Use image from runtime configuration if available, otherwise use built-in defaults
-			container.Image = r.getTemplateImage(agent.Spec.Framework, runtimeConfig)
+			container.Image = r.getTemplateImage(effectiveFramework, runtimeConfig)
 		}
 		container.Ports = containerPorts
 		container.Env = allEnvVars
@@ -303,8 +306,7 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
-			"app":       agent.Name,
-			"framework": agent.Spec.Framework,
+			"app": agent.Name,
 		}
 
 		// Service selector (stable labels only)
@@ -480,6 +482,20 @@ func isNoMatchError(err error) bool {
 	}
 	// Check for "no matches for kind" error which occurs when CRD is not installed
 	return meta.IsNoMatchError(err)
+}
+
+// resolveEffectiveFramework returns the effective framework for an agent.
+// If the agent specifies a framework explicitly, that is used.
+// Otherwise, the default framework from AgentRuntimeConfiguration is used.
+// If no configuration exists, falls back to the built-in default (google-adk).
+func resolveEffectiveFramework(agent *runtimev1alpha1.Agent, config *runtimev1alpha1.AgentRuntimeConfiguration) string {
+	if agent.Spec.Framework != "" {
+		return agent.Spec.Framework
+	}
+	if config != nil && config.Spec.DefaultFramework != "" {
+		return config.Spec.DefaultFramework
+	}
+	return googleAdkFramework
 }
 
 // getTemplateImage returns the appropriate template image for the given framework.
