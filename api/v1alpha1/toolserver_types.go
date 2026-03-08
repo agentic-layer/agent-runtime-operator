@@ -39,6 +39,10 @@ type ToolServerSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
 
+	// ImagePullSecrets is a list of references to secrets for pulling the tool server container image.
+	// +optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	// Command overrides the container's ENTRYPOINT.
 	// If not specified, the container image's ENTRYPOINT is used.
 	// Follows the same semantics as Kubernetes Pod containers.

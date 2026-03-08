@@ -97,6 +97,71 @@ var _ = Describe("ToolServer Resources", func() {
 		})
 	})
 
+	Describe("ImagePullSecrets Configuration", func() {
+		It("should propagate imagePullSecrets to the deployment pod template spec", func() {
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-imagepullsecrets-toolserver",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					TransportType: "http",
+					Image:         "image:tag",
+					Port:          8080,
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{Name: "my-registry-secret"},
+						{Name: "another-secret"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-imagepullsecrets-toolserver",
+					Namespace: "default",
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-imagepullsecrets-toolserver", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.ImagePullSecrets).To(ConsistOf(
+				corev1.LocalObjectReference{Name: "my-registry-secret"},
+				corev1.LocalObjectReference{Name: "another-secret"},
+			))
+		})
+
+		It("should have no imagePullSecrets when not specified", func() {
+			toolServer := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-no-imagepullsecrets-toolserver",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					TransportType: "http",
+					Image:         "image:tag",
+					Port:          8080,
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolServer)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-no-imagepullsecrets-toolserver",
+					Namespace: "default",
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-no-imagepullsecrets-toolserver", Namespace: "default"}, deployment)).To(Succeed())
+			Expect(deployment.Spec.Template.Spec.ImagePullSecrets).To(BeEmpty())
+		})
+	})
+
 	Describe("Custom Resource Configuration", func() {
 		It("should use custom resource requests and limits when specified", func() {
 			customResources := &corev1.ResourceRequirements{

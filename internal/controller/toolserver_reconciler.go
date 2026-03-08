@@ -229,6 +229,8 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 		container.ReadinessProbe = r.buildReadinessProbe(toolServer.Spec.Port)
 		container.Resources = getOrDefaultToolServerResourceRequirements(toolServer)
 
+		deployment.Spec.Template.Spec.ImagePullSecrets = toolServer.Spec.ImagePullSecrets
+
 		// Set owner reference
 		return ctrl.SetControllerReference(toolServer, deployment, r.Scheme)
 	}); err != nil {
