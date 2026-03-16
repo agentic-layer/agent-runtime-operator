@@ -34,5 +34,11 @@ resources:
 - agent_admin_role.yaml
 - agent_editor_role.yaml
 - agent_viewer_role.yaml
+- guard_admin_role.yaml
+- guard_editor_role.yaml
+- guard_viewer_role.yaml
+- guardrailprovider_admin_role.yaml
+- guardrailprovider_editor_role.yaml
+- guardrailprovider_viewer_role.yaml
 
 

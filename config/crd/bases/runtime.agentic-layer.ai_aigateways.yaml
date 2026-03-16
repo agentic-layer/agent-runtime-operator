@@ -290,6 +290,26 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
+              guardrails:
+                description: |-
+                  Guardrails lists the Guard resources to be applied to requests through this AI gateway.
+                  Guards are applied in the order they are listed.
+                items:
+                  description: GuardRef is a reference to a Guard resource.
+                  properties:
+                    name:
+                      description: Name is the name of the Guard resource.
+                      minLength: 1
+                      type: string
+                    namespace:
+                      description: |-
+                        Namespace is the namespace of the Guard resource.
+                        If not specified, defaults to the same namespace as the AiGateway.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               podMetadata:
                 description: |-
                   PodMetadata defines labels and annotations to be applied only to the pod template

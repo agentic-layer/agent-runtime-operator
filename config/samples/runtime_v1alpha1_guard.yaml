@@ -1,0 +1,27 @@
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Guard
+metadata:
+  name: pii-guard
+  namespace: default
+spec:
+  name: pii-detection
+  version: "1.0.0"
+  mode: pre_call
+  description: Detects and handles Personally Identifiable Information (PII) in user inputs.
+  providerRef:
+    name: openai-moderation
+    namespace: default
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Guard
+metadata:
+  name: toxic-language-guard
+  namespace: default
+spec:
+  name: toxic-language
+  mode: pre_call
+  description: Detects and blocks toxic or harmful language in user inputs.
+  providerRef:
+    name: openai-moderation
+    namespace: default

@@ -1,0 +1,21 @@
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: GuardrailProvider
+metadata:
+  name: openai-moderation
+  namespace: default
+spec:
+  protocol: openai-moderation
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: GuardrailProvider
+metadata:
+  name: custom-openai-moderation
+  namespace: default
+spec:
+  protocol: openai-moderation
+  transportType: http
+  backendRef:
+    name: custom-guardrail-backend
+    namespace: default
+    port: 8080

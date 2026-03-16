@@ -82,4 +82,20 @@ resources:
   kind: ToolGatewayClass
   path: github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: agentic-layer.ai
+  group: runtime
+  kind: Guard
+  path: github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: agentic-layer.ai
+  group: runtime
+  kind: GuardrailProvider
+  path: github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"
