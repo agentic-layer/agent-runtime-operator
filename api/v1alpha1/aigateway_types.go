@@ -48,6 +48,11 @@ type AiGatewaySpec struct {
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
+	// Guardrails lists the Guard resources to be applied to requests through this AI gateway.
+	// Guards are applied in the order they are listed.
+	// +optional
+	Guardrails []corev1.ObjectReference `json:"guardrails,omitempty"`
+
 	// CommonMetadata defines labels and annotations to be applied to the Deployment and Service
 	// resources created for this gateway, as well as the pod template.
 	// +optional
@@ -59,6 +64,7 @@ type AiGatewaySpec struct {
 	PodMetadata *EmbeddedMetadata `json:"podMetadata,omitempty"`
 }
 
+// AiModel is an AI model configuration.
 type AiModel struct {
 	// Name is the identifier for the AI model (e.g., "gpt-4", "claude-3-opus")
 	// +kubebuilder:validation:Required

@@ -1,0 +1,41 @@
+---
+# Create the API key secret before applying this sample:
+# kubectl create secret generic openai-api-key --from-literal=api-key=<your-openai-api-key>
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: GuardrailProvider
+metadata:
+  name: openai-moderation
+  namespace: default
+spec:
+  protocol: openai-moderation
+  apiKeySecretRef:
+    name: openai-api-key
+    key: api-key
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: GuardrailProvider
+metadata:
+  name: custom-openai-moderation
+  namespace: default
+spec:
+  protocol: openai-moderation
+  transportType: http
+  backendRef:
+    kind: Service
+    name: custom-guardrail-backend
+    namespace: default
+    port: 8080
+---
+# Create the API key secret before applying this sample:
+# kubectl create secret generic guardrail-api-key --from-literal=api-key=<your-api-key>
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: GuardrailProvider
+metadata:
+  name: external-guardrail-provider
+  namespace: default
+spec:
+  protocol: openai-moderation
+  externalUrl: https://api.example.com/guardrails
+  apiKeySecretRef:
+    name: guardrail-api-key
+    key: api-key
