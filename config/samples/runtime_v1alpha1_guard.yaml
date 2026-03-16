@@ -10,6 +10,7 @@ spec:
   mode: pre_call
   description: Detects and handles Personally Identifiable Information (PII) in user inputs.
   providerRef:
+    kind: GuardrailProvider
     name: openai-moderation
     namespace: default
 ---
@@ -23,5 +24,6 @@ spec:
   mode: pre_call
   description: Detects and blocks toxic or harmful language in user inputs.
   providerRef:
+    kind: GuardrailProvider
     name: openai-moderation
     namespace: default

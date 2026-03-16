@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,6 +26,11 @@ type GuardrailProviderSpec struct {
 	// Protocol defines the guardrail protocol used by this provider.
 	// +kubebuilder:validation:Enum=openai-moderation;bedrock
 	Protocol string `json:"protocol"`
+
+	// ApiKeySecretRef references a Kubernetes Secret containing the API key for the guardrail provider.
+	// The secret must contain the key specified in the SecretKeySelector.
+	// +optional
+	ApiKeySecretRef *corev1.SecretKeySelector `json:"apiKeySecretRef,omitempty"`
 
 	// TransportType defines the transport used to communicate with the guardrail backend.
 	// Required when BackendRef is specified.
@@ -35,20 +41,21 @@ type GuardrailProviderSpec struct {
 	// BackendRef references the Kubernetes Service acting as the guardrail backend.
 	// When omitted, the provider uses the protocol's default managed endpoint
 	// (e.g., the official OpenAI moderation API or AWS Bedrock).
+	// Mutually exclusive with ExternalUrl.
 	// +optional
 	BackendRef *GuardrailBackendRef `json:"backendRef,omitempty"`
+
+	// ExternalUrl specifies an external URL for the guardrail backend.
+	// Use this to point to an external guardrail service outside the cluster.
+	// Mutually exclusive with BackendRef.
+	// +optional
+	// +kubebuilder:validation:Format=uri
+	ExternalUrl string `json:"externalUrl,omitempty"`
 }
 
 // GuardrailBackendRef references a Kubernetes Service acting as the guardrail backend.
 type GuardrailBackendRef struct {
-	// Name is the name of the Kubernetes Service.
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// Namespace is the namespace of the Kubernetes Service.
-	// If not specified, defaults to the same namespace as the GuardrailProvider.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
+	corev1.ObjectReference `json:",inline"`
 
 	// Port is the port number of the Kubernetes Service.
 	// +kubebuilder:validation:Minimum=1

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -41,19 +42,7 @@ type GuardSpec struct {
 
 	// ProviderRef references the GuardrailProvider that hosts this guard.
 	// If Namespace is not specified, defaults to the same namespace as the Guard.
-	ProviderRef GuardrailProviderRef `json:"providerRef"`
-}
-
-// GuardrailProviderRef is a reference to a GuardrailProvider resource.
-type GuardrailProviderRef struct {
-	// Name is the name of the GuardrailProvider.
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// Namespace is the namespace of the GuardrailProvider.
-	// If not specified, defaults to the same namespace as the Guard.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
+	ProviderRef corev1.ObjectReference `json:"providerRef"`
 }
 
 // GuardStatus defines the observed state of Guard.

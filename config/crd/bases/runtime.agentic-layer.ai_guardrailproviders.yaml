@@ -39,20 +39,65 @@ spec:
           spec:
             description: GuardrailProviderSpec defines the desired state of GuardrailProvider.
             properties:
+              apiKeySecretRef:
+                description: |-
+                  ApiKeySecretRef references a Kubernetes Secret containing the API key for the guardrail provider.
+                  The secret must contain the key specified in the SecretKeySelector.
+                properties:
+                  key:
+                    description: The key of the secret to select from.  Must be a
+                      valid secret key.
+                    type: string
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  optional:
+                    description: Specify whether the Secret or its key must be defined
+                    type: boolean
+                required:
+                - key
+                type: object
+                x-kubernetes-map-type: atomic
               backendRef:
                 description: |-
                   BackendRef references the Kubernetes Service acting as the guardrail backend.
                   When omitted, the provider uses the protocol's default managed endpoint
                   (e.g., the official OpenAI moderation API or AWS Bedrock).
+                  Mutually exclusive with ExternalUrl.
                 properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
                   name:
-                    description: Name is the name of the Kubernetes Service.
-                    minLength: 1
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                   namespace:
                     description: |-
-                      Namespace is the namespace of the Kubernetes Service.
-                      If not specified, defaults to the same namespace as the GuardrailProvider.
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
                     type: string
                   port:
                     description: Port is the port number of the Kubernetes Service.
@@ -60,10 +105,27 @@ spec:
                     maximum: 65535
                     minimum: 1
                     type: integer
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
                 required:
-                - name
                 - port
                 type: object
+                x-kubernetes-map-type: atomic
+              externalUrl:
+                description: |-
+                  ExternalUrl specifies an external URL for the guardrail backend.
+                  Use this to point to an external guardrail service outside the cluster.
+                  Mutually exclusive with BackendRef.
+                format: uri
+                type: string
               protocol:
                 description: Protocol defines the guardrail protocol used by this
                   provider.
