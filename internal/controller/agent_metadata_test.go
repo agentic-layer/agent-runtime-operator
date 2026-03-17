@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -38,8 +39,9 @@ var _ = Describe("Agent Metadata", func() {
 
 	BeforeEach(func() {
 		reconciler = &AgentReconciler{
-			Client: k8sClient,
-			Scheme: k8sClient.Scheme(),
+			Client:   k8sClient,
+			Scheme:   k8sClient.Scheme(),
+			Recorder: &events.FakeRecorder{},
 		}
 		Expect(os.Setenv("POD_NAMESPACE", "default")).To(Succeed())
 	})

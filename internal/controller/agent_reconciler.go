@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,7 +54,8 @@ const (
 // AgentReconciler reconciles a Agent object
 type AgentReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder events.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents,verbs=get;list;watch;create;update;patch;delete
@@ -100,6 +102,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, &agent)
 	if err != nil {
 		log.Error(err, "Failed to resolve subAgents")
+		r.emitEvent(&agent, corev1.EventTypeWarning, "ReconcileFailed", "ReconcileSubAgents", "Failed to resolve subAgents: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -107,6 +110,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	resolvedTools, err := r.resolveAllTools(ctx, &agent)
 	if err != nil {
 		log.Error(err, "Failed to resolve tools")
+		r.emitEvent(&agent, corev1.EventTypeWarning, "ReconcileFailed", "ResolveTools", "Failed to resolve tools: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -118,18 +122,21 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if statusErr := r.updateAgentStatusNotReady(ctx, &agent, "MissingAiGateway", err.Error()); statusErr != nil {
 			log.Error(statusErr, "Failed to update status after AiGateway resolution failure")
 		}
+		r.emitEvent(&agent, corev1.EventTypeWarning, "ReconcileFailed", "ResolveAiGateway", "Failed to resolve AiGateway: %v", err)
 		return ctrl.Result{}, err
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway, runtimeConfig)
 	}); err != nil {
+		r.emitEvent(&agent, corev1.EventTypeWarning, "ReconcileFailed", "EnsureDeployment", "Failed to reconcile Deployment: %v", err)
 		return ctrl.Result{}, err
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		return r.ensureService(ctx, &agent)
 	}); err != nil {
+		r.emitEvent(&agent, corev1.EventTypeWarning, "ReconcileFailed", "EnsureService", "Failed to reconcile Service: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -138,6 +145,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	r.emitEvent(&agent, corev1.EventTypeNormal, "Updated", "Reconciled", "Agent reconciled successfully")
 
 	log.V(1).Info("Reconciled Agent")
 
@@ -267,8 +276,12 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		return ctrl.SetControllerReference(agent, deployment, r.Scheme)
 	}); err != nil {
 		return err
-	} else if op != controllerutil.OperationResultNone {
+	} else if op == controllerutil.OperationResultCreated {
 		log.Info("Deployment reconciled", "operation", op, "obj", *deployment)
+		r.emitEvent(agent, corev1.EventTypeNormal, "Created", "CreateDeployment", "Deployment %s created", deployment.Name)
+	} else if op == controllerutil.OperationResultUpdated {
+		log.Info("Deployment reconciled", "operation", op, "obj", *deployment)
+		r.emitEvent(agent, corev1.EventTypeNormal, "Updated", "UpdateDeployment", "Deployment %s updated", deployment.Name)
 	} else {
 		log.V(1).Info("Deployment up to date")
 	}
@@ -341,8 +354,12 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 		return ctrl.SetControllerReference(agent, service, r.Scheme)
 	}); err != nil {
 		return err
-	} else if op != controllerutil.OperationResultNone {
+	} else if op == controllerutil.OperationResultCreated {
 		log.Info("Service reconciled", "operation", op, "obj", *service)
+		r.emitEvent(agent, corev1.EventTypeNormal, "Created", "CreateService", "Service %s created", service.Name)
+	} else if op == controllerutil.OperationResultUpdated {
+		log.Info("Service reconciled", "operation", op, "obj", *service)
+		r.emitEvent(agent, corev1.EventTypeNormal, "Updated", "UpdateService", "Service %s updated", service.Name)
 	} else {
 		log.V(1).Info("Service up to date")
 	}
@@ -435,6 +452,13 @@ func getOrDefaultResourceRequirements(agent *runtimev1alpha1.Agent) corev1.Resou
 			corev1.ResourceMemory: resource.MustParse("500Mi"),
 			corev1.ResourceCPU:    resource.MustParse("500m"),
 		},
+	}
+}
+
+// emitEvent records a Kubernetes event on the given object if a Recorder is configured.
+func (r *AgentReconciler) emitEvent(regarding runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	if r.Recorder != nil {
+		r.Recorder.Eventf(regarding, nil, eventtype, reason, action, note, args...)
 	}
 }
 
