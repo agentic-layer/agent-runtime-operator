@@ -23,44 +23,62 @@ import (
 
 // GuardrailProviderSpec defines the desired state of GuardrailProvider.
 type GuardrailProviderSpec struct {
-	// Protocol defines the guardrail protocol used by this provider.
-	// +kubebuilder:validation:Enum=openai-moderation;bedrock
-	Protocol string `json:"protocol"`
+	// Type defines the guardrail API type implemented by this provider.
+	// Each type corresponds to a specific guardrail API contract.
+	// +kubebuilder:validation:Enum=openai-moderation-api;bedrock-api;presidio-api
+	Type string `json:"type"`
 
-	// ApiKeySecretRef references a Kubernetes Secret containing the API key for the guardrail provider.
-	// The secret must contain the key specified in the SecretKeySelector.
+	// OpenAIModeration holds configuration for providers implementing the OpenAI Moderation API.
+	// Required when type is "openai-moderation-api".
 	// +optional
-	ApiKeySecretRef *corev1.SecretKeySelector `json:"apiKeySecretRef,omitempty"`
+	OpenAIModeration *OpenAIModerationProviderConfig `json:"openaiModeration,omitempty"`
 
-	// TransportType defines the transport used to communicate with the guardrail backend.
-	// Required when BackendRef is specified.
-	// +kubebuilder:validation:Enum=http;grpc;envoy-ext-proc
+	// Bedrock holds configuration for providers implementing the AWS Bedrock Guardrails API.
+	// Required when type is "bedrock-api".
 	// +optional
-	TransportType string `json:"transportType,omitempty"`
+	Bedrock *BedrockProviderConfig `json:"bedrock,omitempty"`
 
-	// BackendRef references the Kubernetes Service acting as the guardrail backend.
-	// When omitted, the provider uses the protocol's default managed endpoint
-	// (e.g., the official OpenAI moderation API or AWS Bedrock).
-	// Mutually exclusive with ExternalUrl.
+	// Presidio holds configuration for providers implementing the Presidio API.
+	// Required when type is "presidio-api".
 	// +optional
-	BackendRef *GuardrailBackendRef `json:"backendRef,omitempty"`
-
-	// ExternalUrl specifies an external URL for the guardrail backend.
-	// Use this to point to an external guardrail service outside the cluster.
-	// Mutually exclusive with BackendRef.
-	// +optional
-	// +kubebuilder:validation:Format=uri
-	ExternalUrl string `json:"externalUrl,omitempty"`
+	Presidio *PresidioProviderConfig `json:"presidio,omitempty"`
 }
 
-// GuardrailBackendRef references a Kubernetes Service acting as the guardrail backend.
-type GuardrailBackendRef struct {
-	corev1.ObjectReference `json:",inline"`
+// OpenAIModerationProviderConfig holds configuration for the OpenAI Moderation API.
+type OpenAIModerationProviderConfig struct {
+	// BaseUrl overrides the default OpenAI moderation endpoint.
+	// When omitted, the official OpenAI moderation API is used.
+	// Can also point to a custom service implementing the same API contract.
+	// +optional
+	// +kubebuilder:validation:Format=uri
+	BaseUrl string `json:"baseUrl,omitempty"`
 
-	// Port is the port number of the Kubernetes Service.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	Port int32 `json:"port"`
+	// ApiKeySecretRef references the secret containing the API key.
+	// +optional
+	ApiKeySecretRef *corev1.SecretKeySelector `json:"apiKeySecretRef,omitempty"`
+}
+
+// BedrockProviderConfig holds configuration for the AWS Bedrock Guardrails API.
+type BedrockProviderConfig struct {
+	// Region is the AWS region for the Bedrock service.
+	Region string `json:"region"`
+
+	// CredentialsSecretRef references a secret containing AWS credentials.
+	// The secret should contain "aws-access-key-id" and "aws-secret-access-key" keys.
+	// When omitted, uses IRSA or pod identity for authentication.
+	// +optional
+	CredentialsSecretRef *corev1.SecretReference `json:"credentialsSecretRef,omitempty"`
+}
+
+// PresidioProviderConfig holds configuration for the Presidio Analyzer API.
+type PresidioProviderConfig struct {
+	// BaseUrl is the Presidio analyzer service endpoint.
+	// +kubebuilder:validation:Format=uri
+	BaseUrl string `json:"baseUrl"`
+
+	// ApiKeySecretRef references the secret containing the API key for the Presidio service.
+	// +optional
+	ApiKeySecretRef *corev1.SecretKeySelector `json:"apiKeySecretRef,omitempty"`
 }
 
 // GuardrailProviderStatus defines the observed state of GuardrailProvider.

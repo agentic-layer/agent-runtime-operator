@@ -39,24 +39,72 @@ spec:
           spec:
             description: GuardSpec defines the desired state of Guard.
             properties:
+              bedrock:
+                description: Bedrock holds guard-level configuration for the AWS Bedrock
+                  Guardrails API.
+                properties:
+                  guardrailId:
+                    description: GuardrailId is the identifier of the Bedrock guardrail.
+                    type: string
+                  guardrailVersion:
+                    description: GuardrailVersion is the version of the Bedrock guardrail.
+                    type: string
+                required:
+                - guardrailId
+                type: object
               description:
                 description: |-
                   Description provides a human-readable description of the guard's purpose.
                   This field is for documentation purposes only and has no effect on the guard's behavior.
                 type: string
               mode:
-                description: Mode defines when the guard is applied relative to the
-                  LLM call.
-                enum:
-                - pre_call
-                - post_call
-                - during_call
-                type: string
-              name:
-                description: Name is the identifier of the guard as known by the referenced
-                  GuardrailProvider.
-                minLength: 1
-                type: string
+                description: |-
+                  Mode defines when the guard is applied relative to the LLM call.
+                  Multiple modes can be specified to apply the guard at multiple points.
+                items:
+                  description: GuardMode defines when a guard is applied relative
+                    to the LLM call.
+                  enum:
+                  - pre_call
+                  - post_call
+                  - during_call
+                  type: string
+                minItems: 1
+                type: array
+                x-kubernetes-list-type: set
+              openaiModeration:
+                description: OpenAIModeration holds guard-level configuration for
+                  the OpenAI Moderation API.
+                properties:
+                  model:
+                    description: |-
+                      Model specifies the moderation model to use (e.g., "omni-moderation-latest").
+                      When omitted, the provider's default model is used.
+                    type: string
+                type: object
+              presidio:
+                description: Presidio holds guard-level configuration for the Presidio
+                  API.
+                properties:
+                  entities:
+                    description: |-
+                      Entities specifies which PII entity types to detect (e.g., "PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD").
+                      When omitted, all supported entities are detected.
+                    items:
+                      type: string
+                    type: array
+                  language:
+                    description: |-
+                      Language specifies the language of the text to analyze (e.g., "en").
+                      Defaults to "en" when omitted.
+                    type: string
+                  scoreThreshold:
+                    description: |-
+                      ScoreThreshold sets the minimum confidence score for detection (0.0 to 1.0).
+                      Serialized as a string to ensure consistent cross-language support (e.g., "0.7").
+                    pattern: ^(0(\.\d+)?|1(\.0+)?)$
+                    type: string
+                type: object
               providerRef:
                 description: |-
                   ProviderRef references the GuardrailProvider that hosts this guard.
@@ -102,13 +150,8 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              version:
-                description: Version is the version of the guard at the provider (if
-                  supported).
-                type: string
             required:
             - mode
-            - name
             - providerRef
             type: object
           status:

@@ -1,5 +1,6 @@
 ---
-# Create the API key secret before applying this sample:
+# OpenAI Moderation API using the official managed endpoint.
+# Create the API key secret before applying:
 # kubectl create secret generic openai-api-key --from-literal=api-key=<your-openai-api-key>
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: GuardrailProvider
@@ -7,35 +8,41 @@ metadata:
   name: openai-moderation
   namespace: default
 spec:
-  protocol: openai-moderation
-  apiKeySecretRef:
-    name: openai-api-key
-    key: api-key
+  type: openai-moderation-api
+  openaiModeration:
+    apiKeySecretRef:
+      name: openai-api-key
+      key: api-key
 ---
+# OpenAI Moderation API using a custom in-cluster service.
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: GuardrailProvider
 metadata:
   name: custom-openai-moderation
   namespace: default
 spec:
-  protocol: openai-moderation
-  transportType: http
-  backendRef:
-    kind: Service
-    name: custom-guardrail-backend
-    namespace: default
-    port: 8080
+  type: openai-moderation-api
+  openaiModeration:
+    baseUrl: http://custom-guardrail-backend.default.svc.cluster.local:8080
 ---
-# Create the API key secret before applying this sample:
-# kubectl create secret generic guardrail-api-key --from-literal=api-key=<your-api-key>
+# AWS Bedrock Guardrails API using IRSA for authentication.
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: GuardrailProvider
 metadata:
-  name: external-guardrail-provider
+  name: bedrock-guardrails
   namespace: default
 spec:
-  protocol: openai-moderation
-  externalUrl: https://api.example.com/guardrails
-  apiKeySecretRef:
-    name: guardrail-api-key
-    key: api-key
+  type: bedrock-api
+  bedrock:
+    region: us-east-1
+---
+# Presidio Analyzer API running in-cluster.
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: GuardrailProvider
+metadata:
+  name: presidio-analyzer
+  namespace: default
+spec:
+  type: presidio-api
+  presidio:
+    baseUrl: http://presidio-analyzer.default.svc.cluster.local:5001

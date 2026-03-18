@@ -5,10 +5,23 @@ metadata:
   name: pii-guard
   namespace: default
 spec:
-  name: pii-detection
-  version: "1.0.0"
-  mode: pre_call
+  mode: [pre_call]
   description: Detects and handles Personally Identifiable Information (PII) in user inputs.
+  providerRef:
+    kind: GuardrailProvider
+    name: openai-moderation
+    namespace: default
+  openaiModeration:
+    model: omni-moderation-latest
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Guard
+metadata:
+  name: toxic-language-guard
+  namespace: default
+spec:
+  mode: [pre_call]
+  description: Detects and blocks toxic or harmful language in user inputs.
   providerRef:
     kind: GuardrailProvider
     name: openai-moderation
@@ -17,13 +30,35 @@ spec:
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Guard
 metadata:
-  name: toxic-language-guard
+  name: bedrock-content-guard
   namespace: default
 spec:
-  name: toxic-language
-  mode: pre_call
-  description: Detects and blocks toxic or harmful language in user inputs.
+  mode: [pre_call]
+  description: Content filtering using AWS Bedrock Guardrails.
   providerRef:
     kind: GuardrailProvider
-    name: openai-moderation
+    name: bedrock-guardrails
     namespace: default
+  bedrock:
+    guardrailId: "abc123"
+    guardrailVersion: "1"
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Guard
+metadata:
+  name: presidio-pii-guard
+  namespace: default
+spec:
+  mode: [pre_call]
+  description: Detects PII using Presidio analyzer.
+  providerRef:
+    kind: GuardrailProvider
+    name: presidio-analyzer
+    namespace: default
+  presidio:
+    entities:
+      - PHONE_NUMBER
+      - EMAIL_ADDRESS
+      - CREDIT_CARD
+    language: en
+    scoreThreshold: "0.7"

@@ -21,19 +21,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// GuardMode defines when a guard is applied relative to the LLM call.
+// +kubebuilder:validation:Enum=pre_call;post_call;during_call
+type GuardMode string
+
+const (
+	GuardModePreCall    GuardMode = "pre_call"
+	GuardModePostCall   GuardMode = "post_call"
+	GuardModeDuringCall GuardMode = "during_call"
+)
+
 // GuardSpec defines the desired state of Guard.
 type GuardSpec struct {
-	// Name is the identifier of the guard as known by the referenced GuardrailProvider.
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// Version is the version of the guard at the provider (if supported).
-	// +optional
-	Version string `json:"version,omitempty"`
-
 	// Mode defines when the guard is applied relative to the LLM call.
-	// +kubebuilder:validation:Enum=pre_call;post_call;during_call
-	Mode string `json:"mode"`
+	// Multiple modes can be specified to apply the guard at multiple points.
+	// +kubebuilder:validation:MinItems=1
+	// +listType=set
+	Mode []GuardMode `json:"mode"`
 
 	// Description provides a human-readable description of the guard's purpose.
 	// This field is for documentation purposes only and has no effect on the guard's behavior.
@@ -43,6 +47,55 @@ type GuardSpec struct {
 	// ProviderRef references the GuardrailProvider that hosts this guard.
 	// If Namespace is not specified, defaults to the same namespace as the Guard.
 	ProviderRef corev1.ObjectReference `json:"providerRef"`
+
+	// OpenAIModeration holds guard-level configuration for the OpenAI Moderation API.
+	// +optional
+	OpenAIModeration *OpenAIModerationGuardConfig `json:"openaiModeration,omitempty"`
+
+	// Bedrock holds guard-level configuration for the AWS Bedrock Guardrails API.
+	// +optional
+	Bedrock *BedrockGuardConfig `json:"bedrock,omitempty"`
+
+	// Presidio holds guard-level configuration for the Presidio API.
+	// +optional
+	Presidio *PresidioGuardConfig `json:"presidio,omitempty"`
+}
+
+// OpenAIModerationGuardConfig holds guard-level configuration for the OpenAI Moderation API.
+type OpenAIModerationGuardConfig struct {
+	// Model specifies the moderation model to use (e.g., "omni-moderation-latest").
+	// When omitted, the provider's default model is used.
+	// +optional
+	Model string `json:"model,omitempty"`
+}
+
+// BedrockGuardConfig holds guard-level configuration for the AWS Bedrock Guardrails API.
+type BedrockGuardConfig struct {
+	// GuardrailId is the identifier of the Bedrock guardrail.
+	GuardrailId string `json:"guardrailId"`
+
+	// GuardrailVersion is the version of the Bedrock guardrail.
+	// +optional
+	GuardrailVersion string `json:"guardrailVersion,omitempty"`
+}
+
+// PresidioGuardConfig holds guard-level configuration for the Presidio API.
+type PresidioGuardConfig struct {
+	// Entities specifies which PII entity types to detect (e.g., "PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD").
+	// When omitted, all supported entities are detected.
+	// +optional
+	Entities []string `json:"entities,omitempty"`
+
+	// Language specifies the language of the text to analyze (e.g., "en").
+	// Defaults to "en" when omitted.
+	// +optional
+	Language string `json:"language,omitempty"`
+
+	// ScoreThreshold sets the minimum confidence score for detection (0.0 to 1.0).
+	// Serialized as a string to ensure consistent cross-language support (e.g., "0.7").
+	// +optional
+	// +kubebuilder:validation:Pattern=`^(0(\.\d+)?|1(\.0+)?)$`
+	ScoreThreshold string `json:"scoreThreshold,omitempty"`
 }
 
 // GuardStatus defines the observed state of Guard.

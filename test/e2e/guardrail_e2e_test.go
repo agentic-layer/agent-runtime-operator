@@ -61,10 +61,15 @@ var _ = Describe("Guardrails", Ordered, func() {
 			"-n", guardrailNamespace))
 		Expect(err).NotTo(HaveOccurred(), "custom-openai-moderation GuardrailProvider should exist")
 
-		By("verifying external-guardrail-provider exists")
-		_, err = utils.Run(exec.Command("kubectl", "get", "guardrailprovider", "external-guardrail-provider",
+		By("verifying bedrock-guardrails provider exists")
+		_, err = utils.Run(exec.Command("kubectl", "get", "guardrailprovider", "bedrock-guardrails",
 			"-n", guardrailNamespace))
-		Expect(err).NotTo(HaveOccurred(), "external-guardrail-provider GuardrailProvider should exist")
+		Expect(err).NotTo(HaveOccurred(), "bedrock-guardrails GuardrailProvider should exist")
+
+		By("verifying presidio-analyzer provider exists")
+		_, err = utils.Run(exec.Command("kubectl", "get", "guardrailprovider", "presidio-analyzer",
+			"-n", guardrailNamespace))
+		Expect(err).NotTo(HaveOccurred(), "presidio-analyzer GuardrailProvider should exist")
 	})
 
 	It("should successfully apply Guard resources", func() {
@@ -77,5 +82,15 @@ var _ = Describe("Guardrails", Ordered, func() {
 		_, err = utils.Run(exec.Command("kubectl", "get", "guard", "toxic-language-guard",
 			"-n", guardrailNamespace))
 		Expect(err).NotTo(HaveOccurred(), "toxic-language-guard Guard should exist")
+
+		By("verifying bedrock-content-guard exists")
+		_, err = utils.Run(exec.Command("kubectl", "get", "guard", "bedrock-content-guard",
+			"-n", guardrailNamespace))
+		Expect(err).NotTo(HaveOccurred(), "bedrock-content-guard Guard should exist")
+
+		By("verifying presidio-pii-guard exists")
+		_, err = utils.Run(exec.Command("kubectl", "get", "guard", "presidio-pii-guard",
+			"-n", guardrailNamespace))
+		Expect(err).NotTo(HaveOccurred(), "presidio-pii-guard Guard should exist")
 	})
 })
