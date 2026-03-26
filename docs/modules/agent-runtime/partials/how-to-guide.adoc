@@ -88,6 +88,59 @@ kubectl get crd agents.runtime.agentic-layer.ai
 
 You should see the operator pod running and the Agent CRD available.
 
+== Configure the Operator
+
+After installation, you can customize operator-wide defaults using the `AgentRuntimeConfiguration` resource. This is optional — the operator works with built-in defaults if no configuration is provided.
+
+`AgentRuntimeConfiguration` is a namespace-scoped resource that must be created in the operator's namespace (`agent-runtime-operator-system`). Only one instance is allowed per operator namespace.
+
+=== When to use AgentRuntimeConfiguration
+
+* You want to change the default agent framework used when an `Agent` resource does not specify one
+* You want to pin specific versions of the template images used for template-based agents
+
+=== Create an AgentRuntimeConfiguration
+
+[source,bash]
+----
+cat <<EOF | kubectl apply -f -
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentRuntimeConfiguration
+metadata:
+  name: default
+  namespace: agent-runtime-operator-system
+spec:
+  defaultFramework: "google-adk"
+  agentTemplateImages:
+    googleAdk: "ghcr.io/agentic-layer/agent-template-adk:0.8.0"
+    msaf: "ghcr.io/agentic-layer/agent-template-msaf:0.1.0"
+EOF
+----
+
+=== Configuration fields
+
+`defaultFramework`:: The framework used when an `Agent` resource does not specify one. Supported values: `google-adk`, `msaf`. When this field changes, all agents without an explicit framework are automatically re-reconciled.
+
+`agentTemplateImages`:: Custom container images for template-based agents, keyed by framework. If a framework entry is omitted, the operator falls back to its built-in default image for that framework.
++
+[cols="1,3"]
+|===
+|Field |Description
+
+|`googleAdk`
+|Image used for template-based agents with the `google-adk` framework
+
+|`msaf`
+|Image used for template-based agents with the `msaf` framework
+|===
+
+=== Verify the configuration
+
+[source,bash]
+----
+kubectl get agentruntimeconfiguration default -n agent-runtime-operator-system
+----
+
 == Next Steps
 
 Now that you have the Agent Runtime Operator installed, you can:
