@@ -86,24 +86,31 @@ spec:
                 description: Presidio holds guard-level configuration for the Presidio
                   API.
                 properties:
-                  entities:
-                    description: |-
-                      Entities specifies which PII entity types to detect (e.g., "PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD").
-                      When omitted, all supported entities are detected.
-                    items:
+                  entityActions:
+                    additionalProperties:
                       type: string
-                    type: array
+                    description: |-
+                      EntityActions maps PII entity types to actions to take when detected.
+                      Supported actions are "MASK" (redact the entity) and "BLOCK" (reject the request).
+                      When omitted, detected entities are blocked by default.
+                      The keys also determine which entity types are detected.
+                      When omitted entirely, all supported entities are detected.
+                      Example: {"EMAIL_ADDRESS": "MASK", "CREDIT_CARD": "BLOCK", "PHONE_NUMBER": "MASK"}
+                    type: object
                   language:
                     description: |-
                       Language specifies the language of the text to analyze (e.g., "en").
                       Defaults to "en" when omitted.
                     type: string
-                  scoreThreshold:
+                  scoreThresholds:
+                    additionalProperties:
+                      type: string
                     description: |-
-                      ScoreThreshold sets the minimum confidence score for detection (0.0 to 1.0).
-                      Serialized as a string to ensure consistent cross-language support (e.g., "0.7").
-                    pattern: ^(0(\.\d+)?|1(\.0+)?)$
-                    type: string
+                      ScoreThresholds maps entity types to minimum confidence scores (0.0 to 1.0).
+                      Use "ALL" as key to set a default threshold for all entity types.
+                      Per-entity thresholds override the "ALL" key.
+                      Example: {"ALL": "0.5", "EMAIL_ADDRESS": "0.8", "PHONE_NUMBER": "0.6"}
+                    type: object
                 type: object
               providerRef:
                 description: |-
