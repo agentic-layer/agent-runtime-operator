@@ -56,9 +56,17 @@ spec:
     name: presidio-analyzer
     namespace: default
   presidio:
-    entities:
-      - PHONE_NUMBER
-      - EMAIL_ADDRESS
-      - CREDIT_CARD
     language: en
-    scoreThreshold: "0.7"
+    # Per-entity score thresholds (0.0 to 1.0).
+    # Use "ALL" as a default for any entity not listed here.
+    scoreThresholds:
+      ALL: "0.7"
+      EMAIL_ADDRESS: "0.8"
+      US_SSN: "0.9"
+    # Per-entity actions: "MASK" redacts the entity, "BLOCK" rejects the request.
+    # The keys also determine which entity types are detected.
+    entityActions:
+      EMAIL_ADDRESS: "MASK"
+      PHONE_NUMBER: "MASK"
+      CREDIT_CARD: "BLOCK"
+      US_SSN: "BLOCK"

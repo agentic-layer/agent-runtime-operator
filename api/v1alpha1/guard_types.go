@@ -80,22 +80,36 @@ type BedrockGuardConfig struct {
 }
 
 // PresidioGuardConfig holds guard-level configuration for the Presidio API.
+//
+// For a full list of supported entity types, see:
+// https://microsoft.github.io/presidio/supported_entities/
+//
+// Common entity types include:
+//   - PERSON, EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD
+//   - IP_ADDRESS, URL, IBAN_CODE, LOCATION, DATE_TIME
+//   - US_SSN, US_PASSPORT, US_DRIVER_LICENSE, US_BANK_NUMBER
+//   - UK_NHS, UK_NINO, UK_PASSPORT
 type PresidioGuardConfig struct {
-	// Entities specifies which PII entity types to detect (e.g., "PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD").
-	// When omitted, all supported entities are detected.
-	// +optional
-	Entities []string `json:"entities,omitempty"`
-
 	// Language specifies the language of the text to analyze (e.g., "en").
 	// Defaults to "en" when omitted.
 	// +optional
 	Language string `json:"language,omitempty"`
 
-	// ScoreThreshold sets the minimum confidence score for detection (0.0 to 1.0).
-	// Serialized as a string to ensure consistent cross-language support (e.g., "0.7").
+	// ScoreThresholds maps entity types to minimum confidence scores (0.0 to 1.0).
+	// Use "ALL" as key to set a default threshold for all entity types.
+	// Per-entity thresholds override the "ALL" key.
+	// Example: {"ALL": "0.5", "EMAIL_ADDRESS": "0.8", "PHONE_NUMBER": "0.6"}
 	// +optional
-	// +kubebuilder:validation:Pattern=`^(0(\.\d+)?|1(\.0+)?)$`
-	ScoreThreshold string `json:"scoreThreshold,omitempty"`
+	ScoreThresholds map[string]string `json:"scoreThresholds,omitempty"`
+
+	// EntityActions maps PII entity types to actions to take when detected.
+	// Supported actions are "MASK" (redact the entity) and "BLOCK" (reject the request).
+	// When omitted, detected entities are blocked by default.
+	// The keys also determine which entity types are detected.
+	// When omitted entirely, all supported entities are detected.
+	// Example: {"EMAIL_ADDRESS": "MASK", "CREDIT_CARD": "BLOCK", "PHONE_NUMBER": "MASK"}
+	// +optional
+	EntityActions map[string]string `json:"entityActions,omitempty"`
 }
 
 // GuardStatus defines the observed state of Guard.
