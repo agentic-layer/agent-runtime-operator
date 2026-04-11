@@ -55,6 +55,11 @@ type AgentGatewaySpec struct {
 	// of the Deployment created for this gateway.
 	// +optional
 	PodMetadata *EmbeddedMetadata `json:"podMetadata,omitempty"`
+
+	// Guardrails lists the Guard resources to be applied to traffic through this gateway.
+	// Guards are applied in the order they are listed.
+	// +optional
+	Guardrails []corev1.ObjectReference `json:"guardrails,omitempty"`
 }
 
 // AgentGatewayStatus defines the observed state of AgentGateway
