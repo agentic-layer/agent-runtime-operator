@@ -302,7 +302,7 @@ var _ = Describe("Agent Config", func() {
 			// Verify LITELLM_PROXY_API_KEY is set
 			proxyKeyVar := findEnvVar(envVars, "LITELLM_PROXY_API_KEY")
 			Expect(proxyKeyVar).NotTo(BeNil())
-			Expect(proxyKeyVar.Value).To(Equal("NOT_USED_BY_GATEWAY"))
+			Expect(proxyKeyVar.Value).To(Equal("default/gateway-agent"))
 
 			// Verify USE_LITELLM_PROXY is set
 			useLiteLLMVar := findEnvVar(envVars, "USE_LITELLM_PROXY")

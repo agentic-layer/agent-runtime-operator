@@ -364,7 +364,7 @@ var _ = Describe("Agent Controller", func() {
 
 			proxyKeyVar := findEnvVar(container.Env, "LITELLM_PROXY_API_KEY")
 			Expect(proxyKeyVar).NotTo(BeNil())
-			Expect(proxyKeyVar.Value).To(Equal("NOT_USED_BY_GATEWAY"))
+			Expect(proxyKeyVar.Value).To(Equal("default/test-gateway-env-vars"))
 
 			useLiteLLMVar := findEnvVar(container.Env, "USE_LITELLM_PROXY")
 			Expect(useLiteLLMVar).NotTo(BeNil())

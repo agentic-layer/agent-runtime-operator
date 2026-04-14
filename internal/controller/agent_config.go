@@ -97,7 +97,7 @@ func buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgent
 		})
 		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 			Name:  "LITELLM_PROXY_API_KEY",
-			Value: "NOT_USED_BY_GATEWAY", // API key required by ADK but unused when connecting to AI Gateway
+			Value: fmt.Sprintf("%s/%s", agent.Namespace, agent.Name), // Pseudo API key used by LiteLLM for per-agent metrics
 		})
 		templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 			Name:  "USE_LITELLM_PROXY",
