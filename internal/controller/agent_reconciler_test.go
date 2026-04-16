@@ -131,6 +131,17 @@ var _ = Describe("Agent Controller", func() {
 			})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve"))
+
+			// Verify status is set to NotReady
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-missing-subagent", Namespace: "default"}, updatedAgent)).To(Succeed())
+			readyCondition := findReadyCondition(updatedAgent.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCondition.Reason).To(Equal("ReconciliationFailed"))
+			Expect(readyCondition.Message).To(ContainSubstring("failed to resolve"))
+			Expect(updatedAgent.Status.Url).To(BeEmpty())
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 
 		It("should fail when toolserver cannot be resolved", func() {
@@ -157,6 +168,17 @@ var _ = Describe("Agent Controller", func() {
 			})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to resolve"))
+
+			// Verify status is set to NotReady
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-missing-toolserver", Namespace: "default"}, updatedAgent)).To(Succeed())
+			readyCondition := findReadyCondition(updatedAgent.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCondition.Reason).To(Equal("ReconciliationFailed"))
+			Expect(readyCondition.Message).To(ContainSubstring("failed to resolve"))
+			Expect(updatedAgent.Status.Url).To(BeEmpty())
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 
 		It("should reconcile successfully with AiGateway and update status", func() {
@@ -803,6 +825,110 @@ var _ = Describe("Agent Controller", func() {
 			})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("multiple AgentRuntimeConfiguration resources found"))
+
+			// Verify status is set to NotReady
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-agent-multiple-configs", Namespace: "default"}, updatedAgent)).To(Succeed())
+			readyCondition := findReadyCondition(updatedAgent.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCondition.Reason).To(Equal("ReconciliationFailed"))
+			Expect(readyCondition.Message).To(ContainSubstring("multiple AgentRuntimeConfiguration"))
+			Expect(updatedAgent.Status.Url).To(BeEmpty())
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
+		})
+	})
+
+	Describe("Reconcile status on failure", func() {
+		It("should set status to NotReady when explicit AiGateway cannot be resolved", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-status-missing-aigateway",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/"},
+					},
+					AiGatewayRef: &corev1.ObjectReference{
+						Name:      "nonexistent-gateway",
+						Namespace: "default",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-status-missing-aigateway",
+					Namespace: "default",
+				},
+			})
+			Expect(err).To(HaveOccurred())
+
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-status-missing-aigateway", Namespace: "default"}, updatedAgent)).To(Succeed())
+
+			readyCondition := findReadyCondition(updatedAgent.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCondition.Reason).To(Equal("ReconciliationFailed"))
+			Expect(readyCondition.Message).To(ContainSubstring("failed to resolve AiGateway"))
+			Expect(updatedAgent.Status.Url).To(BeEmpty())
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
+		})
+
+		It("should transition status from Ready to NotReady when a dependency becomes unresolvable", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-status-transition",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{
+					Framework: "google-adk",
+					Image:     "test-image:latest",
+					Protocols: []runtimev1alpha1.AgentProtocol{
+						{Type: runtimev1alpha1.A2AProtocol, Port: 8000, Path: "/"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).To(Succeed())
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-status-transition", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify agent is Ready with URL populated
+			updatedAgent := &runtimev1alpha1.Agent{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-status-transition", Namespace: "default"}, updatedAgent)).To(Succeed())
+			readyCondition := findReadyCondition(updatedAgent.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(updatedAgent.Status.Url).NotTo(BeEmpty())
+
+			// Add a reference to a non-existent subAgent
+			updatedAgent.Spec.SubAgents = []runtimev1alpha1.SubAgent{
+				{Name: "missing-sub", AgentRef: &corev1.ObjectReference{Name: "nonexistent-agent"}},
+			}
+			Expect(k8sClient.Update(ctx, updatedAgent)).To(Succeed())
+
+			// Reconcile again - should fail
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test-status-transition", Namespace: "default"},
+			})
+			Expect(err).To(HaveOccurred())
+
+			// Verify agent transitioned to NotReady with URL cleared
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-status-transition", Namespace: "default"}, updatedAgent)).To(Succeed())
+			readyCondition = findReadyCondition(updatedAgent.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCondition.Reason).To(Equal("ReconciliationFailed"))
+			Expect(updatedAgent.Status.Url).To(BeEmpty())
+			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 	})
 })
