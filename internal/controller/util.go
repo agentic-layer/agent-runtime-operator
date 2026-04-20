@@ -88,3 +88,13 @@ func buildPodTemplateMetadata(
 	}
 	return podLabels, podAnnotations
 }
+
+// findReadyCondition returns the "Ready" condition from the given conditions slice, or nil if not found.
+func findReadyCondition(conditions []metav1.Condition) *metav1.Condition {
+	for i := range conditions {
+		if conditions[i].Type == "Ready" {
+			return &conditions[i]
+		}
+	}
+	return nil
+}

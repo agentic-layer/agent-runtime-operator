@@ -89,48 +89,16 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	log.V(1).Info("Reconciling Agent")
 
-	// Get agent runtime configuration (optional - returns nil if not found)
-	runtimeConfig, err := r.getAgentRuntimeConfiguration(ctx)
-	if err != nil {
-		log.Error(err, "Failed to get AgentRuntimeConfiguration")
-		return ctrl.Result{}, err
-	}
-
-	// Resolve subAgents early - fail fast if any cannot be resolved
-	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, &agent)
-	if err != nil {
-		log.Error(err, "Failed to resolve subAgents")
-		return ctrl.Result{}, err
-	}
-
-	// Resolve Tools from ToolServer references early - fail fast if any cannot be resolved
-	resolvedTools, err := r.resolveAllTools(ctx, &agent)
-	if err != nil {
-		log.Error(err, "Failed to resolve tools")
-		return ctrl.Result{}, err
-	}
-
-	// Resolve AiGateway (optional - returns nil if not found)
-	aiGateway, err := r.resolveAiGateway(ctx, &agent)
-	if err != nil {
-		log.Error(err, "Failed to resolve AiGateway")
-		// Update status to reflect missing AiGateway
-		if statusErr := r.updateAgentStatusNotReady(ctx, &agent, "MissingAiGateway", err.Error()); statusErr != nil {
-			log.Error(statusErr, "Failed to update status after AiGateway resolution failure")
+	// Run reconciliation and always update status based on outcome
+	aiGateway, reconcileErr := r.reconcileAgent(ctx, &agent)
+	if reconcileErr != nil {
+		log.Error(reconcileErr, "Reconciliation failed")
+		if statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.updateAgentStatusNotReady(ctx, &agent, "ReconciliationFailed", reconcileErr.Error())
+		}); statusErr != nil {
+			log.Error(statusErr, "Failed to update agent status to not ready")
 		}
-		return ctrl.Result{}, err
-	}
-
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.ensureDeployment(ctx, &agent, resolvedSubAgents, resolvedTools, aiGateway, runtimeConfig)
-	}); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.ensureService(ctx, &agent)
-	}); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, reconcileErr
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -142,6 +110,50 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	log.V(1).Info("Reconciled Agent")
 
 	return ctrl.Result{}, nil
+}
+
+// reconcileAgent performs the core reconciliation work: resolving dependencies,
+// ensuring the Deployment and Service. It returns the resolved AiGateway (may be nil)
+// and an error. The caller uses the error to set the CR status in a single place,
+// ensuring every error path is reflected in the CR status.
+func (r *AgentReconciler) reconcileAgent(ctx context.Context, agent *runtimev1alpha1.Agent) (*runtimev1alpha1.AiGateway, error) {
+	// Get agent runtime configuration (optional - returns nil if not found)
+	runtimeConfig, err := r.getAgentRuntimeConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve subAgents early - fail fast if any cannot be resolved
+	resolvedSubAgents, err := r.resolveAllSubAgents(ctx, agent)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve Tools from ToolServer references early - fail fast if any cannot be resolved
+	resolvedTools, err := r.resolveAllTools(ctx, agent)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve AiGateway (optional - returns nil if not found)
+	aiGateway, err := r.resolveAiGateway(ctx, agent)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.ensureDeployment(ctx, agent, resolvedSubAgents, resolvedTools, aiGateway, runtimeConfig)
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.ensureService(ctx, agent)
+	}); err != nil {
+		return nil, err
+	}
+
+	return aiGateway, nil
 }
 
 // ensureDeployment ensures the Deployment for the Agent exists and is up to date

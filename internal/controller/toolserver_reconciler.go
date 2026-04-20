@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -79,38 +80,50 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	log.Info("Reconciling ToolServer")
 
-	// Resolve ToolGateway (optional - returns nil if not found)
-	toolGateway, err := r.resolveToolGateway(ctx, &toolServer)
-	if err != nil {
-		log.Error(err, "Failed to resolve ToolGateway")
-		return ctrl.Result{}, err
-	}
-
-	// Ensure Deployment exists and is up to date for http/sse transports
-	if err := r.ensureDeployment(ctx, &toolServer); err != nil {
-		log.Error(err, "Failed to ensure Deployment")
-		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "DeploymentFailed", err.Error()); statusErr != nil {
-			log.Error(statusErr, "Failed to update status after deployment failure")
+	// Run reconciliation and always update status based on outcome
+	toolGateway, reconcileErr := r.reconcileToolServer(ctx, &toolServer)
+	if reconcileErr != nil {
+		log.Error(reconcileErr, "Reconciliation failed")
+		if statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.updateToolServerStatusNotReady(ctx, &toolServer, "ReconciliationFailed", reconcileErr.Error())
+		}); statusErr != nil {
+			log.Error(statusErr, "Failed to update tool server status to not ready")
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, reconcileErr
 	}
 
-	// Ensure Service exists and is up to date for http/sse transports
-	if err := r.ensureService(ctx, &toolServer); err != nil {
-		log.Error(err, "Failed to ensure Service")
-		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "ServiceFailed", err.Error()); statusErr != nil {
-			log.Error(statusErr, "Failed to update status after service failure")
-		}
-		return ctrl.Result{}, err
-	}
-
-	// Update ToolServer status to Ready (optimistic)
-	if err := r.updateToolServerStatusReady(ctx, &toolServer, toolGateway); err != nil {
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.updateToolServerStatusReady(ctx, &toolServer, toolGateway)
+	}); err != nil {
 		log.Error(err, "Failed to update ToolServer status")
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// reconcileToolServer performs the core reconciliation work: resolving the ToolGateway,
+// ensuring the Deployment and Service. It returns the resolved ToolGateway (may be nil)
+// and an error. The caller uses the error to set the CR status in a single place,
+// ensuring every error path is reflected in the CR status.
+func (r *ToolServerReconciler) reconcileToolServer(ctx context.Context, toolServer *runtimev1alpha1.ToolServer) (*runtimev1alpha1.ToolGateway, error) {
+	// Resolve ToolGateway (optional - returns nil if not found)
+	toolGateway, err := r.resolveToolGateway(ctx, toolServer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure Deployment exists and is up to date for http/sse transports
+	if err := r.ensureDeployment(ctx, toolServer); err != nil {
+		return nil, err
+	}
+
+	// Ensure Service exists and is up to date for http/sse transports
+	if err := r.ensureService(ctx, toolServer); err != nil {
+		return nil, err
+	}
+
+	return toolGateway, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

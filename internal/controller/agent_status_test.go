@@ -95,14 +95,7 @@ var _ = Describe("Agent Status", func() {
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-condition-ready", Namespace: "default"}, updatedAgent)).To(Succeed())
 
-			var condition *metav1.Condition
-			for i := range updatedAgent.Status.Conditions {
-				if updatedAgent.Status.Conditions[i].Type == "Ready" {
-					condition = &updatedAgent.Status.Conditions[i]
-					break
-				}
-			}
-
+			condition := findReadyCondition(updatedAgent.Status.Conditions)
 			Expect(condition).NotTo(BeNil())
 			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 			Expect(condition.Reason).To(Equal("Reconciled"))
@@ -206,14 +199,7 @@ var _ = Describe("Agent Status", func() {
 			updatedAgent := &runtimev1alpha1.Agent{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "agent-not-ready", Namespace: "default"}, updatedAgent)).To(Succeed())
 
-			var condition *metav1.Condition
-			for i := range updatedAgent.Status.Conditions {
-				if updatedAgent.Status.Conditions[i].Type == "Ready" {
-					condition = &updatedAgent.Status.Conditions[i]
-					break
-				}
-			}
-
+			condition := findReadyCondition(updatedAgent.Status.Conditions)
 			Expect(condition).NotTo(BeNil())
 			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(condition.Reason).To(Equal("MissingSubAgents"))

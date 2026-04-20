@@ -135,7 +135,7 @@ var _ = Describe("ToolServer Controller", func() {
 			expectedURL := "http://test-http-toolserver.default.svc.cluster.local:8080/mcp"
 			Expect(toolserver.Status.Url).To(Equal(expectedURL))
 			Expect(toolserver.Status.Conditions).NotTo(BeEmpty())
-			readyCondition := findCondition(toolserver.Status.Conditions, "Ready")
+			readyCondition := findReadyCondition(toolserver.Status.Conditions)
 			Expect(readyCondition).NotTo(BeNil())
 			Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
 		})
@@ -271,14 +271,126 @@ var _ = Describe("ToolServer Controller", func() {
 			Expect(toolserver.Status.Url).To(Equal(expectedURL))
 		})
 	})
-})
 
-// Helper function to find a condition by type
-func findCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
-	for i := range conditions {
-		if conditions[i].Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
+	Context("When reconciliation fails", func() {
+		ctx := context.Background()
+
+		AfterEach(func() {
+			toolServerList := &runtimev1alpha1.ToolServerList{}
+			Expect(k8sClient.List(ctx, toolServerList)).To(Succeed())
+			for i := range toolServerList.Items {
+				_ = k8sClient.Delete(ctx, &toolServerList.Items[i])
+			}
+		})
+
+		It("should set status to NotReady when explicit ToolGateway cannot be resolved", func() {
+			toolserver := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-toolserver-missing-gateway",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					TransportType: "http",
+					Image:         "python:3.11",
+					Port:          8080,
+					Path:          "/mcp",
+					ToolGatewayRef: &corev1.ObjectReference{
+						Name:      "nonexistent-gateway",
+						Namespace: "default",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolserver)).To(Succeed())
+
+			controllerReconciler := &ToolServerReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-toolserver-missing-gateway",
+					Namespace: "default",
+				},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to resolve ToolGateway"))
+
+			updatedToolServer := &runtimev1alpha1.ToolServer{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-toolserver-missing-gateway", Namespace: "default"}, updatedToolServer)).To(Succeed())
+
+			readyCondition := findReadyCondition(updatedToolServer.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCondition.Reason).To(Equal("ReconciliationFailed"))
+			Expect(readyCondition.Message).To(ContainSubstring("failed to resolve ToolGateway"))
+			Expect(updatedToolServer.Status.ToolGatewayRef).To(BeNil())
+			Expect(updatedToolServer.Status.GatewayUrl).To(BeEmpty())
+		})
+
+		It("should transition status from Ready to NotReady when ToolGateway reference becomes unresolvable", func() {
+			toolserver := &runtimev1alpha1.ToolServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-toolserver-transition",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.ToolServerSpec{
+					Protocol:      "mcp",
+					TransportType: "http",
+					Image:         "python:3.11",
+					Port:          8080,
+					Path:          "/mcp",
+				},
+			}
+			Expect(k8sClient.Create(ctx, toolserver)).To(Succeed())
+
+			controllerReconciler := &ToolServerReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-toolserver-transition",
+					Namespace: "default",
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify tool server is Ready with URL populated
+			updatedToolServer := &runtimev1alpha1.ToolServer{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-toolserver-transition", Namespace: "default"}, updatedToolServer)).To(Succeed())
+			readyCondition := findReadyCondition(updatedToolServer.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(updatedToolServer.Status.Url).NotTo(BeEmpty())
+
+			// Add explicit ToolGatewayRef to a non-existent gateway
+			updatedToolServer.Spec.ToolGatewayRef = &corev1.ObjectReference{
+				Name:      "nonexistent-gateway",
+				Namespace: "default",
+			}
+			Expect(k8sClient.Update(ctx, updatedToolServer)).To(Succeed())
+
+			// Reconcile again - should fail
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-toolserver-transition",
+					Namespace: "default",
+				},
+			})
+			Expect(err).To(HaveOccurred())
+
+			// Verify tool server transitioned to NotReady
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-toolserver-transition", Namespace: "default"}, updatedToolServer)).To(Succeed())
+			readyCondition = findReadyCondition(updatedToolServer.Status.Conditions)
+			Expect(readyCondition).NotTo(BeNil())
+			Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCondition.Reason).To(Equal("ReconciliationFailed"))
+			Expect(readyCondition.Message).To(ContainSubstring("failed to resolve ToolGateway"))
+			Expect(updatedToolServer.Status.ToolGatewayRef).To(BeNil())
+			Expect(updatedToolServer.Status.GatewayUrl).To(BeEmpty())
+		})
+	})
+})
