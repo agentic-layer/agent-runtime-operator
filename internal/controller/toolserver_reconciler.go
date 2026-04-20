@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -83,13 +84,17 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	toolGateway, reconcileErr := r.reconcileToolServer(ctx, &toolServer)
 	if reconcileErr != nil {
 		log.Error(reconcileErr, "Reconciliation failed")
-		if statusErr := r.updateToolServerStatusNotReady(ctx, &toolServer, "ReconciliationFailed", reconcileErr.Error()); statusErr != nil {
+		if statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.updateToolServerStatusNotReady(ctx, &toolServer, "ReconciliationFailed", reconcileErr.Error())
+		}); statusErr != nil {
 			log.Error(statusErr, "Failed to update tool server status to not ready")
 		}
 		return ctrl.Result{}, reconcileErr
 	}
 
-	if err := r.updateToolServerStatusReady(ctx, &toolServer, toolGateway); err != nil {
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.updateToolServerStatusReady(ctx, &toolServer, toolGateway)
+	}); err != nil {
 		log.Error(err, "Failed to update ToolServer status")
 		return ctrl.Result{}, err
 	}
