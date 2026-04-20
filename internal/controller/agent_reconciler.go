@@ -93,7 +93,9 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	aiGateway, reconcileErr := r.reconcileAgent(ctx, &agent)
 	if reconcileErr != nil {
 		log.Error(reconcileErr, "Reconciliation failed")
-		if statusErr := r.updateAgentStatusNotReady(ctx, &agent, "ReconciliationFailed", reconcileErr.Error()); statusErr != nil {
+		if statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.updateAgentStatusNotReady(ctx, &agent, "ReconciliationFailed", reconcileErr.Error())
+		}); statusErr != nil {
 			log.Error(statusErr, "Failed to update agent status to not ready")
 		}
 		return ctrl.Result{}, reconcileErr
