@@ -39,11 +39,8 @@ var _ = Describe("Agent with ToolRoute", Ordered, func() {
 
 	BeforeAll(func() {
 		By("creating the test namespace")
-		// Use --dry-run=client + apply to make it idempotent
-		_, err := utils.Run(exec.Command("kubectl", "create", "namespace", toolRouteTestNamespace, "--dry-run=client", "-o", "yaml"))
-		Expect(err).NotTo(HaveOccurred())
 		_, _ = utils.Run(exec.Command("kubectl", "create", "namespace", toolRouteTestNamespace))
-		// Ignore error if namespace already exists
+		var err error
 
 		By("applying the ToolServer resource")
 		toolServerYAML := fmt.Sprintf(`
