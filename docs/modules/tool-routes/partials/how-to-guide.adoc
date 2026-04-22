@@ -1,0 +1,72 @@
+= Create a Tool Route
+
+A ToolRoute exposes a tool server (cluster-local or external) through a ToolGateway, with
+optional per-route filtering on which tools are visible.
+
+IMPORTANT: Before following this guide, install the Agent Runtime Operator and have a
+ToolGateway available. See the Agent Runtime Operator guide for installation.
+
+== Expose a cluster-local ToolServer
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: github-readonly
+  namespace: tools
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    toolServerRef:
+      name: github-mcp
+  toolFilter:
+    allow: [search_issues, "get_*", "list_*"]
+    deny:  ["*delete*", force_push]
+----
+
+== Expose an external MCP server
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: github-readonly
+  namespace: tools
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    external:
+      url: https://github-mcp.example.com/mcp
+  toolFilter:
+    allow: [search_issues, "get_*", "list_*"]
+----
+
+== Filter syntax
+
+Patterns match tool names using glob syntax:
+
+* `*` matches any run of characters
+* `?` matches exactly one character
+
+`allow` defines the candidate set (if nil or empty, every tool is a candidate).
+`deny` is applied after `allow` and wins on conflict.
+
+== Reference a ToolRoute from an Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: summarizer-agent
+spec:
+  tools:
+    - name: github
+      toolRouteRef:
+        name: github-readonly
+        namespace: tools
+----

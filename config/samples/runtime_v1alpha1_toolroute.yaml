@@ -1,0 +1,18 @@
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: example-toolroute
+  namespace: test-tool-servers
+spec:
+  toolGatewayRef:
+    name: example-toolgateway
+  upstream:
+    toolServerRef:
+      name: example-http-toolserver
+  toolFilter:
+    allow: ["get_*", "list_*"]
+    deny: ["*delete*"]
