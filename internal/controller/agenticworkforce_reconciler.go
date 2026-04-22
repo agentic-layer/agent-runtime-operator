@@ -214,15 +214,16 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 
 	// Collect tools from this agent
 	for _, tool := range agent.Spec.Tools {
-		if tool.ToolServerRef != nil {
-			// Cluster ToolServer reference - use namespace/name format
-			toolNamespace := getNamespaceWithDefault(tool.ToolServerRef, agent.Namespace)
-			toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolServerRef.Name)
-			allTools[toolKey] = true
-		} else if tool.Url != "" {
-			// Remote tool - record the URL directly
-			allTools[tool.Url] = true
+		if tool.ToolRouteRef.Name == "" {
+			continue
 		}
+		// ToolRoute reference - use namespace/name format
+		toolNamespace := tool.ToolRouteRef.Namespace
+		if toolNamespace == "" {
+			toolNamespace = agent.Namespace
+		}
+		toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolRouteRef.Name)
+		allTools[toolKey] = true
 	}
 
 	// Recursively traverse sub-agents

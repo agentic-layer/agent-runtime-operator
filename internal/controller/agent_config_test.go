@@ -81,8 +81,8 @@ var _ = Describe("Agent Config", func() {
 						{Name: "sub2", Url: "https://example.com/sub2.json", InteractionType: "transfer"},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool1", ToolServerRef: &corev1.ObjectReference{Name: "tool-server-1"}},
-						{Name: "tool2", ToolServerRef: &corev1.ObjectReference{Name: "tool-server-2"}},
+						{Name: "tool1", ToolRouteRef: corev1.ObjectReference{Name: "tool-server-1"}},
+						{Name: "tool2", ToolRouteRef: corev1.ObjectReference{Name: "tool-server-2"}},
 					},
 				},
 			}
@@ -159,7 +159,7 @@ var _ = Describe("Agent Config", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "test-tool", ToolServerRef: &corev1.ObjectReference{Name: "tool-server-1"}},
+						{Name: "test-tool", ToolRouteRef: corev1.ObjectReference{Name: "tool-server-1"}},
 					},
 				},
 			}
@@ -185,7 +185,7 @@ var _ = Describe("Agent Config", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "auth-tool", ToolServerRef: &corev1.ObjectReference{Name: "tool-server-1"}},
+						{Name: "auth-tool", ToolRouteRef: corev1.ObjectReference{Name: "tool-server-1"}},
 					},
 				},
 			}
@@ -214,7 +214,7 @@ var _ = Describe("Agent Config", func() {
 				},
 				Spec: runtimev1alpha1.AgentSpec{
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "public-tool", ToolServerRef: &corev1.ObjectReference{Name: "tool-server-1"}},
+						{Name: "public-tool", ToolRouteRef: corev1.ObjectReference{Name: "tool-server-1"}},
 					},
 				},
 			}

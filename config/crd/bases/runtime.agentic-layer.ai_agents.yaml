@@ -548,29 +548,27 @@ spec:
                   Tools defines configuration for integrating MCP (Model Context Protocol) tools.
                   This is converted to JSON and passed as AGENT_TOOLS environment variable to the agent.
                 items:
-                  description: AgentTool defines configuration for integrating an
-                    MCP (Model Context Protocol) tool
+                  description: AgentTool defines configuration for attaching a tool
+                    to an agent via a ToolRoute.
                   properties:
                     name:
-                      description: Name is the unique identifier for this tool
+                      description: Name is the unique identifier for this tool within
+                        the agent.
                       minLength: 1
                       type: string
                     propagatedHeaders:
                       description: |-
                         PropagatedHeaders is a list of HTTP header names that should be propagated from incoming
-                        A2A requests to this MCP tool server. This enables authentication and authorization
-                        scenarios where the MCP server needs to access external APIs on behalf of users.
-                        Header names are case-insensitive. If not specified or empty, no headers are propagated.
+                        A2A requests to the MCP tool server. Header names are case-insensitive.
+                        If not specified or empty, no headers are propagated.
                       items:
                         type: string
                       type: array
-                    toolServerRef:
+                    toolRouteRef:
                       description: |-
-                        ToolServerRef references a ToolServer resource in the cluster.
-                        The operator will resolve the ToolServer's service URL automatically.
-                        Only Name and Namespace fields are used; other fields (Kind, APIVersion, etc.) are ignored.
+                        ToolRouteRef references the ToolRoute that exposes the upstream MCP server.
+                        This is the only way to attach a tool to an agent.
                         If Namespace is not specified, defaults to the same namespace as the current Agent.
-                        Mutually exclusive with Url - exactly one must be specified.
                       properties:
                         apiVersion:
                           description: API version of the referent.
@@ -612,14 +610,9 @@ spec:
                           type: string
                       type: object
                       x-kubernetes-map-type: atomic
-                    url:
-                      description: |-
-                        Url is the HTTP/HTTPS endpoint URL for an MCP tool server outside the cluster.
-                        Mutually exclusive with ToolServerRef - exactly one must be specified.
-                      format: uri
-                      type: string
                   required:
                   - name
+                  - toolRouteRef
                   type: object
                 type: array
               volumeMounts:

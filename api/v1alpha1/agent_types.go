@@ -73,30 +73,21 @@ type SubAgent struct {
 	InteractionType string `json:"interactionType,omitempty"`
 }
 
-// AgentTool defines configuration for integrating an MCP (Model Context Protocol) tool
+// AgentTool defines configuration for attaching a tool to an agent via a ToolRoute.
 type AgentTool struct {
-	// Name is the unique identifier for this tool
+	// Name is the unique identifier for this tool within the agent.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
-	// ToolServerRef references a ToolServer resource in the cluster.
-	// The operator will resolve the ToolServer's service URL automatically.
-	// Only Name and Namespace fields are used; other fields (Kind, APIVersion, etc.) are ignored.
+	// ToolRouteRef references the ToolRoute that exposes the upstream MCP server.
+	// This is the only way to attach a tool to an agent.
 	// If Namespace is not specified, defaults to the same namespace as the current Agent.
-	// Mutually exclusive with Url - exactly one must be specified.
-	// +optional
-	ToolServerRef *corev1.ObjectReference `json:"toolServerRef,omitempty"`
-
-	// Url is the HTTP/HTTPS endpoint URL for an MCP tool server outside the cluster.
-	// Mutually exclusive with ToolServerRef - exactly one must be specified.
-	// +optional
-	// +kubebuilder:validation:Format=uri
-	Url string `json:"url,omitempty"`
+	// +kubebuilder:validation:Required
+	ToolRouteRef corev1.ObjectReference `json:"toolRouteRef"`
 
 	// PropagatedHeaders is a list of HTTP header names that should be propagated from incoming
-	// A2A requests to this MCP tool server. This enables authentication and authorization
-	// scenarios where the MCP server needs to access external APIs on behalf of users.
-	// Header names are case-insensitive. If not specified or empty, no headers are propagated.
+	// A2A requests to the MCP tool server. Header names are case-insensitive.
+	// If not specified or empty, no headers are propagated.
 	// +optional
 	PropagatedHeaders []string `json:"propagatedHeaders,omitempty"`
 }

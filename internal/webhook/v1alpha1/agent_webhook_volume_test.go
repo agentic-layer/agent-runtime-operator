@@ -318,7 +318,7 @@ var _ = Describe("Agent Webhook - Volume Validation", func() {
 					{Name: "helper", Url: "https://example.com/helper.json"},
 				}
 				obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-					{Name: "tool1", ToolServerRef: &corev1.ObjectReference{Name: "tool1"}},
+					{Name: "tool1", ToolRouteRef: corev1.ObjectReference{Name: "tool1-route"}},
 				}
 				obj.Spec.Volumes = []corev1.Volume{
 					{
