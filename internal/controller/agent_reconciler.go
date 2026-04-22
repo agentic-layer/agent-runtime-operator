@@ -131,7 +131,7 @@ func (r *AgentReconciler) reconcileAgent(ctx context.Context, agent *runtimev1al
 		return nil, err
 	}
 
-	// Resolve Tools from ToolServer references early - fail fast if any cannot be resolved
+	// Resolve Tools from ToolRoute references early — fail fast if any cannot be resolved
 	resolvedTools, err := r.resolveAllTools(ctx, agent)
 	if err != nil {
 		return nil, err

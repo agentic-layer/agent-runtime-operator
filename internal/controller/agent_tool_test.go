@@ -168,4 +168,56 @@ var _ = Describe("Agent Tool", func() {
 			Expect(resolved["t1"].Url).To(Equal("https://gw/default/tr-default-ns"))
 		})
 	})
+
+	Describe("findAgentsReferencingToolRoute", func() {
+		It("enqueues an agent that references the changed ToolRoute by name and namespace", func() {
+			tr := createToolRoute(ctx, k8sClient, "tr-watch", DefaultNamespace, "https://gw/watch")
+			createAgentWithTools(ctx, k8sClient, "a-watch", []runtimev1alpha1.AgentTool{{
+				Name:         "t1",
+				ToolRouteRef: corev1.ObjectReference{Name: "tr-watch"},
+			}})
+
+			requests := reconciler.findAgentsReferencingToolRoute(ctx, tr)
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("a-watch"))
+			Expect(requests[0].Namespace).To(Equal(DefaultNamespace))
+		})
+
+		It("does not enqueue agents when namespace differs", func() {
+			createTestNamespace(ctx, k8sClient, "other-ns")
+			trOther := createToolRoute(ctx, k8sClient, "tr-ns", "other-ns", "https://gw/other")
+			// Agent in default references "tr-ns" with no explicit namespace → defaults to "default"
+			createAgentWithTools(ctx, k8sClient, "a-ns", []runtimev1alpha1.AgentTool{{
+				Name:         "t1",
+				ToolRouteRef: corev1.ObjectReference{Name: "tr-ns"},
+			}})
+
+			requests := reconciler.findAgentsReferencingToolRoute(ctx, trOther)
+			Expect(requests).To(BeEmpty())
+		})
+
+		It("enqueues agent only once even when multiple tools reference the same ToolRoute", func() {
+			tr := createToolRoute(ctx, k8sClient, "tr-multi", DefaultNamespace, "https://gw/multi")
+			createAgentWithTools(ctx, k8sClient, "a-multi", []runtimev1alpha1.AgentTool{
+				{Name: "t1", ToolRouteRef: corev1.ObjectReference{Name: "tr-multi"}},
+				{Name: "t2", ToolRouteRef: corev1.ObjectReference{Name: "tr-multi"}},
+			})
+
+			requests := reconciler.findAgentsReferencingToolRoute(ctx, tr)
+			Expect(requests).To(HaveLen(1))
+		})
+
+		It("defaults ToolRouteRef namespace to agent namespace for matching", func() {
+			tr := createToolRoute(ctx, k8sClient, "tr-defns", DefaultNamespace, "https://gw/defns")
+			// Tool has explicit namespace matching the route's namespace
+			createAgentWithTools(ctx, k8sClient, "a-defns", []runtimev1alpha1.AgentTool{{
+				Name:         "t1",
+				ToolRouteRef: corev1.ObjectReference{Name: "tr-defns", Namespace: DefaultNamespace},
+			}})
+
+			requests := reconciler.findAgentsReferencingToolRoute(ctx, tr)
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal("a-defns"))
+		})
+	})
 })
