@@ -34,7 +34,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -53,7 +52,6 @@ type ToolServerReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/finalizers,verbs=update
-// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolgateways,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -81,7 +79,7 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log.Info("Reconciling ToolServer")
 
 	// Run reconciliation and always update status based on outcome
-	toolGateway, reconcileErr := r.reconcileToolServer(ctx, &toolServer)
+	reconcileErr := r.reconcileToolServer(ctx, &toolServer)
 	if reconcileErr != nil {
 		log.Error(reconcileErr, "Reconciliation failed")
 		if statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -93,7 +91,7 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.updateToolServerStatusReady(ctx, &toolServer, toolGateway)
+		return r.updateToolServerStatusReady(ctx, &toolServer)
 	}); err != nil {
 		log.Error(err, "Failed to update ToolServer status")
 		return ctrl.Result{}, err
@@ -102,51 +100,30 @@ func (r *ToolServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-// reconcileToolServer performs the core reconciliation work: resolving the ToolGateway,
-// ensuring the Deployment and Service. It returns the resolved ToolGateway (may be nil)
-// and an error. The caller uses the error to set the CR status in a single place,
+// reconcileToolServer performs the core reconciliation work: ensuring the Deployment and Service.
+// It returns an error. The caller uses the error to set the CR status in a single place,
 // ensuring every error path is reflected in the CR status.
-func (r *ToolServerReconciler) reconcileToolServer(ctx context.Context, toolServer *runtimev1alpha1.ToolServer) (*runtimev1alpha1.ToolGateway, error) {
-	// Resolve ToolGateway (optional - returns nil if not found)
-	toolGateway, err := r.resolveToolGateway(ctx, toolServer)
-	if err != nil {
-		return nil, err
-	}
-
+func (r *ToolServerReconciler) reconcileToolServer(ctx context.Context, toolServer *runtimev1alpha1.ToolServer) error {
 	// Ensure Deployment exists and is up to date for http/sse transports
 	if err := r.ensureDeployment(ctx, toolServer); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Ensure Service exists and is up to date for http/sse transports
 	if err := r.ensureService(ctx, toolServer); err != nil {
-		return nil, err
+		return err
 	}
 
-	return toolGateway, nil
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ToolServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	log := logf.FromContext(context.Background())
-
-	builder := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&runtimev1alpha1.ToolServer{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.Service{})
-
-	// Only watch ToolGateway if the CRD is installed
-	if isToolGatewayCRDInstalled(mgr) {
-		log.Info("ToolGateway CRD detected, enabling watch")
-		builder = builder.Watches(
-			&runtimev1alpha1.ToolGateway{},
-			handler.EnqueueRequestsFromMapFunc(r.findToolServersReferencingToolGateway),
-		)
-	} else {
-		log.Info("ToolGateway CRD not installed, skipping watch (tool server will work without Tool Gateway integration)")
-	}
-
-	return builder.Named("toolserver").Complete(r)
+		Owns(&corev1.Service{}).
+		Named("toolserver").Complete(r)
 }
 
 // ensureDeployment ensures the Deployment for the ToolServer exists and is up to date
@@ -328,37 +305,14 @@ func (r *ToolServerReconciler) buildReadinessProbe(port int32) *corev1.Probe {
 	}
 }
 
-// updateToolServerStatusReady sets the ToolServer status to Ready and updates the URL and ToolGatewayRef
-func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, toolServer *runtimev1alpha1.ToolServer, toolGateway *runtimev1alpha1.ToolGateway) error {
+// updateToolServerStatusReady sets the ToolServer status to Ready and updates the URL
+func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, toolServer *runtimev1alpha1.ToolServer) error {
 	// Build URL for http/sse transports
 	if toolServer.Spec.TransportType == httpTransport || toolServer.Spec.TransportType == sseTransport {
 		toolServer.Status.Url = fmt.Sprintf("http://%s.%s.svc.cluster.local:%d%s",
 			toolServer.Name, toolServer.Namespace, toolServer.Spec.Port, toolServer.Spec.Path)
 	} else {
 		toolServer.Status.Url = ""
-	}
-
-	// Set ToolGatewayRef and GatewayUrl if a Tool Gateway is being used
-	if toolGateway != nil {
-		toolServer.Status.ToolGatewayRef = &corev1.ObjectReference{
-			Kind:       "ToolGateway",
-			Namespace:  toolGateway.Namespace,
-			Name:       toolGateway.Name,
-			APIVersion: runtimev1alpha1.GroupVersion.String(),
-		}
-
-		// Populate GatewayUrl if the ToolGateway has a URL in its status
-		if toolGateway.Status.Url != "" {
-			// Construct the gateway URL for this specific tool server
-			// Format: {gatewayBaseUrl}/{namespace}/{name}/mcp
-			toolServer.Status.GatewayUrl = fmt.Sprintf("%s/%s/%s/mcp",
-				toolGateway.Status.Url, toolServer.Namespace, toolServer.Name)
-		} else {
-			toolServer.Status.GatewayUrl = ""
-		}
-	} else {
-		toolServer.Status.ToolGatewayRef = nil
-		toolServer.Status.GatewayUrl = ""
 	}
 
 	// Set Ready condition to True
@@ -379,10 +333,6 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 
 // updateToolServerStatusNotReady sets the ToolServer status to not Ready
 func (r *ToolServerReconciler) updateToolServerStatusNotReady(ctx context.Context, toolServer *runtimev1alpha1.ToolServer, reason, message string) error {
-	// Clear the ToolGatewayRef and GatewayUrl since the tool server is not ready
-	toolServer.Status.ToolGatewayRef = nil
-	toolServer.Status.GatewayUrl = ""
-
 	// Set Ready condition to False
 	meta.SetStatusCondition(&toolServer.Status.Conditions, metav1.Condition{
 		Type:               "Ready",
@@ -417,11 +367,4 @@ func getOrDefaultToolServerResourceRequirements(toolServer *runtimev1alpha1.Tool
 			corev1.ResourceCPU:    resource.MustParse("500m"),
 		},
 	}
-}
-
-// isToolGatewayCRDInstalled checks if the ToolGateway CRD is installed in the cluster
-func isToolGatewayCRDInstalled(mgr ctrl.Manager) bool {
-	gvk := runtimev1alpha1.GroupVersion.WithKind("ToolGateway")
-	_, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
-	return err == nil
 }

@@ -1831,11 +1831,6 @@ func (in *ToolServerSpec) DeepCopyInto(out *ToolServerSpec) {
 		*out = new(v1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ToolGatewayRef != nil {
-		in, out := &in.ToolGatewayRef, &out.ToolGatewayRef
-		*out = new(v1.ObjectReference)
-		**out = **in
-	}
 	if in.CommonMetadata != nil {
 		in, out := &in.CommonMetadata, &out.CommonMetadata
 		*out = new(EmbeddedMetadata)
@@ -1867,11 +1862,6 @@ func (in *ToolServerStatus) DeepCopyInto(out *ToolServerStatus) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-	}
-	if in.ToolGatewayRef != nil {
-		in, out := &in.ToolGatewayRef, &out.ToolGatewayRef
-		*out = new(v1.ObjectReference)
-		**out = **in
 	}
 }
 

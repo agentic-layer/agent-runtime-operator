@@ -73,7 +73,6 @@ rules:
   resources:
   - agentruntimeconfigurations
   - aigateways
-  - toolgateways
   verbs:
   - get
   - list
