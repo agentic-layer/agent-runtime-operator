@@ -111,3 +111,17 @@ spec:
 ----
 
 For more information on LiteLLM-specific OpenTelemetry configuration, see the https://docs.litellm.ai/docs/proxy/logging#opentelemetry[LiteLLM OpenTelemetry documentation].
+
+== Apply Guardrails (Optional)
+
+Attach `Guard` resources to the gateway to run content inspection (for example PII masking) on every request. The `AiGateway` CRD exposes `spec.guardrails` -- an ordered list of references to `Guard` resources:
+
+[source,yaml]
+----
+spec:
+  guardrails:
+    - name: pii-guard
+      namespace: guards
+----
+
+See xref:agent-runtime-operator:guardrails:how-to-guide.adoc[Create and Use Guardrails in Gateways] for a full walkthrough and the xref:agent-runtime-operator:guardrails:reference.adoc[Guardrails Reference] for the Guard and GuardrailProvider schema.

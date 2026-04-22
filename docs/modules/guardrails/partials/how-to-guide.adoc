@@ -1,0 +1,184 @@
+= Create and Use Guardrails in Gateways
+
+This guide walks you through configuring guardrails for traffic flowing through an Agentic Layer gateway.
+Guardrails inspect gateway traffic for content that should be masked or blocked -- for example, personally identifiable information (PII) in prompts or tool arguments.
+
+Guardrails are expressed through two gateway-agnostic CRDs:
+
+* *GuardrailProvider* -- declares a backend that implements a specific guardrail API contract (Presidio, OpenAI Moderation, AWS Bedrock).
+* *Guard* -- declares *when* and *how* a provider is applied to a single concern (PII, toxic language, content policy).
+
+A gateway resource (for example `AiGateway`) then references one or more `Guard` resources in its `spec.guardrails` list.
+The gateway's operator resolves those references and configures its underlying gateway implementation to invoke the guardrail at request time.
+
+TIP: Before following this guide, make sure you have the xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Agent Runtime Operator] and a gateway operator that supports guardrails installed.
+The only gateway operator that currently implements guardrails is the xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator], which supports Presidio-based PII guardrails on an `AiGateway`.
+
+== Implementation Status
+
+Guardrails are a *gateway capability* -- each gateway implementation translates Guard CRDs into its native guardrail mechanism.
+The Guard and GuardrailProvider CRDs are stable and gateway-agnostic, but runtime support is being rolled out per gateway.
+
+[cols="2,2,2,3"]
+|===
+|Gateway | Guardrail support | Supported providers | Notes
+
+|`AiGateway` (LiteLLM)
+|Yes
+|`presidio-api`
+|Request-time PII detection and masking; see xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[].
+
+|`AgentGateway` (KrakenD)
+|Not yet
+|--
+|`guardrails` field exists on the CRD but is not yet honored by the operator.
+
+|`ToolGateway`
+|Not yet
+|--
+|`guardrails` field exists on the CRD; support is planned via a dedicated Envoy-based operator.
+|===
+
+The rest of this guide uses an `AiGateway` backed by the LiteLLM operator and a Presidio analyzer as the working example.
+
+== Quick Start: PII Guardrail on an AiGateway
+
+This example masks common PII entities (names, phone numbers, email addresses, credit cards) in every request sent through an `AiGateway`.
+
+=== Prerequisites
+
+* A Presidio Analyzer service reachable from the cluster. For local experimentation you can use the Microsoft Presidio Helm chart or the `presidio` manifests in the `agentic-layer/presidio` repository.
+* An installed Agent Runtime Operator and AI Gateway LiteLLM Operator.
+
+=== Step 1: Create a GuardrailProvider
+
+The `GuardrailProvider` points at the Presidio backend.
+It is referenced by one or more `Guard` resources.
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: GuardrailProvider
+metadata:
+  name: presidio
+  namespace: guardrail-providers
+spec:
+  type: presidio-api
+  presidio:
+    baseUrl: "http://presidio.guardrail-providers:80"
+----
+
+NOTE: The `baseUrl` must be reachable from the gateway's namespace. Use a fully qualified DNS name (`service.namespace`) when the provider and gateway live in different namespaces.
+
+=== Step 2: Create a Guard
+
+The `Guard` resource binds a provider to a concrete policy: when it runs (`mode`), which entities it cares about, and what to do with them.
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Guard
+metadata:
+  name: pii-guard
+  namespace: guards
+spec:
+  mode:
+    - pre_call
+  description: Detect and mask PII in user inputs before they are sent to the LLM.
+  providerRef:
+    name: presidio
+    namespace: guardrail-providers
+  presidio:
+    language: en
+    scoreThresholds:
+      ALL: "0.5"
+    entityActions:
+      PHONE_NUMBER: MASK
+      EMAIL_ADDRESS: MASK
+      CREDIT_CARD: MASK
+      PERSON: MASK
+----
+
+Key fields:
+
+* `mode` -- when the guard runs. `pre_call` inspects the request before it reaches the LLM, `post_call` inspects the LLM response, `during_call` inspects both. You can combine modes, for example `[pre_call, post_call]`.
+* `providerRef` -- the `GuardrailProvider` that hosts this guard. Cross-namespace references are supported; `namespace` defaults to the Guard's own namespace when omitted.
+* `presidio.entityActions` -- maps https://microsoft.github.io/presidio/supported_entities/[Presidio entity types] to actions. `MASK` replaces the detected value with a placeholder; `BLOCK` rejects the whole request. When omitted entirely, every supported entity is detected and blocked by default.
+* `presidio.scoreThresholds` -- per-entity confidence cutoffs. Use `ALL` as a catch-all; specific entity keys override it.
+
+=== Step 3: Attach the Guard to an AiGateway
+
+Reference the Guard from `AiGateway.spec.guardrails`.
+The LiteLLM operator resolves the reference, fetches the referenced `GuardrailProvider`, and writes the appropriate guardrail block into the LiteLLM configuration.
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AiGateway
+metadata:
+  name: ai-gateway-pii
+  namespace: default
+spec:
+  aiGatewayClassName: litellm
+  aiModels:
+    - provider: openai
+      name: gpt-3.5-turbo
+  guardrails:
+    - name: pii-guard
+      namespace: guards
+----
+
+Apply the three manifests:
+
+[source,bash]
+----
+kubectl apply -f guardrailprovider.yaml
+kubectl apply -f guard.yaml
+kubectl apply -f aigateway.yaml
+----
+
+=== Step 4: Verify the Guardrail Is Active
+
+Inspect the generated LiteLLM `ConfigMap` -- the operator writes a `guardrails` section derived from every resolved `Guard`:
+
+[source,bash]
+----
+kubectl get configmap ai-gateway-pii-config -n default -o yaml
+----
+
+You should see a `guardrails:` list whose entries reference the `pii-guard` Guard name, the Presidio base URL from the `GuardrailProvider`, and the score thresholds and entity actions from the `Guard`.
+
+Send a request through the gateway that contains PII, then check the response. PII entities listed in `entityActions` with action `MASK` will be replaced with placeholders before the prompt reaches the LLM.
+
+== Multiple Guards on a Single Gateway
+
+`AiGateway.spec.guardrails` is an ordered list, so you can chain multiple concerns -- for example PII masking *and* toxic-language detection. The gateway operator evaluates them in the order they appear.
+
+[source,yaml]
+----
+spec:
+  guardrails:
+    - name: pii-guard
+      namespace: guards
+    - name: toxic-language-guard
+      namespace: guards
+----
+
+Each referenced Guard can use a different provider and mode. The LiteLLM implementation requires every provider referenced to have `type: presidio-api`; other provider types are accepted by the CRDs but not yet consumed by the LiteLLM operator.
+
+== Cross-Namespace References
+
+The `providerRef` on a `Guard` and the `ObjectReference` entries in `spec.guardrails` both support explicit `namespace` fields.
+This lets you centralize guardrail policy:
+
+* Put shared `GuardrailProvider` resources in a `guardrail-providers` namespace.
+* Put reusable `Guard` resources in a `guards` namespace.
+* Reference them from application `AiGateway` resources in their own namespaces.
+
+The gateway operator is granted the RBAC permissions it needs to read `Guard` and `GuardrailProvider` resources across namespaces.
+
+== Next Steps
+
+* Explore the xref:agent-runtime-operator:guardrails:reference.adoc[Guardrails Reference] for the full CRD schema.
+* See the xref:agent-runtime-operator:ai-gateways:how-to-guide.adoc[Create an AI Gateway] guide for the complete `AiGateway` configuration surface.
+* Review the Presidio https://microsoft.github.io/presidio/supported_entities/[supported entity catalog] to decide which entities to detect and how to act on them.

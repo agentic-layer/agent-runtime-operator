@@ -1,0 +1,242 @@
+= Guardrails Reference
+
+Guardrails are expressed with two gateway-agnostic Custom Resource Definitions:
+
+* *GuardrailProvider* -- a backend that implements a specific guardrail API contract.
+* *Guard* -- a policy that binds a provider to a concrete inspection point (pre-call, post-call, during-call) with provider-specific configuration.
+
+Gateway resources (for example `AiGateway`) reference one or more Guards in their `spec.guardrails` list.
+
+== Full API Reference
+
+https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+
+== CRDs
+
+* *Guard*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_guards.yaml
+* *GuardrailProvider*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_guardrailproviders.yaml
+
+== GuardrailProvider
+
+A `GuardrailProvider` describes *where* and *how* to reach a guardrail backend.
+Per-policy tuning (which entities to catch, at which confidence, what to do with them) lives on the `Guard`, not on the provider.
+
+=== Spec
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`type`
+|`string` (required)
+|API contract implemented by this provider. One of `presidio-api`, `openai-moderation-api`, `bedrock-api`.
+
+|`openaiModeration`
+|object
+|Configuration for `type: openai-moderation-api`.
+
+|`bedrock`
+|object
+|Configuration for `type: bedrock-api`.
+
+|`presidio`
+|object
+|Configuration for `type: presidio-api`.
+|===
+
+=== `presidio` config
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`baseUrl`
+|URI (required)
+|HTTP endpoint of the Presidio Analyzer service. Must be reachable from the gateway's namespace.
+
+|`apiKeySecretRef`
+|`SecretKeySelector`
+|Optional API key for authenticated Presidio deployments.
+|===
+
+=== `openaiModeration` config
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`baseUrl`
+|URI
+|Override the default `https://api.openai.com/...` endpoint. Use this to point at a custom service that implements the OpenAI Moderation API contract. When omitted, the official OpenAI endpoint is used.
+
+|`apiKeySecretRef`
+|`SecretKeySelector`
+|Reference to the Secret key that contains the API key.
+|===
+
+=== `bedrock` config
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`region`
+|`string` (required)
+|AWS region hosting the Bedrock Guardrails service.
+
+|`credentialsSecretRef`
+|`SecretReference`
+|Secret containing `aws-access-key-id` and `aws-secret-access-key`. When omitted, the pod's IRSA or pod-identity credentials are used.
+|===
+
+== Guard
+
+A `Guard` binds a provider to a concrete policy and defines *when* the policy runs relative to the LLM or tool call.
+
+=== Spec
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`mode`
+|`[]string` (required, min 1)
+|When the guard is applied. Each entry is one of `pre_call`, `post_call`, `during_call`. Multiple modes can be combined.
+
+|`description`
+|`string`
+|Human-readable description. Documentation only; has no runtime effect.
+
+|`providerRef`
+|`ObjectReference` (required)
+|Reference to the `GuardrailProvider`. `namespace` defaults to the Guard's own namespace when omitted.
+
+|`openaiModeration`
+|object
+|Guard-level configuration for OpenAI Moderation.
+
+|`bedrock`
+|object
+|Guard-level configuration for AWS Bedrock Guardrails.
+
+|`presidio`
+|object
+|Guard-level configuration for Presidio.
+|===
+
+=== Guard modes
+
+[cols="1,3"]
+|===
+|Mode |What it inspects
+
+|`pre_call`
+|The outgoing payload before it reaches the LLM or tool server (prompt, tool call arguments).
+
+|`post_call`
+|The payload returned from the LLM or tool server (response text, tool results) before it reaches the caller.
+
+|`during_call`
+|Both the request and response. For protocols without a streaming body (for example MCP), this is equivalent to `pre_call + post_call`.
+|===
+
+=== `presidio` guard config
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`language`
+|`string`
+|ISO language code for the content under inspection (for example `en`, `de`). Defaults to `en` when omitted.
+
+|`scoreThresholds`
+|`map[string]string`
+|Per-entity confidence cutoffs in the range `0.0`--`1.0`. Use `ALL` as the catch-all; per-entity keys override it. Example: `{"ALL": "0.5", "EMAIL_ADDRESS": "0.8"}`.
+
+|`entityActions`
+|`map[string]string`
+|Maps entity types to actions. `MASK` replaces the value with a placeholder (for example `<PERSON>`); `BLOCK` rejects the whole request. The keys also determine which entity types are detected. When omitted entirely, every supported entity is detected and blocked.
+|===
+
+Presidio entity types are documented at https://microsoft.github.io/presidio/supported_entities/.
+Common examples: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `IP_ADDRESS`, `IBAN_CODE`, `US_SSN`.
+
+=== `openaiModeration` guard config
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`model`
+|`string`
+|Moderation model to use (for example `omni-moderation-latest`). Defaults to the provider's default when omitted.
+|===
+
+=== `bedrock` guard config
+
+[cols="1,1,3"]
+|===
+|Field |Type |Description
+
+|`guardrailId`
+|`string` (required)
+|Identifier of the Bedrock Guardrail.
+
+|`guardrailVersion`
+|`string`
+|Version of the Bedrock Guardrail. Defaults to the latest available version when omitted.
+|===
+
+== Attaching Guards to Gateways
+
+Gateway CRDs expose a uniform `guardrails` field -- an ordered list of `ObjectReference` entries pointing at `Guard` resources. The gateway's operator resolves each reference, loads the referenced `GuardrailProvider`, and configures the underlying gateway accordingly.
+
+[source,yaml]
+----
+spec:
+  guardrails:
+    - name: pii-guard
+      namespace: guards
+    - name: toxic-language-guard
+      namespace: guards
+----
+
+The field is present on:
+
+* `AiGateway.spec.guardrails`
+* `AgentGateway.spec.guardrails`
+* `ToolGateway.spec.guardrails`
+
+== Gateway Support Matrix
+
+[cols="2,2,2,3"]
+|===
+|Gateway | Implementing operator | Supported provider types | Notes
+
+|`AiGateway`
+|xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator]
+|`presidio-api`
+|Generates LiteLLM `guardrails:` config from resolved Guards. `mode` maps directly to the LiteLLM `mode` field; `entityActions` map to LiteLLM's `pii_entities_config`; `scoreThresholds` map to `presidio_score_thresholds`. Output PII tokens are parsed back to the original values on responses.
+
+|`AgentGateway`
+|agent-gateway-krakend-operator
+|--
+|Not yet implemented. The `guardrails` field is accepted by the CRD but ignored by the operator.
+
+|`ToolGateway`
+|agent-runtime-operator + downstream operator
+|--
+|Not yet implemented. A future Envoy-based tool gateway operator is planned and will use a shared ext_proc guardrail adapter service.
+|===
+
+== Samples
+
+The agent-runtime-operator repository ships ready-to-apply samples that cover every supported provider type:
+
+* `GuardrailProvider` samples -- https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/samples/runtime_v1alpha1_guardrailprovider.yaml
+* `Guard` samples -- https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/samples/runtime_v1alpha1_guard.yaml
+
+An end-to-end example that applies a Presidio guard to an `AiGateway` across three namespaces lives in the LiteLLM operator repository:
+
+* https://github.com/agentic-layer/ai-gateway-litellm-operator/blob/main/config/samples/v1alpha1_guardrail_presidio.yaml
