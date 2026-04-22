@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
@@ -38,8 +39,9 @@ var _ = Describe("Agent Controller", func() {
 
 	BeforeEach(func() {
 		reconciler = &AgentReconciler{
-			Client: k8sClient,
-			Scheme: k8sClient.Scheme(),
+			Client:   k8sClient,
+			Scheme:   k8sClient.Scheme(),
+			Recorder: &events.FakeRecorder{},
 		}
 		// Set POD_NAMESPACE for tests to use default namespace
 		Expect(os.Setenv("POD_NAMESPACE", "default")).To(Succeed())

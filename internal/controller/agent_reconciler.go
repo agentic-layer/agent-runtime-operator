@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,7 +54,8 @@ const (
 // AgentReconciler reconciles a Agent object
 type AgentReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder events.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents,verbs=get;list;watch;create;update;patch;delete
@@ -279,8 +281,12 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 		return ctrl.SetControllerReference(agent, deployment, r.Scheme)
 	}); err != nil {
 		return err
-	} else if op != controllerutil.OperationResultNone {
-		log.Info("Deployment reconciled", "operation", op, "obj", *deployment)
+	} else if op == controllerutil.OperationResultCreated {
+		log.Info("Deployment created", "operation", op, "obj", *deployment)
+		r.emitEvent(agent, "Created", "CreateDeployment", "Deployment %s created", deployment.Name)
+	} else if op == controllerutil.OperationResultUpdated {
+		log.Info("Deployment updated", "operation", op, "obj", *deployment)
+		r.emitEvent(agent, "Updated", "UpdateDeployment", "Deployment %s updated", deployment.Name)
 	} else {
 		log.V(1).Info("Deployment up to date")
 	}
@@ -353,8 +359,12 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 		return ctrl.SetControllerReference(agent, service, r.Scheme)
 	}); err != nil {
 		return err
-	} else if op != controllerutil.OperationResultNone {
-		log.Info("Service reconciled", "operation", op, "obj", *service)
+	} else if op == controllerutil.OperationResultCreated {
+		log.Info("Service created", "operation", op, "obj", *service)
+		r.emitEvent(agent, "Created", "CreateService", "Service %s created", service.Name)
+	} else if op == controllerutil.OperationResultUpdated {
+		log.Info("Service updated", "operation", op, "obj", *service)
+		r.emitEvent(agent, "Updated", "UpdateService", "Service %s updated", service.Name)
 	} else {
 		log.V(1).Info("Service up to date")
 	}
@@ -447,6 +457,13 @@ func getOrDefaultResourceRequirements(agent *runtimev1alpha1.Agent) corev1.Resou
 			corev1.ResourceMemory: resource.MustParse("500Mi"),
 			corev1.ResourceCPU:    resource.MustParse("500m"),
 		},
+	}
+}
+
+// emitEvent records a normal Kubernetes event on the given object if a Recorder is configured.
+func (r *AgentReconciler) emitEvent(regarding runtime.Object, reason, action, note string, args ...interface{}) {
+	if r.Recorder != nil {
+		r.Recorder.Eventf(regarding, nil, corev1.EventTypeNormal, reason, action, note, args...)
 	}
 }
 
