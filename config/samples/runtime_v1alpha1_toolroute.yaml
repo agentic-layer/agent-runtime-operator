@@ -8,6 +8,13 @@
 # Deploy with: kubectl apply -f runtime_v1alpha1_toolroute.yaml
 
 ---
+# Namespace for tool server tests
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-tool-servers
+---
+
 # ToolServer: Provides MCP tools
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: ToolServer
