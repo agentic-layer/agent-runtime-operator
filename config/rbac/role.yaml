@@ -73,7 +73,14 @@ rules:
   resources:
   - agentruntimeconfigurations
   - aigateways
+  - toolroutes
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - runtime.agentic-layer.ai
+  resources:
+  - toolroutes/status
+  verbs:
+  - get

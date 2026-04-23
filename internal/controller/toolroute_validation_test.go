@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
 )
@@ -24,6 +25,15 @@ var _ = Describe("ToolRoute CEL validation", func() {
 			},
 		}
 	}
+
+	AfterEach(func() {
+		// Clean up all ToolRoutes in the test namespace
+		routes := &runtimev1alpha1.ToolRouteList{}
+		_ = k8sClient.List(ctx, routes, &client.ListOptions{Namespace: ns})
+		for i := range routes.Items {
+			_ = k8sClient.Delete(ctx, &routes.Items[i])
+		}
+	})
 
 	It("accepts upstream with only toolServerRef", func() {
 		r := newRoute("valid-tsref", runtimev1alpha1.ToolRouteUpstream{

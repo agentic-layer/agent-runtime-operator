@@ -129,6 +129,7 @@ spec:
                         description: Url is the HTTP/HTTPS endpoint of the external
                           MCP server.
                         format: uri
+                        pattern: ^https?://.+
                         type: string
                     required:
                     - url

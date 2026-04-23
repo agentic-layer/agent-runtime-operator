@@ -39,8 +39,10 @@ var _ = Describe("Agent with ToolRoute", Ordered, func() {
 
 	BeforeAll(func() {
 		By("creating the test namespace")
-		_, _ = utils.Run(exec.Command("kubectl", "create", "namespace", toolRouteTestNamespace))
-		var err error
+		out, err := utils.Run(exec.Command("kubectl", "create", "namespace", toolRouteTestNamespace))
+		if err != nil && !strings.Contains(out, "AlreadyExists") {
+			Fail(fmt.Sprintf("failed to create namespace: %v\nOutput: %s", err, out))
+		}
 
 		By("applying the ToolServer resource")
 		toolServerYAML := fmt.Sprintf(`
@@ -187,8 +189,7 @@ spec:
 })
 
 // kubectlApplyStdin returns a kubectl apply command that reads YAML from stdin.
-// It writes the YAML to a temp file via the process substitution approach that
-// works with exec.Command.
+// The YAML content is streamed via stdin to `kubectl apply -f -`.
 func kubectlApplyStdin(yamlContent string) *exec.Cmd {
 	cmd := exec.Command("kubectl", "apply", "-f", "-")
 	cmd.Stdin = strings.NewReader(yamlContent)

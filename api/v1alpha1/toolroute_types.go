@@ -54,6 +54,7 @@ type ExternalUpstream struct {
 	// Url is the HTTP/HTTPS endpoint of the external MCP server.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Format=uri
+	// +kubebuilder:validation:Pattern=`^https?://.+`
 	Url string `json:"url"`
 }
 
