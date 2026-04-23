@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,104 +27,34 @@ import (
 	"github.com/agentic-layer/agent-runtime-operator/test/utils"
 )
 
-var _ = Describe("Agent with ToolRoute", Ordered, func() {
+var _ = Describe("ToolRoute Integration", Ordered, func() {
 	const (
-		toolRouteTestNamespace = "e2e-toolroute"
-		toolServerName         = "ts-e2e"
-		toolRouteName          = "tr-e2e"
-		agentName              = "agent-e2e-toolroute"
-		fakeGatewayURL         = "http://fake-gw/e2e/mcp"
+		sampleFile     = "config/samples/runtime_v1alpha1_toolroute.yaml"
+		testNamespace  = "test-tool-servers"
+		toolServerName = "example-http-toolserver"
+		toolRouteName  = "example-toolroute"
+		agentName      = "example-toolroute-agent"
+		fakeGatewayURL = "http://fake-gateway.test-tool-servers.svc.cluster.local:8080/mcp"
 	)
 
 	BeforeAll(func() {
-		By("creating the test namespace")
-		out, err := utils.Run(exec.Command("kubectl", "create", "namespace", toolRouteTestNamespace))
-		if err != nil && !strings.Contains(out, "AlreadyExists") {
-			Fail(fmt.Sprintf("failed to create namespace: %v\nOutput: %s", err, out))
-		}
-
-		By("applying the ToolServer resource")
-		toolServerYAML := fmt.Sprintf(`
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: ToolServer
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  protocol: mcp
-  transportType: http
-  image: mcp/context7:latest
-  port: 8080
-  replicas: 1
-`, toolServerName, toolRouteTestNamespace)
-		_, err = utils.Run(kubectlApplyStdin(toolServerYAML))
-		Expect(err).NotTo(HaveOccurred(), "Failed to apply ToolServer")
-
-		By("applying the ToolRoute resource")
-		toolRouteYAML := fmt.Sprintf(`
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: ToolRoute
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  toolGatewayRef:
-    name: placeholder-gateway
-  upstream:
-    toolServerRef:
-      name: %s
-`, toolRouteName, toolRouteTestNamespace, toolServerName)
-		_, err = utils.Run(kubectlApplyStdin(toolRouteYAML))
-		Expect(err).NotTo(HaveOccurred(), "Failed to apply ToolRoute")
+		By("applying the toolroute sample")
+		_, err := utils.Run(exec.Command("kubectl", "apply", "-f", sampleFile))
+		Expect(err).NotTo(HaveOccurred(), "Failed to apply toolroute sample")
 
 		By("patching ToolRoute status to simulate gateway assigning a URL")
 		_, err = utils.Run(exec.Command("kubectl", "patch", "toolroute", toolRouteName,
-			"-n", toolRouteTestNamespace,
+			"-n", testNamespace,
 			"--subresource=status",
 			"--type=merge",
 			"-p", fmt.Sprintf(`{"status":{"url":%q}}`, fakeGatewayURL),
 		))
 		Expect(err).NotTo(HaveOccurred(), "Failed to patch ToolRoute status with URL")
-
-		By("applying the Agent resource referencing the ToolRoute")
-		agentYAML := fmt.Sprintf(`
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: Agent
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  framework: google-adk
-  description: "E2E test agent with ToolRoute"
-  instruction: "Test agent"
-  model: "gemini/gemini-2.5-flash"
-  tools:
-    - name: e2e_tool
-      toolRouteRef:
-        name: %s
-  protocols:
-    - type: A2A
-  replicas: 1
-`, agentName, toolRouteTestNamespace, toolRouteName)
-		_, err = utils.Run(kubectlApplyStdin(agentYAML))
-		Expect(err).NotTo(HaveOccurred(), "Failed to apply Agent")
 	})
 
 	AfterAll(func() {
-		By("cleaning up Agent resource")
-		_, _ = utils.Run(exec.Command("kubectl", "delete", "agent", agentName,
-			"-n", toolRouteTestNamespace, "--ignore-not-found=true"))
-
-		By("cleaning up ToolRoute resource")
-		_, _ = utils.Run(exec.Command("kubectl", "delete", "toolroute", toolRouteName,
-			"-n", toolRouteTestNamespace, "--ignore-not-found=true"))
-
-		By("cleaning up ToolServer resource")
-		_, _ = utils.Run(exec.Command("kubectl", "delete", "toolserver", toolServerName,
-			"-n", toolRouteTestNamespace, "--ignore-not-found=true"))
-
-		By("deleting the test namespace")
-		_, _ = utils.Run(exec.Command("kubectl", "delete", "namespace", toolRouteTestNamespace, "--ignore-not-found=true"))
+		By("cleaning up the toolroute sample")
+		_, _ = utils.Run(exec.Command("kubectl", "delete", "-f", sampleFile, "--ignore-not-found=true"))
 	})
 
 	AfterEach(func() {
@@ -136,9 +65,9 @@ spec:
 
 			By("fetching events from the test namespace")
 			eventsOutput, err := utils.Run(exec.Command("kubectl", "get", "events",
-				"-n", toolRouteTestNamespace, "--sort-by=.lastTimestamp"))
+				"-n", testNamespace, "--sort-by=.lastTimestamp"))
 			if err == nil {
-				_, _ = fmt.Fprintf(GinkgoWriter, "Events in %s:\n%s", toolRouteTestNamespace, eventsOutput)
+				_, _ = fmt.Fprintf(GinkgoWriter, "Events in %s:\n%s", testNamespace, eventsOutput)
 			}
 		}
 	})
@@ -147,29 +76,29 @@ spec:
 		By("waiting for the Agent Deployment to exist")
 		Eventually(func(g Gomega) {
 			_, err := utils.Run(exec.Command("kubectl", "get", "deployment", agentName,
-				"-n", toolRouteTestNamespace))
+				"-n", testNamespace))
 			g.Expect(err).NotTo(HaveOccurred(), "Agent Deployment should exist")
 		}, 2*time.Minute, 5*time.Second).Should(Succeed())
 
 		By("verifying AGENT_TOOLS env contains the ToolRoute URL")
 		Eventually(func(g Gomega) {
 			envOutput, err := utils.Run(exec.Command("kubectl", "get", "deployment", agentName,
-				"-n", toolRouteTestNamespace,
+				"-n", testNamespace,
 				"-o", `jsonpath={.spec.template.spec.containers[0].env}`))
 			g.Expect(err).NotTo(HaveOccurred(), "Should be able to read Deployment env vars")
 			g.Expect(envOutput).To(ContainSubstring(fakeGatewayURL),
 				"AGENT_TOOLS env should contain the URL from ToolRoute.status.url")
-			g.Expect(envOutput).To(ContainSubstring("e2e_tool"),
+			g.Expect(envOutput).To(ContainSubstring("example_tools"),
 				"AGENT_TOOLS env should contain the tool name")
 		}, 2*time.Minute, 5*time.Second).Should(Succeed())
 	})
 
 	It("should update the Agent Deployment when ToolRoute status URL changes", func() {
-		const updatedURL = "http://fake-gw/e2e/mcp/v2"
+		const updatedURL = "http://updated-gateway.test-tool-servers.svc.cluster.local:8080/mcp/v2"
 
 		By("patching ToolRoute status with a new URL")
 		_, err := utils.Run(exec.Command("kubectl", "patch", "toolroute", toolRouteName,
-			"-n", toolRouteTestNamespace,
+			"-n", testNamespace,
 			"--subresource=status",
 			"--type=merge",
 			"-p", fmt.Sprintf(`{"status":{"url":%q}}`, updatedURL),
@@ -179,7 +108,7 @@ spec:
 		By("verifying AGENT_TOOLS env is updated with the new URL")
 		Eventually(func(g Gomega) {
 			envOutput, err := utils.Run(exec.Command("kubectl", "get", "deployment", agentName,
-				"-n", toolRouteTestNamespace,
+				"-n", testNamespace,
 				"-o", `jsonpath={.spec.template.spec.containers[0].env}`))
 			g.Expect(err).NotTo(HaveOccurred(), "Should be able to read Deployment env vars")
 			g.Expect(envOutput).To(ContainSubstring(updatedURL),
@@ -187,11 +116,3 @@ spec:
 		}, 2*time.Minute, 5*time.Second).Should(Succeed())
 	})
 })
-
-// kubectlApplyStdin returns a kubectl apply command that reads YAML from stdin.
-// The YAML content is streamed via stdin to `kubectl apply -f -`.
-func kubectlApplyStdin(yamlContent string) *exec.Cmd {
-	cmd := exec.Command("kubectl", "apply", "-f", "-")
-	cmd.Stdin = strings.NewReader(yamlContent)
-	return cmd
-}
