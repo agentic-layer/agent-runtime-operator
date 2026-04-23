@@ -13,6 +13,7 @@ resources:
 - bases/runtime.agentic-layer.ai_guards.yaml
 - bases/runtime.agentic-layer.ai_toolgatewayclasses.yaml
 - bases/runtime.agentic-layer.ai_toolgateways.yaml
+- bases/runtime.agentic-layer.ai_toolroutes.yaml
 - bases/runtime.agentic-layer.ai_toolservers.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
