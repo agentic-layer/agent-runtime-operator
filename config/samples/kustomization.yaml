@@ -3,6 +3,7 @@ resources:
 - runtime_v1alpha1_agent.yaml
 - runtime_v1alpha1_agenticworkforce.yaml
 - runtime_v1alpha1_agentruntimeconfiguration.yaml
+- runtime_v1alpha1_toolroute.yaml
 - runtime_v1alpha1_toolserver.yaml
 - runtime_v1alpha1_guardrailprovider.yaml
 - runtime_v1alpha1_guard.yaml

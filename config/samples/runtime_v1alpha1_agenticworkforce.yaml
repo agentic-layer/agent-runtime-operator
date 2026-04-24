@@ -55,6 +55,36 @@ spec:
   replicas: 1
 
 ---
+# ToolRoute 1: Routes to toolserver-ns1
+# This route will be used by the shared agent
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: toolroute-ns1
+  namespace: test-wf-ns1
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    toolServerRef:
+      name: toolserver-ns1
+
+---
+# ToolRoute 2: Routes to toolserver-ns2
+# This demonstrates cross-namespace tool routes
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: toolroute-ns2
+  namespace: test-wf-ns2
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    toolServerRef:
+      name: toolserver-ns2
+
+---
 # Shared Agent (Leaf Agent): Used by BOTH workforces
 # - In Workforce 1: Part of the 3-level hierarchy (leaf)
 # - In Workforce 2: Direct entry point (simple workforce)
@@ -69,8 +99,8 @@ spec:
   image: ghcr.io/agentic-layer/mock-agent:0.6.2
   tools:
     - name: tool-ns1
-      toolServerRef:
-        name: toolserver-ns1
+      toolRouteRef:
+        name: toolroute-ns1
 
 ---
 # Mid-level Agent: Part of the hierarchy for Workforce 1
@@ -88,8 +118,8 @@ spec:
   # Cross-namespace tool reference
   tools:
     - name: tool-ns2
-      toolServerRef:
-        name: toolserver-ns2
+      toolRouteRef:
+        name: toolroute-ns2
   # Cross-namespace sub-agent reference
   subAgents:
     - name: shared
@@ -160,14 +190,14 @@ spec:
 #     - mid-agent (ns2)
 #     - shared-agent (ns1)
 #   transitiveTools:
-#     - toolserver-ns1 (ns1) [from shared-agent]
-#     - toolserver-ns2 (ns2) [from mid-agent]
+#     - toolroute-ns1 (ns1) [from shared-agent]
+#     - toolroute-ns2 (ns2) [from mid-agent]
 #
 # simple-workforce status should show:
 #   transitiveAgents:
 #     - shared-agent (ns1)
 #   transitiveTools:
-#     - toolserver-ns1 (ns1) [from shared-agent]
+#     - toolroute-ns1 (ns1) [from shared-agent]
 #
 # Verification commands:
 #   kubectl get agenticworkforce -n test-wf-ns1

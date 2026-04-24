@@ -65,7 +65,7 @@ var _ = Describe("AgenticWorkforce", Ordered, func() {
 
 		By("verifying complex workforce contains all transitive tools")
 		verifyWorkforceContainsTools(complexWorkforce, namespace1,
-			"toolserver-ns1", "toolserver-ns2")
+			"toolroute-ns1", "toolroute-ns2")
 	})
 
 	It("should deploy and validate simple workforce with shared agent", func() {
@@ -75,8 +75,8 @@ var _ = Describe("AgenticWorkforce", Ordered, func() {
 		By("verifying simple workforce contains only the shared agent")
 		verifyWorkforceContainsAgents(simpleWorkforce, namespace1, "shared-agent")
 
-		By("verifying simple workforce contains only toolserver-ns1")
-		verifyWorkforceContainsTools(simpleWorkforce, namespace1, "toolserver-ns1")
+		By("verifying simple workforce contains only toolroute-ns1")
+		verifyWorkforceContainsTools(simpleWorkforce, namespace1, "toolroute-ns1")
 	})
 })
 

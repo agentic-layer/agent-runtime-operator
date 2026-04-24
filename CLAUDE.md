@@ -55,6 +55,12 @@ This folder is hosted as a separate [documentation site](https://docs.agentic-la
   - Environment variable configuration
   - Status tracking with conditions and service URL
 
+- **ToolRoute CRD** (`api/v1alpha1/toolroute_types.go`): Defines the ToolRoute custom resource for per-consumer exposure of tool servers through a ToolGateway:
+  - Upstream reference (cluster ToolServer or external URL)
+  - Tool filter (name + glob allow/deny)
+  - Status URL populated by the gateway implementation operator
+  - Not reconciled by agent-runtime-operator — each tool-gateway implementation owns its reconciliation
+
 - **Agent Controller** (`internal/controller/agent_controller.go`): Reconciles Agent resources by:
   - Creating Kubernetes Deployments for agent workloads
   - Managing Services for protocol exposure

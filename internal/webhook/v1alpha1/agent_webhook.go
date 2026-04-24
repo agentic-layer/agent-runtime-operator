@@ -227,43 +227,16 @@ func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgen
 	return errs
 }
 
-// validateTool validates a Tool configuration for business logic correctness.
-// This performs stateless validation only - no cluster state checks.
-// Basic URI format validation is handled by kubebuilder annotation.
+// validateTool validates a single AgentTool entry.
+// Stateless validation only; cross-object references (e.g., existence of ToolRoute) are enforced at reconcile time.
 func (v *AgentCustomValidator) validateTool(tool runtimev1alpha1.AgentTool, index int) []*field.Error {
 	var errs []*field.Error
 
-	hasToolServerRef := tool.ToolServerRef != nil
-	hasURL := tool.Url != ""
-
-	// Exactly one of toolServerRef or url must be specified (mutually exclusive)
-	if hasToolServerRef && hasURL {
-		errs = append(errs, field.Forbidden(
-			field.NewPath("spec", "tools").Index(index),
-			"toolServerRef and url are mutually exclusive - specify exactly one"))
-	}
-
-	if !hasToolServerRef && !hasURL {
+	if tool.ToolRouteRef.Name == "" {
 		errs = append(errs, field.Required(
-			field.NewPath("spec", "tools").Index(index),
-			"either toolServerRef or url must be specified"))
-	}
-
-	// Validate toolServerRef if provided
-	if hasToolServerRef && tool.ToolServerRef.Name == "" {
-		errs = append(errs, field.Required(
-			field.NewPath("spec", "tools").Index(index).Child("toolServerRef", "name"),
-			"toolServerRef.name must be specified"))
-	}
-
-	// Only validate scheme restriction (kubebuilder handles URI format)
-	if hasURL {
-		if err := v.validateHTTPScheme(tool.Url); err != nil {
-			errs = append(errs, field.Invalid(
-				field.NewPath("spec", "tools").Index(index).Child("url"),
-				tool.Url,
-				fmt.Sprintf("Tool[%d].Url: %s", index, err.Error())))
-		}
+			field.NewPath("spec", "tools").Index(index).Child("toolRouteRef", "name"),
+			"toolRouteRef.name must be set",
+		))
 	}
 
 	return errs

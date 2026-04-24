@@ -63,6 +63,8 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agents/finalizers,verbs=update
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolservers/status,verbs=get
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolroutes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=toolroutes/status,verbs=get
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=aigateways,verbs=get;list;watch
 // +kubebuilder:rbac:groups=runtime.agentic-layer.ai,resources=agentruntimeconfigurations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
@@ -131,7 +133,7 @@ func (r *AgentReconciler) reconcileAgent(ctx context.Context, agent *runtimev1al
 		return nil, err
 	}
 
-	// Resolve Tools from ToolServer references early - fail fast if any cannot be resolved
+	// Resolve Tools from ToolRoute references early — fail fast if any cannot be resolved
 	resolvedTools, err := r.resolveAllTools(ctx, agent)
 	if err != nil {
 		return nil, err
@@ -385,8 +387,8 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingSubAgent),
 		).
 		Watches(
-			&runtimev1alpha1.ToolServer{},
-			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingToolServer),
+			&runtimev1alpha1.ToolRoute{},
+			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingToolRoute),
 		).
 		Watches(
 			&runtimev1alpha1.AgentRuntimeConfiguration{},

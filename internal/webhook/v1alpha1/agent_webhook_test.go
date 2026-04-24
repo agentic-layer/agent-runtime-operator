@@ -373,7 +373,7 @@ var _ = Describe("Agent Webhook", func() {
 					{Name: "summarizer", Url: "https://example.com/summarizer.json"},
 				}
 				obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-					{Name: "news_fetcher", ToolServerRef: &corev1.ObjectReference{Name: "news-fetcher-tool"}},
+					{Name: "news_fetcher", ToolRouteRef: corev1.ObjectReference{Name: "news-fetcher-route"}},
 				}
 
 				By("calling the Default method")
@@ -389,7 +389,7 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.SubAgents[0].Url).To(Equal("https://example.com/summarizer.json"))
 				Expect(obj.Spec.Tools).To(HaveLen(1))
 				Expect(obj.Spec.Tools[0].Name).To(Equal("news_fetcher"))
-				Expect(obj.Spec.Tools[0].ToolServerRef.Name).To(Equal("news-fetcher-tool"))
+				Expect(obj.Spec.Tools[0].ToolRouteRef.Name).To(Equal("news-fetcher-route"))
 			})
 
 			It("Should work with empty template fields", func() {
@@ -530,128 +530,24 @@ var _ = Describe("Agent Webhook", func() {
 			})
 
 			Describe("Tool validation", func() {
-				It("should reject tools with both toolServerRef and url", func() {
+				It("rejects a tool with empty toolRouteRef.name", func() {
 					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{
-							Name:          "invalid-tool",
-							ToolServerRef: &corev1.ObjectReference{Name: "server"},
-							Url:           "https://example.com/tool",
-						},
+						{Name: "t1"},
 					}
 
 					warnings, err := validator.validateAgent(obj)
 					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("mutually exclusive"))
-					Expect(err.Error()).To(ContainSubstring("spec.tools[0]"))
+					Expect(err.Error()).To(ContainSubstring("toolRouteRef.name must be set"))
 					Expect(warnings).To(BeEmpty())
 				})
 
-				It("should reject tools with neither toolServerRef nor url", func() {
+				It("accepts a tool with a valid toolRouteRef", func() {
 					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "incomplete-tool"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("either toolServerRef or url must be specified"))
-					Expect(err.Error()).To(ContainSubstring("spec.tools[0]"))
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should accept tool with direct URL", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "remote-tool", Url: "https://mcp.example.com/tools"},
+						{Name: "t1", ToolRouteRef: corev1.ObjectReference{Name: "some-route"}},
 					}
 
 					warnings, err := validator.validateAgent(obj)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should accept tool with toolServerRef", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "local-tool", ToolServerRef: &corev1.ObjectReference{Name: "my-toolserver"}},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should reject toolServerRef without name", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "tool", ToolServerRef: &corev1.ObjectReference{Namespace: "default"}},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("toolServerRef.name must be specified"))
-					Expect(err.Error()).To(ContainSubstring("spec.tools[0].toolServerRef.name"))
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should accept valid HTTP and HTTPS URLs", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "https-tool", Url: "https://example.com/tools"},
-						{Name: "http-tool", Url: "http://mcp-service:8080/tools"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should reject invalid URL schemes", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "ftp-tool", Url: "ftp://example.com/tool"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("must use HTTP or HTTPS scheme"))
-					Expect(err.Error()).To(ContainSubstring("Tool[0].Url"))
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should reject URLs without host", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "bad-tool", Url: "https://"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("must have a valid host"))
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should provide clear error messages with field paths", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "valid", Url: "https://example.com/valid"},
-						{Name: "invalid", Url: "file:///path/to/tool"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("spec.tools[1].url"))
-					Expect(err.Error()).To(ContainSubstring("Tool[1].Url"))
-					Expect(warnings).To(BeEmpty())
-				})
-
-				It("should validate multiple tools independently", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "valid-url", Url: "https://mcp1.example.com/tools"},
-						{Name: "valid-ref", ToolServerRef: &corev1.ObjectReference{Name: "toolserver1"}},
-						{Name: "invalid-both", ToolServerRef: &corev1.ObjectReference{Name: "server"}, Url: "https://example.com"},
-						{Name: "invalid-none"},
-					}
-
-					warnings, err := validator.validateAgent(obj)
-					Expect(err).To(HaveOccurred())
-					// Should have errors for both invalid tools (index 2 and 3)
-					Expect(err.Error()).To(ContainSubstring("spec.tools[2]"))
-					Expect(err.Error()).To(ContainSubstring("spec.tools[3]"))
-					Expect(err.Error()).To(ContainSubstring("mutually exclusive"))
-					Expect(err.Error()).To(ContainSubstring("either toolServerRef or url must be specified"))
 					Expect(warnings).To(BeEmpty())
 				})
 			})

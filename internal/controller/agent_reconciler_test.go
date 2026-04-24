@@ -146,7 +146,7 @@ var _ = Describe("Agent Controller", func() {
 			Expect(updatedAgent.Status.AiGatewayRef).To(BeNil())
 		})
 
-		It("should fail when toolserver cannot be resolved", func() {
+		It("should fail when toolroute cannot be resolved", func() {
 			agent := &runtimev1alpha1.Agent{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-missing-toolserver",
@@ -156,7 +156,7 @@ var _ = Describe("Agent Controller", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "missing-tool", ToolServerRef: &corev1.ObjectReference{Name: "missing-toolserver"}},
+						{Name: "missing-tool", ToolRouteRef: corev1.ObjectReference{Name: "missing-toolroute"}},
 					},
 				},
 			}

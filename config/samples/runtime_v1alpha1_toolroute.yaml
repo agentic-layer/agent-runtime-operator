@@ -1,0 +1,76 @@
+# ToolRoute Sample
+#
+# This sample demonstrates the integration of ToolServer, ToolRoute, and Agent:
+# 1. ToolServer provides MCP tools
+# 2. ToolRoute exposes the ToolServer through a ToolGateway
+# 3. Agent references the ToolRoute to access the tools
+#
+# Deploy with: kubectl apply -f runtime_v1alpha1_toolroute.yaml
+
+---
+# Namespace for tool server tests
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-tool-servers
+---
+
+# ToolServer: Provides MCP tools
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: example-http-toolserver
+  namespace: test-tool-servers
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  replicas: 1
+
+---
+# ToolRoute: Exposes the ToolServer through a gateway with optional filtering
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: example-toolroute
+  namespace: test-tool-servers
+spec:
+  toolGatewayRef:
+    name: example-toolgateway
+  upstream:
+    toolServerRef:
+      name: example-http-toolserver
+  toolFilter:
+    allow: ["get_*", "list_*"]
+    deny: ["*delete*"]
+
+---
+# Agent: Uses tools from the ToolRoute
+# The agent references the ToolRoute, and the operator resolves the URL from ToolRoute.status.url
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  labels:
+    app.kubernetes.io/name: agent-runtime-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: example-toolroute-agent
+  namespace: test-tool-servers
+spec:
+  framework: google-adk
+  description: "Example agent using ToolRoute"
+  instruction: "You are an agent that can use tools provided through a ToolRoute"
+  model: "gemini/gemini-2.5-flash"
+  tools:
+    - name: example_tools
+      toolRouteRef:
+        name: example-toolroute
+  protocols:
+    - type: A2A
+  replicas: 1

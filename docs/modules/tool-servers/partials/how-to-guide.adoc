@@ -56,25 +56,32 @@ kubectl logs -l app=context7-toolserver
 
 == Using Tool Servers with Agents
 
-To connect a tool server to your agent, reference it using `toolServerRef`:
-
-NOTE: Replace `your-gemini-api-key-here` with your actual Gemini API key before deploying.
+Tool servers are exposed to agents through a ToolRoute. Define a ToolRoute to expose a
+ToolServer via a ToolGateway, then reference the route from the agent:
 
 [source,yaml]
 ----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: context7-route
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    toolServerRef:
+      name: context7-toolserver
+---
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent
 metadata:
   name: coding-assistant
 spec:
   framework: google-adk
-  description: "A coding assistant with access to up-to-date documentation"
-  instruction: "You are a helpful coding assistant. Use the context7 tool to fetch up-to-date documentation for libraries and frameworks to help answer coding questions accurately."
-  model: "gemini/gemini-2.5-flash"
   tools:
     - name: context7_tools
-      toolServerRef:
-        name: context7-toolserver
+      toolRouteRef:
+        name: context7-route
   protocols:
     - type: A2A
   replicas: 1
@@ -82,9 +89,5 @@ spec:
     - name: GEMINI_API_KEY
       value: "your-gemini-api-key-here"
 ----
-
-The operator automatically wires the agent to the tool server using the ToolServer's name.
-
-For more details on creating and configuring agents, see xref:agent-runtime-operator:agents:how-to-guide.adoc[Create an AI Agent].
 
 Happy tool server building! 🔧
