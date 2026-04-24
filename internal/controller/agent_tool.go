@@ -65,10 +65,7 @@ func (r *AgentReconciler) resolveToolRouteUrl(ctx context.Context, tool runtimev
 		return "", fmt.Errorf("toolRouteRef.name is empty")
 	}
 
-	namespace := tool.ToolRouteRef.Namespace
-	if namespace == "" {
-		namespace = parentNamespace
-	}
+	namespace := getNamespaceWithDefault(&tool.ToolRouteRef, parentNamespace)
 
 	var route runtimev1alpha1.ToolRoute
 	if err := r.Get(ctx, types.NamespacedName{Name: tool.ToolRouteRef.Name, Namespace: namespace}, &route); err != nil {
