@@ -80,8 +80,9 @@ spec:
   framework: google-adk
   tools:
     - name: context7_tools
-      toolRouteRef:
-        name: context7-route
+      upstream:
+        toolRouteRef:
+          name: context7-route
   protocols:
     - type: A2A
   replicas: 1

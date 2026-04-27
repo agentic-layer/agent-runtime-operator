@@ -98,17 +98,22 @@ spec:
   tools:
     # Reference to ToolServer in the same namespace (namespace field omitted)
     - name: news_fetcher
-      toolServerRef:
-        name: news_fetcher_toolserver
+      upstream:
+        toolServerRef:
+          name: news_fetcher_toolserver
 
     # Direct URL to external MCP server (no ToolServer resource needed)
     - name: web_fetcher
-      url: "https://mcp.example.com/web-fetch"
+      upstream:
+        external:
+          url: "https://mcp.example.com/web-fetch"
 
     # Optional: Propagate specific headers to the MCP server for authentication
     # Headers from incoming A2A requests are passed to the tool server
     - name: authenticated_api
-      url: "https://api.example.com/mcp"
+      upstream:
+        external:
+          url: "https://api.example.com/mcp"
       propagatedHeaders:
         - Authorization
         - X-API-Key
@@ -161,13 +166,17 @@ The `propagatedHeaders` field allows you to pass specific HTTP headers from inco
 ----
 tools:
   - name: github_api
-    url: "https://github-mcp.example.com/mcp"
+    upstream:
+      external:
+        url: "https://github-mcp.example.com/mcp"
     propagatedHeaders:
       - Authorization      # Pass the Authorization header
       - X-GitHub-Token     # Pass custom headers
 
   - name: public_tool
-    url: "https://public-mcp.example.com/mcp"
+    upstream:
+      external:
+        url: "https://public-mcp.example.com/mcp"
     # No propagatedHeaders - no headers are passed
 ----
 
