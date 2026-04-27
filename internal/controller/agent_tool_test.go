@@ -30,11 +30,9 @@ import (
 )
 
 const (
-	TestProtocol      = "mcp"
-	TestTransportHTTP = "http"
-	TestImage         = "test-image:latest"
-	TestFramework     = "google-adk"
-	DefaultNamespace  = "default"
+	TestImage        = "test-image:latest"
+	TestFramework    = "google-adk"
+	DefaultNamespace = "default"
 )
 
 // createToolRoute creates a ToolRoute resource and optionally populates its status.Url.

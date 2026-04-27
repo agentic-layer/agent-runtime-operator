@@ -31,7 +31,6 @@ var _ = Describe("ToolRoute Integration", Ordered, func() {
 	const (
 		sampleFile     = "config/samples/runtime_v1alpha1_toolroute.yaml"
 		testNamespace  = "test-tool-servers"
-		toolServerName = "example-http-toolserver"
 		toolRouteName  = "example-toolroute"
 		agentName      = "example-toolroute-agent"
 		fakeGatewayURL = "http://fake-gateway.test-tool-servers.svc.cluster.local:8080/mcp"
