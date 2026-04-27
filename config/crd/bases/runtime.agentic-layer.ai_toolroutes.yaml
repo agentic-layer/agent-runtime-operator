@@ -74,6 +74,7 @@ spec:
                 description: |-
                   ToolGatewayRef identifies the ToolGateway hosting this route.
                   Namespace defaults to the ToolRoute's namespace if not specified.
+                  If omitted, the default ToolGateway in the cluster is used.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -186,7 +187,6 @@ spec:
                   rule: '(has(self.toolServerRef) ? 1 : 0) + (has(self.external) ?
                     1 : 0) == 1'
             required:
-            - toolGatewayRef
             - upstream
             type: object
           status:

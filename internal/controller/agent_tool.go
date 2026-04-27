@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	runtimev1alpha1 "github.com/agentic-layer/agent-runtime-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,14 +35,14 @@ type ResolvedTool struct {
 	PropagatedHeaders []string
 }
 
-// resolveAllTools resolves every tool's URL via its ToolRoute. Errors are aggregated so
+// resolveAllTools resolves every tool's URL via its upstream. Errors are aggregated so
 // the caller sees all unresolved tools in a single message.
 func (r *AgentReconciler) resolveAllTools(ctx context.Context, agent *runtimev1alpha1.Agent) (map[string]ResolvedTool, error) {
 	resolved := make(map[string]ResolvedTool)
 	var issues []string
 
 	for _, tool := range agent.Spec.Tools {
-		url, err := r.resolveToolRouteUrl(ctx, tool, agent.Namespace)
+		url, err := r.resolveToolUrl(ctx, tool, agent.Namespace)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("tool %q: %v", tool.Name, err))
 			continue
@@ -58,18 +59,27 @@ func (r *AgentReconciler) resolveAllTools(ctx context.Context, agent *runtimev1a
 	return resolved, nil
 }
 
-// resolveToolRouteUrl fetches the ToolRoute referenced by the tool and returns status.url.
-// Namespace defaults to the parent Agent's namespace if the ref doesn't set one.
-func (r *AgentReconciler) resolveToolRouteUrl(ctx context.Context, tool runtimev1alpha1.AgentTool, parentNamespace string) (string, error) {
-	if tool.ToolRouteRef.Name == "" {
-		return "", fmt.Errorf("toolRouteRef.name is empty")
+// resolveToolUrl dispatches to the appropriate resolver based on which upstream field is set.
+func (r *AgentReconciler) resolveToolUrl(ctx context.Context, tool runtimev1alpha1.AgentTool, parentNamespace string) (string, error) {
+	switch {
+	case tool.Upstream.ToolRouteRef != nil:
+		return r.resolveToolRouteUrl(ctx, tool.Upstream.ToolRouteRef, parentNamespace)
+	case tool.Upstream.ToolServerRef != nil:
+		return r.resolveToolServerUrl(ctx, tool.Upstream.ToolServerRef, parentNamespace)
+	case tool.Upstream.External != nil:
+		return tool.Upstream.External.Url, nil
+	default:
+		return "", fmt.Errorf("no upstream configured")
 	}
+}
 
-	namespace := getNamespaceWithDefault(&tool.ToolRouteRef, parentNamespace)
-
+// resolveToolRouteUrl fetches the ToolRoute and returns its status.url.
+// Namespace defaults to parentNamespace if the ref doesn't set one.
+func (r *AgentReconciler) resolveToolRouteUrl(ctx context.Context, ref *corev1.ObjectReference, parentNamespace string) (string, error) {
+	namespace := getNamespaceWithDefault(ref, parentNamespace)
 	var route runtimev1alpha1.ToolRoute
-	if err := r.Get(ctx, types.NamespacedName{Name: tool.ToolRouteRef.Name, Namespace: namespace}, &route); err != nil {
-		return "", fmt.Errorf("failed to resolve ToolRoute %s/%s: %w", namespace, tool.ToolRouteRef.Name, err)
+	if err := r.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: namespace}, &route); err != nil {
+		return "", fmt.Errorf("failed to resolve ToolRoute %s/%s: %w", namespace, ref.Name, err)
 	}
 	if route.Status.Url == "" {
 		return "", fmt.Errorf("ToolRoute %s/%s has no URL in its Status field", namespace, route.Name)
@@ -77,8 +87,21 @@ func (r *AgentReconciler) resolveToolRouteUrl(ctx context.Context, tool runtimev
 	return route.Status.Url, nil
 }
 
-// findAgentsReferencingToolRoute enqueues all Agents that reference the changed ToolRoute.
-// Replaces findAgentsReferencingToolServer. Triggered by watches on ToolRoute status changes.
+// resolveToolServerUrl fetches the ToolServer and returns its status.url.
+// Namespace defaults to parentNamespace if the ref doesn't set one.
+func (r *AgentReconciler) resolveToolServerUrl(ctx context.Context, ref *corev1.ObjectReference, parentNamespace string) (string, error) {
+	namespace := getNamespaceWithDefault(ref, parentNamespace)
+	var server runtimev1alpha1.ToolServer
+	if err := r.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: namespace}, &server); err != nil {
+		return "", fmt.Errorf("failed to resolve ToolServer %s/%s: %w", namespace, ref.Name, err)
+	}
+	if server.Status.Url == "" {
+		return "", fmt.Errorf("ToolServer %s/%s has no URL in its Status field", namespace, server.Name)
+	}
+	return server.Status.Url, nil
+}
+
+// findAgentsReferencingToolRoute enqueues all Agents whose upstream.toolRouteRef matches the changed ToolRoute.
 func (r *AgentReconciler) findAgentsReferencingToolRoute(ctx context.Context, obj client.Object) []ctrl.Request {
 	updated, ok := obj.(*runtimev1alpha1.ToolRoute)
 	if !ok {
@@ -94,10 +117,10 @@ func (r *AgentReconciler) findAgentsReferencingToolRoute(ctx context.Context, ob
 	var requests []ctrl.Request
 	for _, agent := range agentList.Items {
 		for _, tool := range agent.Spec.Tools {
-			if tool.ToolRouteRef.Name != updated.Name {
+			if tool.Upstream.ToolRouteRef == nil || tool.Upstream.ToolRouteRef.Name != updated.Name {
 				continue
 			}
-			ns := tool.ToolRouteRef.Namespace
+			ns := tool.Upstream.ToolRouteRef.Namespace
 			if ns == "" {
 				ns = agent.Namespace
 			}
@@ -109,6 +132,43 @@ func (r *AgentReconciler) findAgentsReferencingToolRoute(ctx context.Context, ob
 			})
 			logf.FromContext(ctx).Info("Enqueuing agent due to ToolRoute status change",
 				"agent", agent.Name, "toolRoute", updated.Name, "url", updated.Status.Url)
+			break
+		}
+	}
+	return requests
+}
+
+// findAgentsReferencingToolServer enqueues all Agents whose upstream.toolServerRef matches the changed ToolServer.
+func (r *AgentReconciler) findAgentsReferencingToolServer(ctx context.Context, obj client.Object) []ctrl.Request {
+	updated, ok := obj.(*runtimev1alpha1.ToolServer)
+	if !ok {
+		return nil
+	}
+
+	var agentList runtimev1alpha1.AgentList
+	if err := r.List(ctx, &agentList); err != nil {
+		logf.FromContext(ctx).Error(err, "Failed to list agents for ToolServer watch")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, agent := range agentList.Items {
+		for _, tool := range agent.Spec.Tools {
+			if tool.Upstream.ToolServerRef == nil || tool.Upstream.ToolServerRef.Name != updated.Name {
+				continue
+			}
+			ns := tool.Upstream.ToolServerRef.Namespace
+			if ns == "" {
+				ns = agent.Namespace
+			}
+			if ns != updated.Namespace {
+				continue
+			}
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace},
+			})
+			logf.FromContext(ctx).Info("Enqueuing agent due to ToolServer status change",
+				"agent", agent.Name, "toolServer", updated.Name, "url", updated.Status.Url)
 			break
 		}
 	}

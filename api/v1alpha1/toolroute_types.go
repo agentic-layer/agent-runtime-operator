@@ -19,8 +19,9 @@ import (
 type ToolRouteSpec struct {
 	// ToolGatewayRef identifies the ToolGateway hosting this route.
 	// Namespace defaults to the ToolRoute's namespace if not specified.
-	// +kubebuilder:validation:Required
-	ToolGatewayRef corev1.ObjectReference `json:"toolGatewayRef"`
+	// If omitted, the default ToolGateway in the cluster is used.
+	// +optional
+	ToolGatewayRef *corev1.ObjectReference `json:"toolGatewayRef,omitempty"`
 
 	// Upstream specifies the MCP server this route proxies.
 	// Exactly one of ToolServerRef or External must be set.

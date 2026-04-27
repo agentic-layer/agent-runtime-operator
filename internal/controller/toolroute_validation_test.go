@@ -20,7 +20,7 @@ var _ = Describe("ToolRoute CEL validation", func() {
 		return &runtimev1alpha1.ToolRoute{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
 			Spec: runtimev1alpha1.ToolRouteSpec{
-				ToolGatewayRef: corev1.ObjectReference{Name: "tg"},
+				ToolGatewayRef: &corev1.ObjectReference{Name: "tg"},
 				Upstream:       u,
 			},
 		}
@@ -39,6 +39,18 @@ var _ = Describe("ToolRoute CEL validation", func() {
 		r := newRoute("valid-tsref", runtimev1alpha1.ToolRouteUpstream{
 			ToolServerRef: &corev1.ObjectReference{Name: "ts"},
 		})
+		Expect(k8sClient.Create(ctx, r)).To(Succeed())
+	})
+
+	It("accepts a ToolRoute without toolGatewayRef (default gateway)", func() {
+		r := &runtimev1alpha1.ToolRoute{
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-no-gw", Namespace: ns},
+			Spec: runtimev1alpha1.ToolRouteSpec{
+				Upstream: runtimev1alpha1.ToolRouteUpstream{
+					ToolServerRef: &corev1.ObjectReference{Name: "ts"},
+				},
+			},
+		}
 		Expect(k8sClient.Create(ctx, r)).To(Succeed())
 	})
 

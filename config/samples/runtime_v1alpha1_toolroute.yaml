@@ -69,8 +69,9 @@ spec:
   model: "gemini/gemini-2.5-flash"
   tools:
     - name: example_tools
-      toolRouteRef:
-        name: example-toolroute
+      upstream:
+        toolRouteRef:
+          name: example-toolroute
   protocols:
     - type: A2A
   replicas: 1

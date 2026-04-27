@@ -212,17 +212,16 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 		return fmt.Errorf("failed to get agent %s: %w", agentKey, err)
 	}
 
-	// Collect tools from this agent
+	// Collect gateway-routed tools from this agent (toolServerRef/external have no stable route key)
 	for _, tool := range agent.Spec.Tools {
-		if tool.ToolRouteRef.Name == "" {
+		if tool.Upstream.ToolRouteRef == nil || tool.Upstream.ToolRouteRef.Name == "" {
 			continue
 		}
-		// ToolRoute reference - use namespace/name format
-		toolNamespace := tool.ToolRouteRef.Namespace
+		toolNamespace := tool.Upstream.ToolRouteRef.Namespace
 		if toolNamespace == "" {
 			toolNamespace = agent.Namespace
 		}
-		toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolRouteRef.Name)
+		toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.Upstream.ToolRouteRef.Name)
 		allTools[toolKey] = true
 	}
 
