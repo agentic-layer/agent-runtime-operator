@@ -67,7 +67,11 @@ func (r *AgentReconciler) resolveToolUrl(ctx context.Context, tool runtimev1alph
 	case tool.Upstream.ToolServerRef != nil:
 		return r.resolveToolServerUrl(ctx, tool.Upstream.ToolServerRef, parentNamespace)
 	case tool.Upstream.External != nil:
-		return tool.Upstream.External.Url, nil
+		url := strings.TrimSpace(tool.Upstream.External.Url)
+		if url == "" {
+			return "", fmt.Errorf("external upstream URL is empty")
+		}
+		return url, nil
 	default:
 		return "", fmt.Errorf("no upstream configured")
 	}
