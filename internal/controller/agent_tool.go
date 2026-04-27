@@ -80,6 +80,9 @@ func (r *AgentReconciler) resolveToolUrl(ctx context.Context, tool runtimev1alph
 // resolveToolRouteUrl fetches the ToolRoute and returns its status.url.
 // Namespace defaults to parentNamespace if the ref doesn't set one.
 func (r *AgentReconciler) resolveToolRouteUrl(ctx context.Context, ref *corev1.ObjectReference, parentNamespace string) (string, error) {
+	if ref.Name == "" {
+		return "", fmt.Errorf("toolRouteRef.name is empty")
+	}
 	namespace := getNamespaceWithDefault(ref, parentNamespace)
 	var route runtimev1alpha1.ToolRoute
 	if err := r.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: namespace}, &route); err != nil {
@@ -94,6 +97,9 @@ func (r *AgentReconciler) resolveToolRouteUrl(ctx context.Context, ref *corev1.O
 // resolveToolServerUrl fetches the ToolServer and returns its status.url.
 // Namespace defaults to parentNamespace if the ref doesn't set one.
 func (r *AgentReconciler) resolveToolServerUrl(ctx context.Context, ref *corev1.ObjectReference, parentNamespace string) (string, error) {
+	if ref.Name == "" {
+		return "", fmt.Errorf("toolServerRef.name is empty")
+	}
 	namespace := getNamespaceWithDefault(ref, parentNamespace)
 	var server runtimev1alpha1.ToolServer
 	if err := r.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: namespace}, &server); err != nil {

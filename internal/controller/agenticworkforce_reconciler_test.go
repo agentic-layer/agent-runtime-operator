@@ -344,9 +344,9 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 			}))
 			Expect(tools).To(HaveLen(3))
 			Expect(tools).To(ContainElements(
-				"default/local-server", // ToolRouteRef (namespace defaulted)
-				"default/remote-route", // ToolRouteRef (namespace defaulted)
-				"tools/another-server", // ToolRouteRef with explicit namespace
+				"toolroute:default/local-server", // ToolRouteRef (namespace defaulted)
+				"toolroute:default/remote-route", // ToolRouteRef (namespace defaulted)
+				"toolroute:tools/another-server", // ToolRouteRef with explicit namespace
 			))
 		})
 
