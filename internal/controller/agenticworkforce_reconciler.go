@@ -212,17 +212,31 @@ func (r *AgenticWorkforceReconciler) traverseAgent(ctx context.Context, namespac
 		return fmt.Errorf("failed to get agent %s: %w", agentKey, err)
 	}
 
-	// Collect tools from this agent
+	// Collect all tools from this agent with stable identifiers
 	for _, tool := range agent.Spec.Tools {
-		if tool.ToolRouteRef.Name == "" {
+		var toolKey string
+		switch {
+		case tool.Upstream.ToolRouteRef != nil && tool.Upstream.ToolRouteRef.Name != "":
+			// ToolRoute: use namespace/name format
+			toolNamespace := tool.Upstream.ToolRouteRef.Namespace
+			if toolNamespace == "" {
+				toolNamespace = agent.Namespace
+			}
+			toolKey = fmt.Sprintf("toolroute:%s/%s", toolNamespace, tool.Upstream.ToolRouteRef.Name)
+		case tool.Upstream.ToolServerRef != nil && tool.Upstream.ToolServerRef.Name != "":
+			// ToolServer: use namespace/name format with prefix
+			toolNamespace := tool.Upstream.ToolServerRef.Namespace
+			if toolNamespace == "" {
+				toolNamespace = agent.Namespace
+			}
+			toolKey = fmt.Sprintf("toolserver:%s/%s", toolNamespace, tool.Upstream.ToolServerRef.Name)
+		case tool.Upstream.External != nil && tool.Upstream.External.Url != "":
+			// External: use URL as key with prefix
+			toolKey = fmt.Sprintf("external:%s", tool.Upstream.External.Url)
+		default:
+			// Skip tools without a valid upstream
 			continue
 		}
-		// ToolRoute reference - use namespace/name format
-		toolNamespace := tool.ToolRouteRef.Namespace
-		if toolNamespace == "" {
-			toolNamespace = agent.Namespace
-		}
-		toolKey := fmt.Sprintf("%s/%s", toolNamespace, tool.ToolRouteRef.Name)
 		allTools[toolKey] = true
 	}
 

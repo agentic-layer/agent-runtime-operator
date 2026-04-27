@@ -156,7 +156,7 @@ var _ = Describe("Agent Controller", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "missing-tool", ToolRouteRef: corev1.ObjectReference{Name: "missing-toolroute"}},
+						{Name: "missing-tool", Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "missing-toolroute"}}},
 					},
 				},
 			}

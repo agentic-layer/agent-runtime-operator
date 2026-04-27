@@ -317,9 +317,9 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "local-tool", ToolRouteRef: corev1.ObjectReference{Name: "local-server"}},
-						{Name: "remote-tool", ToolRouteRef: corev1.ObjectReference{Name: "remote-route"}},
-						{Name: "another-local", ToolRouteRef: corev1.ObjectReference{Name: "another-server", Namespace: "tools"}},
+						{Name: "local-tool", Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "local-server"}}},
+						{Name: "remote-tool", Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "remote-route"}}},
+						{Name: "another-local", Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "another-server", Namespace: "tools"}}},
 					},
 				},
 			}
@@ -344,9 +344,9 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 			}))
 			Expect(tools).To(HaveLen(3))
 			Expect(tools).To(ContainElements(
-				"default/local-server", // ToolRouteRef (namespace defaulted)
-				"default/remote-route", // ToolRouteRef (namespace defaulted)
-				"tools/another-server", // ToolRouteRef with explicit namespace
+				"toolroute:default/local-server", // ToolRouteRef (namespace defaulted)
+				"toolroute:default/remote-route", // ToolRouteRef (namespace defaulted)
+				"toolroute:tools/another-server", // ToolRouteRef with explicit namespace
 			))
 		})
 
@@ -454,7 +454,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 					Framework: "google-adk",
 					Image:     "test-image:latest",
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-c", ToolRouteRef: corev1.ObjectReference{Name: "tool-c-server"}},
+						{Name: "tool-c", Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "tool-c-server"}}},
 					},
 				},
 			}
@@ -476,7 +476,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 						},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-b", ToolRouteRef: corev1.ObjectReference{Name: "tool-b-server"}},
+						{Name: "tool-b", Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "tool-b-server"}}},
 					},
 				},
 			}
@@ -498,7 +498,7 @@ var _ = Describe("AgenticWorkforce Controller", func() {
 						},
 					},
 					Tools: []runtimev1alpha1.AgentTool{
-						{Name: "tool-a", ToolRouteRef: corev1.ObjectReference{Name: "tool-a-server"}},
+						{Name: "tool-a", Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "tool-a-server"}}},
 					},
 				},
 			}

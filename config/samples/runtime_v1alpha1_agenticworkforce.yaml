@@ -99,8 +99,9 @@ spec:
   image: ghcr.io/agentic-layer/mock-agent:0.6.2
   tools:
     - name: tool-ns1
-      toolRouteRef:
-        name: toolroute-ns1
+      upstream:
+        toolRouteRef:
+          name: toolroute-ns1
 
 ---
 # Mid-level Agent: Part of the hierarchy for Workforce 1
@@ -118,8 +119,9 @@ spec:
   # Cross-namespace tool reference
   tools:
     - name: tool-ns2
-      toolRouteRef:
-        name: toolroute-ns2
+      upstream:
+        toolRouteRef:
+          name: toolroute-ns2
   # Cross-namespace sub-agent reference
   subAgents:
     - name: shared

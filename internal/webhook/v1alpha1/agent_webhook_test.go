@@ -373,7 +373,9 @@ var _ = Describe("Agent Webhook", func() {
 					{Name: "summarizer", Url: "https://example.com/summarizer.json"},
 				}
 				obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-					{Name: "news_fetcher", ToolRouteRef: corev1.ObjectReference{Name: "news-fetcher-route"}},
+					{Name: "news_fetcher", Upstream: runtimev1alpha1.AgentToolUpstream{
+						ToolRouteRef: &corev1.ObjectReference{Name: "news-fetcher-route"},
+					}},
 				}
 
 				By("calling the Default method")
@@ -389,7 +391,7 @@ var _ = Describe("Agent Webhook", func() {
 				Expect(obj.Spec.SubAgents[0].Url).To(Equal("https://example.com/summarizer.json"))
 				Expect(obj.Spec.Tools).To(HaveLen(1))
 				Expect(obj.Spec.Tools[0].Name).To(Equal("news_fetcher"))
-				Expect(obj.Spec.Tools[0].ToolRouteRef.Name).To(Equal("news-fetcher-route"))
+				Expect(obj.Spec.Tools[0].Upstream.ToolRouteRef.Name).To(Equal("news-fetcher-route"))
 			})
 
 			It("Should work with empty template fields", func() {
@@ -530,22 +532,53 @@ var _ = Describe("Agent Webhook", func() {
 			})
 
 			Describe("Tool validation", func() {
-				It("rejects a tool with empty toolRouteRef.name", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "t1"},
-					}
-
+				It("rejects a tool with empty upstream.toolRouteRef.name", func() {
+					obj.Spec.Tools = []runtimev1alpha1.AgentTool{{
+						Name:     "t1",
+						Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{}},
+					}}
 					warnings, err := validator.validateAgent(obj)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("toolRouteRef.name must be set"))
 					Expect(warnings).To(BeEmpty())
 				})
 
-				It("accepts a tool with a valid toolRouteRef", func() {
-					obj.Spec.Tools = []runtimev1alpha1.AgentTool{
-						{Name: "t1", ToolRouteRef: corev1.ObjectReference{Name: "some-route"}},
-					}
+				It("rejects a tool with empty upstream.toolServerRef.name", func() {
+					obj.Spec.Tools = []runtimev1alpha1.AgentTool{{
+						Name:     "t1",
+						Upstream: runtimev1alpha1.AgentToolUpstream{ToolServerRef: &corev1.ObjectReference{}},
+					}}
+					warnings, err := validator.validateAgent(obj)
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("toolServerRef.name must be set"))
+					Expect(warnings).To(BeEmpty())
+				})
 
+				It("accepts a tool with a valid upstream.toolRouteRef", func() {
+					obj.Spec.Tools = []runtimev1alpha1.AgentTool{{
+						Name:     "t1",
+						Upstream: runtimev1alpha1.AgentToolUpstream{ToolRouteRef: &corev1.ObjectReference{Name: "some-route"}},
+					}}
+					warnings, err := validator.validateAgent(obj)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(warnings).To(BeEmpty())
+				})
+
+				It("accepts a tool with a valid upstream.toolServerRef", func() {
+					obj.Spec.Tools = []runtimev1alpha1.AgentTool{{
+						Name:     "t1",
+						Upstream: runtimev1alpha1.AgentToolUpstream{ToolServerRef: &corev1.ObjectReference{Name: "some-server"}},
+					}}
+					warnings, err := validator.validateAgent(obj)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(warnings).To(BeEmpty())
+				})
+
+				It("accepts a tool with a valid upstream.external url", func() {
+					obj.Spec.Tools = []runtimev1alpha1.AgentTool{{
+						Name:     "t1",
+						Upstream: runtimev1alpha1.AgentToolUpstream{External: &runtimev1alpha1.ExternalUpstream{Url: "https://mcp.example.com"}},
+					}}
 					warnings, err := validator.validateAgent(obj)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(warnings).To(BeEmpty())

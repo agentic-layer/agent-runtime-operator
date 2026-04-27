@@ -73,23 +73,42 @@ type SubAgent struct {
 	InteractionType string `json:"interactionType,omitempty"`
 }
 
-// AgentTool defines configuration for attaching a tool to an agent via a ToolRoute.
+// AgentTool defines configuration for attaching a tool to an agent.
 type AgentTool struct {
 	// Name is the unique identifier for this tool within the agent.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
-	// ToolRouteRef references the ToolRoute that exposes the upstream MCP server.
-	// This is the only way to attach a tool to an agent.
-	// If Namespace is not specified, defaults to the same namespace as the current Agent.
+	// Upstream specifies how to reach the MCP server.
+	// Exactly one of toolRouteRef, toolServerRef, or external must be set.
 	// +kubebuilder:validation:Required
-	ToolRouteRef corev1.ObjectReference `json:"toolRouteRef"`
+	Upstream AgentToolUpstream `json:"upstream"`
 
 	// PropagatedHeaders is a list of HTTP header names that should be propagated from incoming
 	// A2A requests to the MCP tool server. Header names are case-insensitive.
 	// If not specified or empty, no headers are propagated.
 	// +optional
 	PropagatedHeaders []string `json:"propagatedHeaders,omitempty"`
+}
+
+// AgentToolUpstream specifies how an agent reaches an MCP server.
+// Exactly one of toolRouteRef, toolServerRef, or external must be set.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.toolRouteRef) ? 1 : 0) + (has(self.toolServerRef) ? 1 : 0) + (has(self.external) ? 1 : 0) == 1",message="exactly one of toolRouteRef, toolServerRef, or external must be set"
+type AgentToolUpstream struct {
+	// ToolRouteRef references a ToolRoute that exposes the MCP server via a gateway.
+	// Namespace defaults to the agent's namespace if not specified.
+	// +optional
+	ToolRouteRef *corev1.ObjectReference `json:"toolRouteRef,omitempty"`
+
+	// ToolServerRef references a cluster-local ToolServer directly, bypassing any gateway.
+	// Namespace defaults to the agent's namespace if not specified.
+	// +optional
+	ToolServerRef *corev1.ObjectReference `json:"toolServerRef,omitempty"`
+
+	// External describes a remote MCP server reachable at an HTTP URL, bypassing any gateway.
+	// +optional
+	External *ExternalUpstream `json:"external,omitempty"`
 }
 
 // AgentSpec defines the desired state of Agent.

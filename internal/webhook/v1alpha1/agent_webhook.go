@@ -228,14 +228,21 @@ func (v *AgentCustomValidator) validateSubAgent(subAgent runtimev1alpha1.SubAgen
 }
 
 // validateTool validates a single AgentTool entry.
-// Stateless validation only; cross-object references (e.g., existence of ToolRoute) are enforced at reconcile time.
+// Stateless validation only; cross-object references are enforced at reconcile time.
 func (v *AgentCustomValidator) validateTool(tool runtimev1alpha1.AgentTool, index int) []*field.Error {
 	var errs []*field.Error
+	upstreamPath := field.NewPath("spec", "tools").Index(index).Child("upstream")
 
-	if tool.ToolRouteRef.Name == "" {
+	if tool.Upstream.ToolRouteRef != nil && tool.Upstream.ToolRouteRef.Name == "" {
 		errs = append(errs, field.Required(
-			field.NewPath("spec", "tools").Index(index).Child("toolRouteRef", "name"),
+			upstreamPath.Child("toolRouteRef", "name"),
 			"toolRouteRef.name must be set",
+		))
+	}
+	if tool.Upstream.ToolServerRef != nil && tool.Upstream.ToolServerRef.Name == "" {
+		errs = append(errs, field.Required(
+			upstreamPath.Child("toolServerRef", "name"),
+			"toolServerRef.name must be set",
 		))
 	}
 

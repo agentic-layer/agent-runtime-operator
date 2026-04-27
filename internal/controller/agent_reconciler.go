@@ -391,6 +391,10 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingToolRoute),
 		).
 		Watches(
+			&runtimev1alpha1.ToolServer{},
+			handler.EnqueueRequestsFromMapFunc(r.findAgentsReferencingToolServer),
+		).
+		Watches(
 			&runtimev1alpha1.AgentRuntimeConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.findAllAgentsForRuntimeConfiguration),
 		)
