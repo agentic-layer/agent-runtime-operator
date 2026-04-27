@@ -19,7 +19,7 @@ import (
 type ToolRouteSpec struct {
 	// ToolGatewayRef identifies the ToolGateway hosting this route.
 	// Namespace defaults to the ToolRoute's namespace if not specified.
-	// If omitted, the default ToolGateway in the cluster is used.
+	// If not specified, any installed tool-gateway operator may attempt to find the default ToolGateway in the cluster.
 	// +optional
 	ToolGatewayRef *corev1.ObjectReference `json:"toolGatewayRef,omitempty"`
 
