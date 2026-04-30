@@ -36,6 +36,7 @@ type AiGatewayClassStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
 // AiGatewayClass is the Schema for the aigatewayclasses API.
 type AiGatewayClass struct {
