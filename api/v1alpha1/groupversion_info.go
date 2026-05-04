@@ -20,8 +20,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
 var (
@@ -29,8 +30,24 @@ var (
 	GroupVersion = schema.GroupVersion{Group: "runtime.agentic-layer.ai", Version: "v1alpha1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
-	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+	SchemeBuilder = &schemeBuilder{GroupVersion: GroupVersion}
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
 )
+
+// schemeBuilder mirrors the deprecated sigs.k8s.io/controller-runtime/pkg/scheme.Builder
+// but only depends on k8s.io/apimachinery, keeping the api package import-light.
+type schemeBuilder struct {
+	runtime.SchemeBuilder
+	GroupVersion schema.GroupVersion
+}
+
+func (bld *schemeBuilder) Register(objects ...runtime.Object) *schemeBuilder {
+	bld.SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(bld.GroupVersion, objects...)
+		metav1.AddToGroupVersion(s, bld.GroupVersion)
+		return nil
+	})
+	return bld
+}
