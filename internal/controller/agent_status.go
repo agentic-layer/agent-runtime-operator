@@ -49,7 +49,7 @@ func (r *AgentReconciler) updateAgentStatusReady(ctx context.Context, agent *run
 
 	// Set Ready condition to True
 	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{
-		Type:               "Ready",
+		Type:               conditionTypeReady,
 		Status:             metav1.ConditionTrue,
 		Reason:             "Reconciled",
 		Message:            "Agent is ready",
@@ -76,7 +76,7 @@ func (r *AgentReconciler) updateAgentStatusNotReady(ctx context.Context, agent *
 
 	// Set Ready condition to False with the provided reason
 	meta.SetStatusCondition(&agent.Status.Conditions, metav1.Condition{
-		Type:               "Ready",
+		Type:               conditionTypeReady,
 		Status:             metav1.ConditionFalse,
 		Reason:             reason,
 		Message:            message,

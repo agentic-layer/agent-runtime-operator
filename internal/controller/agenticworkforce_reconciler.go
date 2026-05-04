@@ -73,7 +73,7 @@ func (r *AgenticWorkforceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// Update status condition based on validation
 	if allAgentsReady {
 		meta.SetStatusCondition(&workforce.Status.Conditions, metav1.Condition{
-			Type:               "Ready",
+			Type:               conditionTypeReady,
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: workforce.Generation,
 			Reason:             "AllAgentsReady",
@@ -81,7 +81,7 @@ func (r *AgenticWorkforceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		})
 	} else {
 		meta.SetStatusCondition(&workforce.Status.Conditions, metav1.Condition{
-			Type:               "Ready",
+			Type:               conditionTypeReady,
 			Status:             metav1.ConditionFalse,
 			ObservedGeneration: workforce.Generation,
 			Reason:             "AgentsMissing",

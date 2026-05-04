@@ -8,6 +8,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	appLabel           = "app"
+	conditionTypeReady = "Ready"
+)
+
 // findEnvVar finds an environment variable by name in a slice of EnvVars
 func findEnvVar(envVars []corev1.EnvVar, name string) *corev1.EnvVar {
 	for i := range envVars {
@@ -92,7 +97,7 @@ func buildPodTemplateMetadata(
 // findReadyCondition returns the "Ready" condition from the given conditions slice, or nil if not found.
 func findReadyCondition(conditions []metav1.Condition) *metav1.Condition {
 	for i := range conditions {
-		if conditions[i].Type == "Ready" {
+		if conditions[i].Type == conditionTypeReady {
 			return &conditions[i]
 		}
 	}
