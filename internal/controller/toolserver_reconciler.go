@@ -147,14 +147,14 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
-			"app":       toolServer.Name,
+			appLabel:    toolServer.Name,
 			"protocol":  toolServer.Spec.Protocol,
 			"transport": toolServer.Spec.TransportType,
 		}
 
 		// Selector labels (immutable)
 		selectorLabels := map[string]string{
-			"app": toolServer.Name,
+			appLabel: toolServer.Name,
 		}
 
 		// Build container ports
@@ -246,14 +246,14 @@ func (r *ToolServerReconciler) ensureService(ctx context.Context, toolServer *ru
 	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
-			"app":       toolServer.Name,
+			appLabel:    toolServer.Name,
 			"protocol":  toolServer.Spec.Protocol,
 			"transport": toolServer.Spec.TransportType,
 		}
 
 		// Service selector (stable labels only)
 		selectorLabels := map[string]string{
-			"app": toolServer.Name,
+			appLabel: toolServer.Name,
 		}
 
 		// Build service ports
@@ -317,7 +317,7 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 
 	// Set Ready condition to True
 	meta.SetStatusCondition(&toolServer.Status.Conditions, metav1.Condition{
-		Type:               "Ready",
+		Type:               conditionTypeReady,
 		Status:             metav1.ConditionTrue,
 		Reason:             "Reconciled",
 		Message:            "ToolServer is ready",
@@ -335,7 +335,7 @@ func (r *ToolServerReconciler) updateToolServerStatusReady(ctx context.Context, 
 func (r *ToolServerReconciler) updateToolServerStatusNotReady(ctx context.Context, toolServer *runtimev1alpha1.ToolServer, reason, message string) error {
 	// Set Ready condition to False
 	meta.SetStatusCondition(&toolServer.Status.Conditions, metav1.Condition{
-		Type:               "Ready",
+		Type:               conditionTypeReady,
 		Status:             metav1.ConditionFalse,
 		Reason:             reason,
 		Message:            message,

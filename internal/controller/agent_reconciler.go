@@ -188,13 +188,13 @@ func (r *AgentReconciler) ensureDeployment(ctx context.Context, agent *runtimev1
 	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
-			"app":       agent.Name,
+			appLabel:    agent.Name,
 			"framework": effectiveFramework,
 		}
 
 		// Selector labels (immutable)
 		selectorLabels := map[string]string{
-			"app": agent.Name,
+			appLabel: agent.Name,
 		}
 
 		// Build container ports from protocols
@@ -326,12 +326,12 @@ func (r *AgentReconciler) ensureService(ctx context.Context, agent *runtimev1alp
 	if op, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, func() error {
 		// Build managed labels
 		managedLabels := map[string]string{
-			"app": agent.Name,
+			appLabel: agent.Name,
 		}
 
 		// Service selector (stable labels only)
 		selectorLabels := map[string]string{
-			"app": agent.Name,
+			appLabel: agent.Name,
 		}
 
 		// Build service ports from protocols
