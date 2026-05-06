@@ -12,7 +12,7 @@ A gateway resource (for example `AiGateway`) then references one or more `Guard`
 The gateway's operator resolves those references and configures its underlying gateway implementation to invoke the guardrail at request time.
 
 TIP: Before following this guide, make sure you have the xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Agent Runtime Operator] and a gateway operator that supports guardrails installed.
-The only gateway operator that currently implements guardrails is the xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator], which supports Presidio-based PII guardrails on an `AiGateway`.
+Today, guardrails are implemented by the xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator] (Presidio-based PII guardrails on an `AiGateway`) and the xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator] (Presidio-based PII guardrails on a `ToolGateway`).
 
 == Implementation Status
 
@@ -33,10 +33,10 @@ The Guard and GuardrailProvider CRDs are stable and gateway-agnostic, but runtim
 |--
 |`guardrails` field exists on the CRD but is not yet honored by the operator.
 
-|`ToolGateway`
-|Not yet
-|--
-|`guardrails` field exists on the CRD; support is planned via a dedicated Envoy-based operator.
+|`ToolGateway` (agentgateway)
+|Yes
+|`presidio-api`
+|Implemented by the xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator]. The operator deploys a per-Guard `guardrail-adapter` instance and wires it into the gateway's `AgentgatewayPolicy` via `ext_proc`. Today, only one Guard per `ToolGateway` is supported.
 |===
 
 The rest of this guide uses an `AiGateway` backed by the LiteLLM operator and a Presidio analyzer as the working example.

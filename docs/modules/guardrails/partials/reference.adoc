@@ -225,9 +225,9 @@ The field is present on:
 |Not yet implemented. The `guardrails` field is accepted by the CRD but ignored by the operator.
 
 |`ToolGateway`
-|agent-runtime-operator + downstream operator
-|--
-|Not yet implemented. A future Envoy-based tool gateway operator is planned and will use a shared ext_proc guardrail adapter service.
+|xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator]
+|`presidio-api`
+|For each referenced `Guard`, the operator deploys a dedicated `guardrail-adapter` instance (`Deployment` + `ConfigMap` + `Service`) pre-configured from the `Guard` and its `GuardrailProvider`, and wires the gateway's `AgentgatewayPolicy` `extProc.backendRef` at it. Single Guard per `ToolGateway` is supported today.
 |===
 
 == Samples
