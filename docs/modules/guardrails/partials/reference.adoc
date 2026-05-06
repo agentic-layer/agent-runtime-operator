@@ -7,6 +7,44 @@ Guardrails are expressed with two gateway-agnostic Custom Resource Definitions:
 
 Gateway resources (for example `AiGateway`) reference one or more Guards in their `spec.guardrails` list.
 
+== How Guardrails Work
+
+=== Two-tier model
+
+`GuardrailProvider` and `Guard` separate transport from policy:
+
+* `GuardrailProvider` declares *where* and *how* to reach a backend service that implements a guardrail contract (Presidio, OpenAI Moderation, AWS Bedrock). One provider can back many guards.
+* `Guard` binds a provider to a concrete *policy*: when it runs (`mode`), and what configuration to apply (entity actions, score thresholds, language, ...). Each guard targets exactly one provider.
+
+This split lets a platform team operate one set of provider deployments while application teams own the per-gateway policies that reference them.
+
+=== Runtime model
+
+Gateway CRDs expose a uniform `guardrails` field -- an ordered list of references to `Guard` resources. The owning gateway operator turns each reference into runtime configuration in two steps:
+
+. *Resolution* -- the operator reads the referenced `Guard` and its `providerRef`, then validates that the provider type is one it supports for that gateway. Missing references, unsupported provider types, and invalid configuration surface as `Ready=False` conditions on the `Guard` and/or the gateway. Operators reconcile gateways when referenced `Guard` and `GuardrailProvider` resources change, so policy updates roll out automatically.
+
+. *Translation* -- the operator translates the resolved Guard plus provider into the gateway implementation's native guardrail mechanism. The translation is implementation-specific:
++
+* The xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator] writes a `guardrails:` block into the LiteLLM `ConfigMap`, with each entry carrying the resolved provider URL, score thresholds, and entity actions.
+* The xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator] deploys a dedicated `guardrail-adapter` workload per Guard and wires the gateway's `AgentgatewayPolicy` `extProc.backendRef` at it.
+
+At request time, the gateway invokes the configured guardrail at the points selected by `Guard.spec.mode` (`pre_call`, `post_call`, `during_call` -- see <<Guard modes>>). The provider returns the inspected payload with sensitive entities replaced (action `MASK`) or signals that the call should be rejected (`BLOCK`); the gateway applies the decision before forwarding traffic.
+
+=== Cross-namespace references
+
+`Guard.spec.providerRef` and the `ObjectReference` entries in `<Gateway>.spec.guardrails` both accept explicit `namespace` fields, defaulting to the referencing resource's own namespace. This supports a layered layout:
+
+* Shared `GuardrailProvider` resources in a `guardrail-providers` namespace.
+* Reusable `Guard` resources in a `guards` namespace.
+* Application gateways in their own namespaces, referencing both.
+
+Gateway operators are granted RBAC to read `Guard` and `GuardrailProvider` resources cluster-wide.
+
+=== Operator-specific behaviour
+
+Translation, status conditions, and per-provider support vary by gateway operator. The <<Gateway Support Matrix>> below summarises what each operator implements today; for the full per-gateway behaviour see the operator's own reference page.
+
 == Full API Reference
 
 https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
