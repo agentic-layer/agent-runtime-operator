@@ -10,7 +10,7 @@
 
 This guide walks you through deploying an instance of the `AgentGateway` custom resource.
 
-TIP: Before following this guide, make sure you have some kind of Agent Gateway Operator installed. See xref:agent-gateway-krakend-operator:operator:how-to-guide.adoc[Install the Agent Gateway KrakenD Operator] for one example.
+TIP: Before following this guide, make sure you have some kind of Agent Gateway Operator installed. See xref:agent-gateway-krakend-operator::how-to-guides/install.adoc[Install the Agent Gateway KrakenD Operator] for one example.
 
 == Create an AgentGateway Resource
 
