@@ -1,0 +1,52 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= Agents and Workforces
+
+== What it is
+
+The `Agent` custom resource is a framework-agnostic contract for deploying an AI agent workload on Kubernetes. It declares what the agent does (via `description`, `instruction`, and `model`), how it is packaged (via `framework` or `image`), and what it can reach (tools and sub-agents). The operator translates that contract into a `Deployment` and `Service`, abstracting away the container plumbing.
+
+The `AgenticWorkforce` resource groups one or more `Agent` resources under a named entry point. It adds a layer of organisational metadata (name, description, owner, tags) and drives automatic discovery of all transitive agents and tools reachable from those entry points.
+
+== Why it exists
+
+Before the `Agent` CRD, deploying an AI agent meant writing bespoke Kubernetes manifests that hard-coded framework-specific environment variables, port conventions, and health-probe paths. Each team solved the same boilerplate differently, making cross-team sharing and operator-managed upgrades impractical.
+
+The `Agent` CRD captures the stable parts of that contract — framework, protocols, tools, sub-agents — while the operator manages the volatile parts (image resolution, probe configuration, environment variable marshalling). This lets teams describe what an agent is without caring which template image version implements it.
+
+`AgenticWorkforce` was introduced to answer a common operational question: "what agents and tools are actually running in my system right now?" Without it, that answer required manually tracing sub-agent references across multiple YAML files. The workforce resource makes discovery automatic and surfaced in `status`.
+
+== How it fits
+
+Each `Agent` sits inside the xref:agent-runtime-operator:agent-runtime:explanation.adoc[Agent Runtime Operator]'s reconciliation loop. The operator watches `Agent` resources cluster-wide, creates the underlying workload resources, and updates `status.url` when an A2A protocol is configured.
+
+Tools are reached via `ToolServer` (in-cluster) or `ToolRoute` (via a tool gateway). Sub-agents are reached via in-cluster `Agent` references (resolved to cluster-local URLs by the operator) or by direct remote URLs.
+
+`AgenticWorkforce` references `Agent` resources by name and namespace. The operator crawls the sub-agent graph at reconcile time and writes the discovered set into `status.transitiveAgents` and `status.transitiveTools`. No runtime traffic passes through the workforce resource itself — it is purely an observability and grouping construct.
+
+== Trade-offs and alternatives
+
+=== Template vs custom image
+
+Template-based agents (`spec.framework` without `spec.image`) let the operator manage the container image. The operator resolves the image from its built-in registry, keyed by framework. This means zero image-management overhead: a template agent picks up the latest tested image on upgrade. The trade-off is that you cannot add custom Python dependencies or specialised runtime behaviour.
+
+Custom-image agents (`spec.image` set explicitly) give you full control over the runtime. You own the image build and the upgrade cycle. Choose this path when you have dependencies that the template image cannot provide, when you are migrating existing agent code, or when you need runtime behaviour the template does not support.
+
+Both modes share the same `spec.tools`, `spec.subAgents`, `spec.protocols`, and `spec.env` contracts, so you can switch between them by adding or removing `spec.image` without restructuring the rest of the spec.
+
+=== AgenticWorkforce vs individual Agents
+
+Individual `Agent` resources are self-contained and need no workforce. Use `AgenticWorkforce` when you want a named, ownable unit that groups several entry points, when you need automatic transitive discovery for auditing or documentation, or when you want to organise agents by business domain with tags.
+
+== Related
+
+* xref:agents:how-to-guides/create-template-agent.adoc[]
+* xref:agents:how-to-guides/create-custom-image-agent.adoc[]
+* xref:agents:how-to-guides/delegate-to-subagent.adoc[]
+* xref:agents:how-to-guides/create-workforce.adoc[]
+* xref:agents:reference.adoc[]

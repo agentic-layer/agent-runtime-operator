@@ -1,0 +1,68 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
+= Create an Agentic Workforce
+
+This guide shows you how to create an `AgenticWorkforce` resource that groups entry-point agents and lets the operator discover all transitive agents and tools automatically.
+
+== Prerequisites
+
+* Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+* At least one `Agent` already deployed to serve as an entry point.
+
+== Create the AgenticWorkforce
+
+[source,bash]
+----
+cat <<EOF | kubectl apply -f -
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgenticWorkforce
+metadata:
+  name: customer-service-workforce
+spec:
+  name: "Customer Service Team"
+  description: "A workforce handling customer inquiries, support tickets, and product recommendations"
+  owner: "platform-team@example.com"
+  tags:
+    - customer-service
+    - support
+    - production
+  entryPointAgents:
+    - name: my-first-agent
+    # Agent in a different namespace:
+    # - name: specialist-agent
+    #   namespace: ai-agents
+EOF
+----
+
+The operator crawls each entry-point agent's sub-agent graph and populates `status.transitiveAgents` and `status.transitiveTools`.
+
+== Verify
+
+[source,bash]
+----
+# Check the workforce resource
+kubectl get agenticworkforce customer-service-workforce
+
+# View detailed status
+kubectl describe agenticworkforce customer-service-workforce
+
+# List discovered transitive agents
+kubectl get agenticworkforce customer-service-workforce \
+  -o jsonpath='{.status.transitiveAgents[*].name}'
+
+# List discovered transitive tools
+kubectl get agenticworkforce customer-service-workforce \
+  -o jsonpath='{.status.transitiveTools[*]}'
+----
+
+== Related
+
+* xref:agents:reference.adoc[]
+* xref:agents:explanation.adoc[]
+* xref:agents:how-to-guides/create-template-agent.adoc[]

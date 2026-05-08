@@ -1,0 +1,80 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
+= Delegate to a Sub-Agent
+
+This guide shows you how to configure an `Agent` to delegate work to one or more sub-agents, and how to choose between `tool_call` and `transfer` interaction types.
+
+== Prerequisites
+
+* Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+* At least one target sub-agent deployed and reachable (in-cluster `Agent` resource or remote URL).
+
+== Add sub-agents to an Agent
+
+Sub-agents are declared under `spec.subAgents`. Each entry requires a `name` and either an `agentRef` (in-cluster `Agent`) or a `url` (remote agent card URL).
+
+=== Reference an in-cluster Agent
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: orchestrator-agent
+spec:
+  framework: google-adk
+  subAgents:
+    - name: summarizer_agent
+      agentRef:
+        name: summarizer
+        namespace: ai-agents   # omit to default to same namespace
+      interactionType: "tool_call"
+  protocols:
+    - type: A2A
+  replicas: 1
+----
+
+=== Reference a remote Agent
+
+[source,yaml]
+----
+subAgents:
+  - name: specialist_agent
+    url: "https://agents.example.com/specialist-agent.json"
+    interactionType: "transfer"
+----
+
+== Choose an interaction type
+
+[cols="1,3"]
+|===
+| Value | Behaviour
+
+| `tool_call` (default)
+| The parent agent calls the sub-agent as a tool and receives its response. The parent remains in control of the conversation.
+
+| `transfer`
+| The parent hands off the conversation to the sub-agent via `transfer_to_agent`. The sub-agent takes over and interacts directly with the user.
+|===
+
+== Apply and verify
+
+[source,bash]
+----
+kubectl apply -f orchestrator-agent.yaml
+
+# Check the Agent resource status
+kubectl get agent orchestrator-agent
+----
+
+== Related
+
+* xref:agents:reference.adoc[]
+* xref:agents:explanation.adoc[]
+* xref:agents:how-to-guides/create-template-agent.adoc[]

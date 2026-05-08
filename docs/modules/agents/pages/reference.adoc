@@ -1,0 +1,270 @@
+// REFERENCE — Diátaxis
+// This page is information-shaped: tables, field lists, full API surface.
+// DO: be exhaustive within scope; use stable, ctrl-F-able structure;
+//     one heading per resource/CRD/command/field group.
+// DON'T: include tutorials, decision trees, or "why" explanations.
+// If a section drifts into "how would you do X" → move to how-to-guide.adoc.
+// If a section drifts into "why this exists" → move to explanation.adoc.
+
+= Agent and AgenticWorkforce Reference
+
+This reference covers all fields of the `Agent` and `AgenticWorkforce` custom resources in the `runtime.agentic-layer.ai` API group. For operator-wide defaults, see xref:agent-runtime:reference.adoc[].
+
+Full Go API: https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+
+== Agent
+
+`Agent` declares a single AI agent workload. The operator creates a Kubernetes `Deployment` and `Service` for each `Agent`.
+
+=== spec.framework
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `framework`
+| `string` — Agent framework. Allowed values: `google-adk`, `msaf`, `custom`. When omitted, the operator applies the `defaultFramework` from `AgentRuntimeConfiguration`. Setting `custom` requires `spec.image` to be set.
+|===
+
+=== spec.image
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `image`
+| `string` — Container image for the agent. When omitted, the operator selects a template image based on `spec.framework`. When set, the operator uses this image directly (custom-image mode).
+|===
+
+=== spec.protocols
+
+`spec.protocols` lists the communication protocols the agent exposes. Each entry maps to a port on the resulting `Service`.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `protocols[].type`
+| `string` — Protocol type. Currently only `A2A` is supported.
+
+| `protocols[].port`
+| `integer (1–65535)` — Port number. Defaults to the framework's default port when omitted.
+
+| `protocols[].path`
+| `string` — HTTP path prefix. Must match `^/[a-zA-Z0-9/_-]*$`. Defaults to `/` when omitted.
+
+| `protocols[].name`
+| `string` — Optional name for the port entry. Defaults to empty string.
+|===
+
+=== spec.tools
+
+`spec.tools` defines MCP tool servers the agent can call. Each entry is serialised to JSON and passed as the `AGENT_TOOLS` environment variable.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `tools[].name`
+| `string` — Unique identifier for this tool within the agent. Minimum length: 1.
+
+| `tools[].upstream`
+| `object` — How to reach the MCP server. Exactly one of `toolRouteRef`, `toolServerRef`, or `external` must be set.
+
+| `tools[].upstream.toolRouteRef`
+| `ObjectReference` — References a `ToolRoute` resource. `namespace` defaults to the agent's namespace if omitted.
+
+| `tools[].upstream.toolServerRef`
+| `ObjectReference` — References a cluster-local `ToolServer` directly, bypassing any gateway. `namespace` defaults to the agent's namespace if omitted.
+
+| `tools[].upstream.external`
+| `object` — Describes a remote MCP server by URL, bypassing any gateway.
+
+| `tools[].upstream.external.url`
+| `string (URI)` — HTTP/HTTPS URL of the remote MCP server.
+
+| `tools[].propagatedHeaders`
+| `[]string` — HTTP header names to forward from incoming A2A requests to this MCP server. Header matching is case-insensitive. When omitted or empty, no headers are forwarded.
+|===
+
+=== spec.subAgents
+
+`spec.subAgents` configures agents that this agent can delegate to. The list is serialised to JSON and passed as the `SUB_AGENTS` environment variable.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `subAgents[].name`
+| `string` — Descriptive identifier for this sub-agent connection. Minimum length: 1.
+
+| `subAgents[].agentRef`
+| `ObjectReference` — References an in-cluster `Agent` resource. `namespace` defaults to the current agent's namespace if omitted. Mutually exclusive with `url`.
+
+| `subAgents[].url`
+| `string (URI)` — Well-known agent card URL of a remote agent (e.g. `https://agent.example.com/.well-known/agent-card.json`). Mutually exclusive with `agentRef`.
+
+| `subAgents[].interactionType`
+| `string` — How the agent interacts with this sub-agent. Allowed values: `tool_call` (default), `transfer`. `tool_call` keeps the parent in control; `transfer` hands the conversation to the sub-agent.
+|===
+
+=== spec.replicas
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `replicas`
+| `integer (≥0)` — Number of pod replicas. Defaults to the Kubernetes deployment default (1) when omitted.
+|===
+
+=== spec.env
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `env`
+| `[]corev1.EnvVar` — Additional environment variables injected into the agent container. These take precedence over operator-managed variables.
+
+| `envFrom`
+| `[]corev1.EnvFromSource` — Sources (ConfigMaps, Secrets) to populate environment variables from.
+|===
+
+=== spec (template-only fields)
+
+The following fields are only meaningful for template-based agents (no `spec.image`). They are passed as environment variables to the template container.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `description`
+| `string` — Brief description of the agent's purpose. Passed as `AGENT_DESCRIPTION`.
+
+| `instruction`
+| `string` — System prompt defining the agent's behaviour. Passed as `AGENT_INSTRUCTION`.
+
+| `model`
+| `string` — Language model identifier (e.g. `gemini/gemini-2.5-flash`). Passed as `AGENT_MODEL`. Defaults to the framework's default model if omitted.
+|===
+
+=== spec (advanced fields)
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `exposed`
+| `boolean` — Whether this agent should be exposed via the `AgentGateway`. Default: `false`.
+
+| `aiGatewayRef`
+| `ObjectReference` — References an `AiGateway` resource for model routing. Defaults to the cluster's default AiGateway if omitted. `namespace` defaults to the agent's namespace if omitted.
+
+| `volumeMounts`
+| `[]corev1.VolumeMount` — Volume mounts added to the agent container.
+
+| `volumes`
+| `[]corev1.Volume` — Volumes added to the agent pod. Names starting with `agent-operator-` are reserved and will be rejected by the webhook.
+
+| `resources`
+| `corev1.ResourceRequirements` — Compute resource requests and limits for the agent container.
+
+| `commonMetadata`
+| `EmbeddedMetadata` — Labels and annotations applied to both the `Deployment` and `Service`, as well as the pod template.
+
+| `podMetadata`
+| `EmbeddedMetadata` — Labels and annotations applied only to the pod template of the `Deployment`.
+|===
+
+=== status.conditions
+
+`Agent` uses standard Kubernetes `metav1.Condition` entries.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `conditions`
+| `[]metav1.Condition` — Latest observations of the agent's state. Inspect `type`, `status`, `reason`, and `message` fields for troubleshooting.
+
+| `url`
+| `string` — Cluster-local URL populated automatically when the agent has an A2A protocol configured. Format: `http://\{name}.\{namespace}.svc.cluster.local:\{port}/.well-known/agent-card.json`.
+
+| `aiGatewayRef`
+| `ObjectReference` — Automatically populated with the `AiGateway` this agent is connected to. `nil` if no AI Gateway is in use.
+|===
+
+== AgenticWorkforce
+
+`AgenticWorkforce` declares a named group of entry-point agents. The operator crawls each entry point's sub-agent graph and records all discovered agents and tools in `status`.
+
+=== spec.entryPointAgents
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `entryPointAgents`
+| `[]ObjectReference` — Required. Minimum one entry. Each reference points to an `Agent` in the cluster. `namespace` defaults to the workforce's namespace if omitted. The operator resolves these agents and discovers all transitive sub-agents automatically.
+|===
+
+=== spec.tags
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `name`
+| `string` — Required. Human-readable display name for the workforce.
+
+| `description`
+| `string` — Required. Description of the workforce's purpose and capabilities.
+
+| `owner`
+| `string` — Required. Email address or identifier of the workforce owner.
+
+| `tags`
+| `[]string` — Optional labels for categorising and organising workforces.
+|===
+
+=== status.transitiveAgents
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `transitiveAgents`
+| `[]TransitiveAgent` — All agents discovered from the entry-point agents, both in-cluster and remote.
+
+| `transitiveAgents[].name`
+| `string` — Descriptive identifier for this transitive agent.
+
+| `transitiveAgents[].namespace`
+| `string` — Kubernetes namespace of the agent. Only set for in-cluster agents.
+
+| `transitiveAgents[].url`
+| `string (URI)` — Well-known agent card URL. Only set for remote agents.
+|===
+
+=== status.transitiveTools
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `transitiveTools`
+| `[]string` — All tool names available across the entire workforce, discovered from all transitive agents.
+
+| `conditions`
+| `[]metav1.Condition` — Latest observations of the workforce's state.
+|===
+
+== Related
+
+* xref:agents:explanation.adoc[]
+* xref:agents:how-to-guides/create-template-agent.adoc[]
+* xref:agents:how-to-guides/create-custom-image-agent.adoc[]
+* xref:agents:how-to-guides/propagate-headers.adoc[]
+* xref:agents:how-to-guides/delegate-to-subagent.adoc[]
+* xref:agents:how-to-guides/create-workforce.adoc[]

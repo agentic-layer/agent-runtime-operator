@@ -1,0 +1,69 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
+= Propagate Headers to Tool Servers
+
+This guide shows you how to forward specific HTTP headers from incoming A2A requests to MCP tool servers, enabling per-tool authentication and authorization.
+
+== Prerequisites
+
+* Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+* An existing `Agent` with at least one tool configured.
+
+NOTE: Header propagation is only supported for MCP tool servers (`spec.tools`), not for sub-agents.
+
+== Configure propagatedHeaders on a tool
+
+Add `propagatedHeaders` to any tool entry under `spec.tools`. List the header names you want forwarded. Header matching is case-insensitive.
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: my-agent
+spec:
+  framework: google-adk
+  tools:
+    - name: github_api
+      upstream:
+        external:
+          url: "https://github-mcp.example.com/mcp"
+      propagatedHeaders:
+        - Authorization      # Forward the Authorization header
+        - X-GitHub-Token     # Forward a custom header
+
+    - name: public_tool
+      upstream:
+        external:
+          url: "https://public-mcp.example.com/mcp"
+      # No propagatedHeaders — no headers forwarded to this server
+
+  protocols:
+    - type: A2A
+  replicas: 1
+----
+
+When an A2A request arrives carrying an `Authorization` header, only the `github_api` tool server receives it. The `public_tool` server receives no additional headers.
+
+== Apply and verify
+
+[source,bash]
+----
+kubectl apply -f my-agent.yaml
+
+# Check the Agent resource status
+kubectl get agent my-agent
+----
+
+To confirm header forwarding at runtime, inspect your MCP server logs for the expected headers on incoming requests.
+
+== Related
+
+* xref:agents:reference.adoc[]
+* xref:agents:how-to-guides/create-template-agent.adoc[]

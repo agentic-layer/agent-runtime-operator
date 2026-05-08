@@ -94,4 +94,4 @@ You should see the operator pod running and the Agent CRD available.
 == What's next
 
 * xref:agent-runtime:how-to-guides/configure.adoc[] — set cluster-wide defaults for the operator
-* xref:agents:how-to-guide.adoc[] — deploy your first agent
+* xref:agents:how-to-guides/create-template-agent.adoc[] — deploy a template-based agent

@@ -1,0 +1,75 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
+= Deploy a Custom-Image Agent
+
+This guide shows you how to deploy an `Agent` resource using your own container image instead of an operator-managed template.
+
+== Prerequisites
+
+* Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+* A container image that exposes an HTTP server implementing the A2A protocol.
+
+== Container requirements
+
+Your custom agent image must:
+
+. Expose an HTTP server on the port you configure (or the framework default).
+. Implement the A2A protocol specification.
+
+For examples and an SDK for building custom agent images, see:
+
+* https://github.com/agentic-layer/agent-samples[agent-samples]
+* https://github.com/agentic-layer/sdk-python[sdk-python]
+
+== Create the Agent
+
+Set `spec.image` to your container image. The operator uses your image instead of a template:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: weather-agent
+spec:
+  framework: google-adk
+  image: ghcr.io/agentic-layer/weather-agent:0.3.0
+  protocols:
+    - type: A2A
+  replicas: 1
+  env:
+    - name: LOGLEVEL
+      value: "INFO"
+----
+
+[source,bash]
+----
+kubectl apply -f weather-agent.yaml
+----
+
+== Verify
+
+[source,bash]
+----
+# Check the Agent resource status
+kubectl get agent weather-agent
+
+# Check the underlying Deployment
+kubectl get deployment weather-agent
+
+# View agent logs
+kubectl logs -l app=weather-agent
+----
+
+The agent is ready when the Deployment reports all replicas available.
+
+== Related
+
+* xref:agents:reference.adoc[]
+* xref:agents:explanation.adoc[]

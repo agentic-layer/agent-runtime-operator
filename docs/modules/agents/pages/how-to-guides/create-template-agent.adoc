@@ -1,0 +1,90 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
+= Deploy a Template-Based Agent
+
+This guide shows you how to deploy an `Agent` resource using an operator-managed template image, configure its tools and sub-agents, and verify it is running.
+
+== Prerequisites
+
+* Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+* A Gemini API key (or credentials for your chosen model).
+
+== Create the Agent
+
+Apply an `Agent` resource with `spec.framework` set and no `spec.image`. The operator resolves the container image from its built-in template registry.
+
+The example below deploys a news agent that calls two tool servers and delegates to a summarizer sub-agent:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: news-agent
+spec:
+  framework: google-adk
+  description: "A news agent that fetches and summarizes current articles"
+  instruction: "You are a news agent that can fetch current news articles and provide summaries. Use the news fetcher tool to get articles and provide concise summaries."
+  model: "gemini/gemini-2.5-flash"
+
+  # External tools the agent can use
+  tools:
+    # Reference to ToolServer in the same namespace
+    - name: news_fetcher
+      upstream:
+        toolServerRef:
+          name: news_fetcher_toolserver
+
+    # Direct URL to external MCP server
+    - name: web_fetcher
+      upstream:
+        external:
+          url: "https://mcp.example.com/web-fetch"
+
+  # Sub-agents this agent can delegate to
+  subAgents:
+    - name: summarizer_agent
+      url: "https://agents.example.com/summarizer-agent.json"
+      interactionType: "tool_call"
+
+  protocols:
+    - type: A2A
+  replicas: 1
+  env:
+    - name: GEMINI_API_KEY
+      value: "your-gemini-api-key-here"
+----
+
+[source,bash]
+----
+kubectl apply -f news-agent.yaml
+----
+
+== Verify
+
+[source,bash]
+----
+# Check the Agent resource status
+kubectl get agent news-agent
+
+# Check the underlying Deployment
+kubectl get deployment news-agent
+
+# View agent logs
+kubectl logs -l app=news-agent
+----
+
+The agent is ready when the Deployment reports all replicas available.
+
+== Related
+
+* xref:agents:reference.adoc[]
+* xref:agents:explanation.adoc[]
+* xref:agents:how-to-guides/propagate-headers.adoc[]
+* xref:agents:how-to-guides/delegate-to-subagent.adoc[]
