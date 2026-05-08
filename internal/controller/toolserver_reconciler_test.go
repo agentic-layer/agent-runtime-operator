@@ -111,6 +111,10 @@ var _ = Describe("ToolServer Controller", func() {
 			Expect(container.Ports).To(HaveLen(1))
 			Expect(container.Ports[0].ContainerPort).To(Equal(int32(8080)))
 			Expect(container.Env).To(ContainElement(corev1.EnvVar{Name: "LOGLEVEL", Value: "INFO"}))
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "OTEL_SEMCONV_STABILITY_OPT_IN",
+				Value: "gen_ai_latest_experimental",
+			}))
 			Expect(container.ReadinessProbe).NotTo(BeNil())
 			Expect(container.ReadinessProbe.TCPSocket).NotTo(BeNil())
 			Expect(container.ReadinessProbe.TCPSocket.Port.IntValue()).To(Equal(8080))

@@ -38,7 +38,7 @@ var _ = Describe("Agent Config", func() {
 
 			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(envVars).To(HaveLen(6))
+			Expect(envVars).To(HaveLen(7))
 
 			// Verify all required template variables are present with correct values
 			agentNameVar := findEnvVar(envVars, "AGENT_NAME")
@@ -56,6 +56,10 @@ var _ = Describe("Agent Config", func() {
 			agentModelVar := findEnvVar(envVars, "AGENT_MODEL")
 			Expect(agentModelVar).NotTo(BeNil())
 			Expect(agentModelVar.Value).To(Equal(""))
+
+			otelSemconvVar := findEnvVar(envVars, "OTEL_SEMCONV_STABILITY_OPT_IN")
+			Expect(otelSemconvVar).NotTo(BeNil())
+			Expect(otelSemconvVar.Value).To(Equal("gen_ai_latest_experimental"))
 
 			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
 			Expect(subAgentsVar).NotTo(BeNil())
@@ -101,7 +105,7 @@ var _ = Describe("Agent Config", func() {
 
 			envVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(envVars).To(HaveLen(6))
+			Expect(envVars).To(HaveLen(7))
 
 			agentDescVar := findEnvVar(envVars, "AGENT_DESCRIPTION")
 			Expect(agentDescVar.Value).To(Equal("Test agent description"))
@@ -291,8 +295,8 @@ var _ = Describe("Agent Config", func() {
 			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Should have base variables (6) + LiteLLM variables (3) = 9 total
-			Expect(envVars).To(HaveLen(9))
+			// Should have base variables (7) + LiteLLM variables (3) = 10 total
+			Expect(envVars).To(HaveLen(10))
 
 			// Verify LITELLM_PROXY_API_BASE is set
 			proxyBaseVar := findEnvVar(envVars, "LITELLM_PROXY_API_BASE")
@@ -322,8 +326,8 @@ var _ = Describe("Agent Config", func() {
 			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Should only have base variables (6), no LiteLLM variables
-			Expect(envVars).To(HaveLen(6))
+			// Should only have base variables (7), no LiteLLM variables
+			Expect(envVars).To(HaveLen(7))
 
 			// Verify LiteLLM variables are NOT present
 			Expect(findEnvVar(envVars, "LITELLM_PROXY_API_BASE")).To(BeNil())
@@ -364,6 +368,29 @@ var _ = Describe("Agent Config", func() {
 			proxyBaseVar := findEnvVar(result, "LITELLM_PROXY_API_BASE")
 			Expect(proxyBaseVar).NotTo(BeNil())
 			Expect(proxyBaseVar.Value).To(Equal("http://ai-gateway.default.svc.cluster.local:4000"))
+		})
+
+		It("should allow user to override OTEL_SEMCONV_STABILITY_OPT_IN", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "otel-override-agent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{},
+			}
+
+			templateVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			userVars := []corev1.EnvVar{
+				{Name: "OTEL_SEMCONV_STABILITY_OPT_IN", Value: "http"},
+			}
+
+			result := mergeEnvironmentVariables(templateVars, userVars)
+
+			otelSemconvVar := findEnvVar(result, "OTEL_SEMCONV_STABILITY_OPT_IN")
+			Expect(otelSemconvVar).NotTo(BeNil())
+			Expect(otelSemconvVar.Value).To(Equal("http"))
 		})
 	})
 
