@@ -19,6 +19,7 @@ User Guides and How-To Guides
 Reference Documentation
 - @docs/modules/agent-runtime/pages/reference.adoc
 - @docs/modules/agents/pages/reference.adoc
+- @docs/modules/tool-servers/pages/reference.adoc
 - Overall Agentic Layer Architecture: https://docs.agentic-layer.ai/architecture/main/index.html
 
 Documentation in AsciiDoc format is located in the `docs/` directory.

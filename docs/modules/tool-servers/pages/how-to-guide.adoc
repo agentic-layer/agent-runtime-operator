@@ -1,18 +1,28 @@
-= Create a Tool Server
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
 
-This guide walks you through creating and deploying tool servers using the Agent Runtime Operator. Tool servers extend your agents' capabilities by providing external tools and functionality through the Model Context Protocol (MCP).
+= Deploy a ToolServer
+
+This guide shows you how to deploy a `ToolServer` resource on your Kubernetes cluster and verify it is running.
 
 IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guides/install.adoc[Install the Agent Runtime Operator] for installation instructions.
 
-== Quick Start: Your First Tool Server
+== Prerequisites
 
-Get your first tool server running in under 5 minutes.
+* Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+* A container image that implements the MCP protocol.
 
-=== Deploy your first tool server
+== Create the ToolServer
+
+Apply a `ToolServer` resource. The example below deploys the Context7 MCP server, which provides up-to-date code documentation:
 
 [source,bash]
 ----
-# Create a tool server using the Context7 MCP server (provides up-to-date code docs)
 cat <<EOF | kubectl apply -f -
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: ToolServer
@@ -30,65 +40,29 @@ spec:
 EOF
 ----
 
-=== Verify your tool server is running
+For the full list of fields and their types, see xref:tool-servers:reference.adoc[].
+
+== Verify
 
 [source,bash]
 ----
-# Check the tool server resource
+# Check the ToolServer resource status
 kubectl get toolserver context7-toolserver
 
-# Check the deployment
+# Check the underlying Deployment
 kubectl get deployment context7-toolserver
 
-# Check the service
+# Check the Service
 kubectl get service context7-toolserver
-----
 
-=== Check the logs
-
-[source,bash]
-----
 # View tool server logs
 kubectl logs -l app=context7-toolserver
 ----
 
-🎉 *Congratulations!* You've successfully deployed your first tool server.
+The tool server is ready when the Deployment reports all replicas available. The `status.url` field on the `ToolServer` resource is populated with the cluster-local URL once the server is ready.
 
-== Using Tool Servers with Agents
+== Related
 
-Tool servers are exposed to agents through a ToolRoute. Define a ToolRoute to expose a
-ToolServer via a ToolGateway, then reference the route from the agent:
-
-[source,yaml]
-----
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: ToolRoute
-metadata:
-  name: context7-route
-spec:
-  toolGatewayRef:
-    name: tool-gateway
-  upstream:
-    toolServerRef:
-      name: context7-toolserver
----
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: Agent
-metadata:
-  name: coding-assistant
-spec:
-  framework: google-adk
-  tools:
-    - name: context7_tools
-      upstream:
-        toolRouteRef:
-          name: context7-route
-  protocols:
-    - type: A2A
-  replicas: 1
-  env:
-    - name: GEMINI_API_KEY
-      value: "your-gemini-api-key-here"
-----
-
-Happy tool server building! 🔧
+* xref:tool-servers:reference.adoc[]
+* xref:tool-servers:explanation.adoc[]
+* xref:tool-routes:how-to-guide.adoc[]

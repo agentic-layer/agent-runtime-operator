@@ -1,0 +1,99 @@
+// REFERENCE — Diátaxis
+// This page is information-shaped: tables, field lists, full API surface.
+// DO: be exhaustive within scope; use stable, ctrl-F-able structure;
+//     one heading per resource/CRD/command/field group.
+// DON'T: include tutorials, decision trees, or "why" explanations.
+// If a section drifts into "how would you do X" → move to how-to-guide.adoc.
+// If a section drifts into "why this exists" → move to explanation.adoc.
+
+= ToolServer Reference
+
+This reference covers all fields of the `ToolServer` custom resource in the `runtime.agentic-layer.ai` API group.
+
+Full Go API: https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+
+== ToolServer
+
+`ToolServer` declares a containerised MCP server. The operator creates a Kubernetes `Deployment` and `Service` for each `ToolServer`.
+
+=== spec
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `protocol`
+| `string` — Tool server protocol. Allowed values: `mcp`. Default: `mcp`. Currently only the Model Context Protocol is supported.
+
+| `transportType`
+| `string` — How the tool server communicates. Allowed values: `http`, `sse`. Default: `http`. `http` uses standard HTTP transport; `sse` uses Server-Sent Events transport. Both create a standalone `Deployment` and `Service`.
+
+| `image`
+| `string` — Required. Container image for the tool server. Minimum length: 1.
+
+| `imagePullSecrets`
+| `[]corev1.LocalObjectReference` — Optional. References to secrets used to pull the tool server container image.
+
+| `command`
+| `[]string` — Optional. Overrides the container's `ENTRYPOINT`. If not specified, the container image's `ENTRYPOINT` is used.
+
+| `args`
+| `[]string` — Optional. Overrides the container's `CMD`. If not specified, the container image's `CMD` is used.
+
+| `port`
+| `integer (1–65535)` — Optional. Port number the tool server listens on. Required for `http` and `sse` transports.
+
+| `path`
+| `string` — Optional. URL path for the MCP endpoint. Must start with `/`. Defaults to `/mcp` for `http` transport and `/sse` for `sse` transport if not specified.
+
+| `replicas`
+| `integer (≥0)` — Optional. Number of pod replicas. Only applicable for `http` and `sse` transports. Defaults to the Kubernetes deployment default (1) when omitted.
+
+| `env`
+| `[]corev1.EnvVar` — Optional. Additional environment variables injected into the tool server container.
+
+| `envFrom`
+| `[]corev1.EnvFromSource` — Optional. Sources (ConfigMaps, Secrets) to populate environment variables from.
+
+| `resources`
+| `corev1.ResourceRequirements` — Optional. Compute resource requests and limits for the tool server container.
+
+| `commonMetadata`
+| `EmbeddedMetadata` — Optional. Labels and annotations applied to both the `Deployment` and `Service`, as well as the pod template. See `commonMetadata / podMetadata fields` below.
+
+| `podMetadata`
+| `EmbeddedMetadata` — Optional. Labels and annotations applied only to the pod template of the `Deployment`. See `commonMetadata / podMetadata fields` below.
+|===
+
+=== spec.commonMetadata / spec.podMetadata fields
+
+Both `commonMetadata` and `podMetadata` share the same `EmbeddedMetadata` structure.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `labels`
+| `map[string]string` — Key/value pairs applied as Kubernetes labels to the target resources.
+
+| `annotations`
+| `map[string]string` — Key/value pairs applied as Kubernetes annotations to the target resources.
+|===
+
+=== status
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `conditions`
+| `[]metav1.Condition` — Latest observations of the tool server's state. Inspect `type`, `status`, `reason`, and `message` fields for troubleshooting.
+
+| `url`
+| `string` — Cluster-local URL where the tool server can be accessed. Only populated for `http` and `sse` transports. Format: `http://\{name}.\{namespace}.svc.cluster.local:\{port}\{path}`.
+|===
+
+== Related
+
+* xref:tool-servers:how-to-guide.adoc[]
+* xref:tool-servers:explanation.adoc[]

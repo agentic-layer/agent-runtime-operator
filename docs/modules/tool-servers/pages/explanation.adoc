@@ -1,0 +1,36 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= ToolServer
+
+== What it is
+
+A `ToolServer` is a Kubernetes custom resource that declares a containerised server implementing the Model Context Protocol (MCP). When you create a `ToolServer`, the Agent Runtime Operator provisions a `Deployment` and a `Service` for the specified container image, making the MCP server reachable within the cluster at a stable URL recorded in `status.url`.
+
+== Why it exists
+
+Agents need access to tools — functions that retrieve data, call external APIs, or execute actions. MCP defines a standard protocol for how agents discover and invoke those tools. Rather than manually managing the Kubernetes workload for each MCP server, `ToolServer` lets you declare intent ("run this MCP server at two replicas") and leave lifecycle management to the operator.
+
+== How it fits
+
+A `ToolServer` sits at the bottom of the tool-serving stack. Once deployed, it is not directly referenced by agents. Instead, a `ToolRoute` resource exposes the `ToolServer` through a `ToolGateway`, applying per-consumer access controls and tool filtering. Agents then reference the `ToolRoute` to call the tools. This separation means a single `ToolServer` can serve many agents with different visibility rules, without each agent needing its own copy of the server. For details on connecting a deployed `ToolServer` to agents, see xref:tool-routes:how-to-guide.adoc[].
+
+== Trade-offs and alternatives
+
+=== HTTP vs. SSE transport
+
+`ToolServer` supports two MCP transports. The `http` transport sends requests and responses over standard HTTP; it is stateless and horizontally scalable — setting `spec.replicas > 1` works without coordination. The `sse` transport uses Server-Sent Events to push streaming responses back to the caller; it suits servers that stream partial results but requires session affinity when running multiple replicas.
+
+=== ToolServer vs. external MCP URL
+
+If an MCP server is already running outside your cluster (for example, a managed SaaS tool endpoint), you do not need a `ToolServer`. An agent or `ToolRoute` can reference an external URL directly via the `external.url` field. Use `ToolServer` when you need to run the MCP server yourself inside the cluster — for latency, data-sovereignty, or configuration-control reasons — and want the operator to manage its lifecycle.
+
+== Related
+
+* xref:tool-servers:how-to-guide.adoc[]
+* xref:tool-servers:reference.adoc[]
+* xref:tool-routes:how-to-guide.adoc[]
