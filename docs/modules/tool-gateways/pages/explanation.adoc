@@ -1,0 +1,55 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= ToolGateway and the Gateway/Class Pluggability Pattern
+
+== What it is
+
+A `ToolGateway` is a Kubernetes custom resource in the `runtime.agentic-layer.ai` API group that declares a desired gateway instance for MCP tool traffic. It specifies *what* the platform wants — environment configuration, guardrails to apply, metadata to propagate — without specifying *how* the gateway is implemented. A `ToolGatewayClass` is a companion cluster-scoped resource that maps a controller name to an implementation operator. Together the two CRDs form a pluggable gateway contract: platform engineers declare a `ToolGateway`; a separately installed implementation operator reconciles it into a running proxy.
+
+== Why it exists
+
+Tool servers in the Agentic Layer need a consistent, addressable entry point for MCP traffic. Without a gateway, agents connect directly to individual tool servers, which provides no central point for access control, filtering, or observability.
+
+A `ToolGateway` solves this by acting as a unified entry point. When a tool server is attached to a gateway, its `status.gatewayUrl` is populated with the gateway-routed URL; agents that access tools through the gateway benefit from any cross-cutting capabilities the implementation provides — authentication, routing, tracing, or guardrail enforcement.
+
+The gateway/class pattern exists for the same reason it does on `AgentGateway` and `AiGateway` (see xref:agent-gateways:explanation.adoc[]): different organisations prefer different gateway technologies, and forcing a single built-in implementation would make the platform difficult to adopt for teams that already operate their own MCP-capable proxy. By separating declaration from implementation, teams can switch or extend gateway implementations without changing any tool-server or agent manifests.
+
+== How it fits
+
+`ToolGateway` is the gateway-side counterpart to `ToolRoute`. A `ToolRoute` cannot route traffic without a gateway to target — the `spec.toolGatewayRef` field on a `ToolRoute` must point to a `ToolGateway` that an implementation operator claims and programs. The two resources are designed to be reconciled together: each tool-gateway implementation operator watches both the `ToolGateway` resources it owns (selected by `ToolGatewayClass`) and the `ToolRoute` resources that reference those gateways. For a detailed account of how `ToolRoute` works and why per-consumer routing matters, see xref:tool-routes:explanation.adoc[].
+
+The gateway/class model mirrors the https://kubernetes.io/docs/concepts/services-networking/gateway/[Kubernetes Gateway API], where a `GatewayClass` selects an implementation and a `Gateway` declares an instance. In the Agentic Layer:
+
+. **`ToolGatewayClass`** (cluster-scoped) — registered once by the implementation operator; its `spec.controller` field carries the operator's unique controller name.
+. **`ToolGateway`** (namespace-scoped) — created by platform engineers for each gateway instance they need; its optional `spec.toolGatewayClassName` field selects the class.
+. **Implementation operator** — watches `ToolGateway` resources whose claimed class it owns, creates the underlying `Deployment` and `Service`, programs any `ToolRoute` resources that target the gateway, and writes status conditions back.
+
+When only one implementation is installed in a cluster, `spec.toolGatewayClassName` can be omitted; the sole implementation claims all unclaimed gateways. Multiple implementations can coexist as long as each `ToolGateway` names the class it wants.
+
+One notable implementation detail: the LiteLLM-based AI gateway operator bundles tool-gateway support alongside its AI model routing. It reconciles both `AiGateway` and `ToolGateway` resources, so teams that install xref:ai-gateway-litellm-operator::index.adoc[] for LLM routing automatically get a `ToolGateway` implementation as well — no additional operator is required.
+
+== Trade-offs and alternatives
+
+=== Pluggable classes vs. a single built-in implementation
+
+Building a single gateway implementation directly into agent-runtime-operator would have been simpler initially. The downside is lock-in: upgrading the gateway would require upgrading the core operator, and organisations that already run a compatible MCP proxy would carry a redundant workload. The class pattern trades a small amount of initial complexity for long-term flexibility and a clear extension point.
+
+=== Direct tool-server access vs. gateway routing
+
+`ToolServer` resources expose a `status.url` that agents can reference directly, and `Agent` resources can use `spec.tools[].upstream.toolServerRef` to bypass the gateway entirely. This is appropriate for simple, single-agent scenarios. In any multi-tenant or multi-agent environment, routing through a `ToolGateway` via `ToolRoute` is preferred: it enables per-consumer filtering, centralised access control, and consistent observability across all tool calls.
+
+=== Default gateway resolution vs. explicit reference
+
+If a `ToolGateway` is deployed in the `tool-gateway` namespace, tool servers will attach to it automatically without an explicit `toolGatewayRef`. This convention reduces boilerplate in simple single-gateway clusters. When multiple gateways coexist — for example, separate gateways per team or per security zone — an explicit reference makes the attachment unambiguous and audit-friendly.
+
+== Related
+
+* xref:tool-gateways:how-to-guide.adoc[]
+* xref:tool-gateways:reference.adoc[]
+* xref:tool-routes:explanation.adoc[]
+* xref:agent-gateways:explanation.adoc[]

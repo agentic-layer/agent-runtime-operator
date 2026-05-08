@@ -1,0 +1,100 @@
+// REFERENCE — Diátaxis
+// This page is information-shaped: tables, field lists, full API surface.
+// DO: be exhaustive within scope; use stable, ctrl-F-able structure;
+//     one heading per resource/CRD/command/field group.
+// DON'T: include tutorials, decision trees, or "why" explanations.
+// If a section drifts into "how would you do X" → move to how-to-guide.adoc.
+// If a section drifts into "why this exists" → move to explanation.adoc.
+
+= ToolGateway and ToolGatewayClass Reference
+
+This reference covers all fields of the `ToolGateway` and `ToolGatewayClass` custom resources in the `runtime.agentic-layer.ai` API group.
+
+Full Go API: https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+
+== ToolGateway
+
+`ToolGateway` declares a desired gateway instance for MCP tool traffic. A gateway implementation operator (selected via `ToolGatewayClass`) reconciles the resource and creates the underlying workload.
+
+=== spec
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `toolGatewayClassName`
+| `string` — Optional. Name of the `ToolGatewayClass` that selects the implementation operator for this gateway. Only required when multiple gateway classes are registered in the cluster. If omitted, the sole installed implementation is used.
+
+| `env`
+| `[]corev1.EnvVar` — Optional. Environment variables injected into the gateway container. Can carry configuration values, credentials, or feature flags.
+
+| `envFrom`
+| `[]corev1.EnvFromSource` — Optional. Sources (ConfigMaps, Secrets) from which environment variables are loaded into the gateway container.
+
+| `commonMetadata`
+| `EmbeddedMetadata` — Optional. Labels and annotations applied to the `Deployment` and `Service` created for this gateway, as well as the pod template. See `commonMetadata / podMetadata fields` below.
+
+| `podMetadata`
+| `EmbeddedMetadata` — Optional. Labels and annotations applied only to the pod template of the `Deployment`. See `commonMetadata / podMetadata fields` below.
+
+| `guardrails`
+| `[]corev1.ObjectReference` — Optional. `Guard` resources applied to traffic flowing through this gateway. Guards are evaluated in the order they are listed.
+|===
+
+=== spec.commonMetadata / spec.podMetadata fields
+
+Both `commonMetadata` and `podMetadata` share the same `EmbeddedMetadata` structure.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `labels`
+| `map[string]string` — Key/value pairs applied as Kubernetes labels to the target resources.
+
+| `annotations`
+| `map[string]string` — Key/value pairs applied as Kubernetes annotations to the target resources.
+|===
+
+=== status
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `conditions`
+| `[]metav1.Condition` — Latest observations of the gateway's state. Inspect `type`, `status`, `reason`, and `message` fields for troubleshooting.
+
+| `url`
+| `string` — Cluster-local URL where this tool gateway can be accessed. Populated by the implementation operator once the gateway is ready.
+|===
+
+== ToolGatewayClass
+
+`ToolGatewayClass` is a cluster-scoped resource that registers a named implementation controller for `ToolGateway`. Each `ToolGateway` that sets `spec.toolGatewayClassName` to the name of a `ToolGatewayClass` will be reconciled by the controller identified in that class.
+
+=== spec
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `controller`
+| `string` — Required. The fully-qualified name of the controller that reconciles `ToolGateway` resources claiming this class. Follows the format `<domain>/<name>` (e.g. `agentic-layer.ai/agentgateway`). An implementation operator watches for `ToolGatewayClass` resources whose `spec.controller` value matches the operator's own controller name.
+|===
+
+=== status
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `conditions`
+| `[]metav1.Condition` — Latest observations of the gateway class's state. Inspect `type`, `status`, `reason`, and `message` fields for troubleshooting.
+|===
+
+== Related
+
+* xref:tool-gateways:how-to-guide.adoc[]
+* xref:tool-gateways:explanation.adoc[]
+* xref:tool-routes:reference.adoc[]

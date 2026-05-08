@@ -1,22 +1,16 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
 = Create a Tool Gateway
 
 This guide walks you through deploying an instance of the `ToolGateway` custom resource.
 
-A `ToolGateway` is like a Kubernetes https://kubernetes.io/docs/concepts/services-networking/gateway/#api-kind-gateway[Gateway] in that there might be many different implementations (also known as "classes"). Example implementations of the Kubernetes Gateway specification include Envoy Gateway, Cilium, or `amazon-vpc-lattice`).
-
 TIP: Before following this guide, make sure you have some kind of Tool Gateway Operator installed.
-
-== How Tool Gateways Work
-
-A `ToolGateway` acts as a unified entry point for accessing tool servers. Instead of agents connecting directly to individual tool servers, they connect through the gateway, which handles routing, authentication, and other cross-cutting concerns.
-
-Tool servers are automatically attached to a `ToolGateway` through a resolution strategy:
-
-1. If the `ToolServer` has an explicit `toolGatewayRef`, that specific `ToolGateway` is used
-2. If no explicit reference is set, the operator looks for a default `ToolGateway` in the `tool-gateway` namespace
-3. If no `ToolGateway` is found, the tool server runs without a gateway (direct access only)
-
-When a tool server is attached to a gateway, its `status.gatewayUrl` is populated with the URL to access it through the gateway.
 
 == Create a ToolGateway Resource
 
@@ -122,8 +116,6 @@ kubectl get toolserver my-toolserver -o yaml
 kubectl get toolservers
 ----
 
-The tool server's `status.gatewayUrl` will contain the URL to access the tool server through the gateway. When present, agents should prefer this URL over the direct `status.url`.
-
 == Configure Environment Variables
 
 You can pass environment variables and load them from ConfigMaps or Secrets:
@@ -145,3 +137,9 @@ spec:
     - configMapRef:
         name: gateway-config
 ----
+
+== Related
+
+* xref:tool-gateways:reference.adoc[]
+* xref:tool-gateways:explanation.adoc[]
+* xref:tool-routes:how-to-guide.adoc[]
