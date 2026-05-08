@@ -1,0 +1,8 @@
+= Agent Runtime Module
+
+The agent-runtime module covers installing the Agent Runtime Operator and configuring its cluster-wide defaults via `AgentRuntimeConfiguration`.
+
+* xref:agent-runtime:how-to-guides/install.adoc[] — install the operator on Kubernetes (kubectl + Flux).
+* xref:agent-runtime:how-to-guides/configure.adoc[] — set cluster-wide defaults via `AgentRuntimeConfiguration`.
+* xref:agent-runtime:reference.adoc[] — `AgentRuntimeConfiguration` field listing.
+* xref:agent-runtime:explanation.adoc[] — what the operator is, why it exists, and how it fits into the layer.

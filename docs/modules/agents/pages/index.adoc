@@ -1,0 +1,16 @@
+= Agents Module
+
+The agents module covers the `Agent` and `AgenticWorkforce` custom resources — deploying agents from templates or custom images, configuring their tools and sub-agents, and grouping them into discoverable workforces.
+
+== How-to guides
+
+* xref:agents:how-to-guides/create-template-agent.adoc[] — deploy an agent using an operator-managed template image.
+* xref:agents:how-to-guides/create-custom-image-agent.adoc[] — deploy an agent using your own container image.
+* xref:agents:how-to-guides/propagate-headers.adoc[] — forward HTTP headers from incoming A2A requests to MCP tool servers.
+* xref:agents:how-to-guides/delegate-to-subagent.adoc[] — configure sub-agents and pick `tool_call` vs. `transfer` interaction.
+* xref:agents:how-to-guides/create-workforce.adoc[] — group entry-point agents into an `AgenticWorkforce`.
+
+== Reference and explanation
+
+* xref:agents:reference.adoc[] — `Agent` and `AgenticWorkforce` CRD field listings.
+* xref:agents:explanation.adoc[] — Agent CRD as a framework-agnostic contract, template vs. custom image trade-offs, the workforce concept.
