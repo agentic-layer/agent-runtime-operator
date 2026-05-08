@@ -6,7 +6,8 @@ Project Overview and Developer Documentation
 - @README.md: audience is human developer only - consult only after explicitly asking user
 
 User Guides and How-To Guides
-- @docs/modules/agent-runtime/pages/how-to-guide.adoc
+- @docs/modules/agent-runtime/pages/how-to-guides/install.adoc
+- @docs/modules/agent-runtime/pages/how-to-guides/configure.adoc
 - @docs/modules/agents/pages/how-to-guide.adoc
 - @docs/modules/tool-servers/pages/how-to-guide.adoc
 - @docs/modules/agent-gateways/pages/how-to-guide.adoc

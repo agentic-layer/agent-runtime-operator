@@ -1,0 +1,58 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
+= Configure the Agent Runtime Operator
+
+This guide walks you through customising operator-wide defaults using the `AgentRuntimeConfiguration` resource.
+
+== Prerequisites
+
+* The Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+
+== When to use AgentRuntimeConfiguration
+
+Create an `AgentRuntimeConfiguration` when you want to:
+
+* Change the default agent framework used when an `Agent` resource does not specify one.
+* Pin specific container images for template-based agents instead of the operator's built-in defaults.
+
+`AgentRuntimeConfiguration` is namespace-scoped and must be created in the operator's namespace (`agent-runtime-operator-system`). Only one instance is allowed per operator namespace. If no configuration is provided, the operator uses its built-in defaults.
+
+== Create an AgentRuntimeConfiguration
+
+[source,bash]
+----
+cat <<EOF | kubectl apply -f -
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: AgentRuntimeConfiguration
+metadata:
+  name: default
+  namespace: agent-runtime-operator-system
+spec:
+  defaultFramework: "google-adk"
+  agentTemplateImages:
+    googleAdk: "ghcr.io/agentic-layer/agent-template-adk:0.8.0"
+    msaf: "ghcr.io/agentic-layer/agent-template-msaf:0.1.0"
+EOF
+----
+
+For the full list of fields and their types, see xref:agent-runtime:reference.adoc[].
+
+== Verify the configuration
+
+[source,bash]
+----
+kubectl get agentruntimeconfiguration default -n agent-runtime-operator-system
+----
+
+The resource should be listed with no error conditions. When `defaultFramework` is changed, the operator automatically re-reconciles all agents that do not specify a framework explicitly.
+
+== Related
+
+* xref:agent-runtime:reference.adoc[]
+* xref:agent-runtime:explanation.adoc[]

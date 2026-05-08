@@ -2,7 +2,7 @@
 
 This guide walks you through creating and deploying agents using the Agent Runtime Operator. Whether you're building your first agent or exploring advanced patterns, this guide provides step-by-step instructions to get you up and running.
 
-IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Install the Agent Runtime Operator] for installation instructions.
+IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guides/install.adoc[Install the Agent Runtime Operator] for installation instructions.
 
 == Quick Start: Your First Agent
 

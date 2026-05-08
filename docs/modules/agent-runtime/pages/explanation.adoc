@@ -1,0 +1,40 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= The Agent Runtime Operator
+
+== What it is
+
+The Agent Runtime Operator is a Kubernetes operator that provides a framework-agnostic way to deploy and manage agentic workloads. It introduces a set of Custom Resource Definitions (CRDs) — `Agent`, `AgenticWorkforce`, `AgentGateway`, `ToolServer`, `ToolRoute`, and others — that let platform teams describe agentic infrastructure declaratively, without coupling their configuration to any single agent framework or gateway implementation.
+
+== Why it exists
+
+Running LLM-based agents in Kubernetes without an operator means maintaining ad-hoc Deployments, Services, and config maps for each agent, duplicating boilerplate across teams, and hand-rolling the plumbing that connects agents to tool servers and gateways. As the number of agents grows, this approach does not scale: there is no consistent model for discoverability, no single place to set cluster-wide defaults, and no abstraction layer that separates the "what" (an agent's behaviour) from the "how" (the runtime it runs on).
+
+The Agent Runtime Operator solves this by owning the CRDs that define the agentic layer's resource model. Platform teams declare an `Agent` resource; the operator reconciles the corresponding Deployment, Service, and readiness probes automatically, applying framework-specific defaults without requiring application developers to understand them.
+
+== How it fits
+
+The operator occupies the bottom of the agentic layer stack. It owns the CRD schemas and is the single source of truth for the API group `runtime.agentic-layer.ai`. Other operators — such as the Agent Gateway KrakenD Operator or a ToolGateway implementation — watch the same API group but reconcile only the resources they own (for example, `AgentGateway` or `ToolRoute`). This separation of concerns means each implementation operator can evolve independently while sharing a common resource model.
+
+`AgentRuntimeConfiguration` is a cluster-scoped defaults object that lives in the operator's own namespace. It lets a platform administrator set the default agent framework and pin template image versions once, rather than repeating those values in every `Agent` manifest. Individual `Agent` resources can always override the defaults by specifying their own `framework` or `image` fields.
+
+The architecture overview at xref:home:architecture:index.adoc[] shows how the operator relates to gateways, tool servers, and the broader Agentic Layer.
+
+== Trade-offs and alternatives
+
+*Single operator for all CRDs vs. one operator per CRD group*: The current design keeps all base CRDs in one operator to simplify installation — one `kubectl apply` is enough. The trade-off is that the operator binary is larger and carries reconciliation logic for several resource types. A future split (for example, separating gateway CRD ownership from agent CRD ownership) was considered but deferred until the API surface stabilises.
+
+*Namespace-scoped `AgentRuntimeConfiguration` vs. cluster-scoped*: A cluster-scoped configuration object would span all namespaces but introduce RBAC complexity (cluster-admin required to change defaults). The namespace-scoped design confines the configuration to the operator's own namespace, where operators already have full access, and limits the blast radius if the configuration is misconfigured.
+
+*Framework abstraction vs. direct container spec*: The `framework` field on `Agent` allows the operator to inject a known-good container image and runtime settings automatically. This is more opinionated than letting every team manage their own images, but it dramatically reduces the per-agent boilerplate and ensures consistent framework upgrades across the cluster.
+
+== Related
+
+* xref:agent-runtime:how-to-guides/install.adoc[]
+* xref:agent-runtime:how-to-guides/configure.adoc[]
+* xref:agent-runtime:reference.adoc[]

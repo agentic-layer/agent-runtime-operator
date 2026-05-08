@@ -11,7 +11,7 @@ Guardrails are expressed through two gateway-agnostic CRDs:
 A gateway resource (for example `AiGateway`) then references one or more `Guard` resources in its `spec.guardrails` list.
 The gateway's operator resolves those references and configures its underlying gateway implementation to invoke the guardrail at request time.
 
-TIP: Before following this guide, make sure you have the xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Agent Runtime Operator] and a gateway operator that supports guardrails installed.
+TIP: Before following this guide, make sure you have the xref:agent-runtime-operator:agent-runtime:how-to-guides/install.adoc[Agent Runtime Operator] and a gateway operator that supports guardrails installed.
 Today, guardrails are implemented by the xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator] (Presidio-based PII guardrails on an `AiGateway`) and the xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator] (Presidio-based PII guardrails on a `ToolGateway`).
 
 == Implementation Status

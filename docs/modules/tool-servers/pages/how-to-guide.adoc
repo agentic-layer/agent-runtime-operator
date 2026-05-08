@@ -2,7 +2,7 @@
 
 This guide walks you through creating and deploying tool servers using the Agent Runtime Operator. Tool servers extend your agents' capabilities by providing external tools and functionality through the Model Context Protocol (MCP).
 
-IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Install the Agent Runtime Operator] for installation instructions.
+IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guides/install.adoc[Install the Agent Runtime Operator] for installation instructions.
 
 == Quick Start: Your First Tool Server
 

@@ -1,23 +1,48 @@
-= Agent Runtime Reference
+// REFERENCE — Diátaxis
+// This page is information-shaped: tables, field lists, full API surface.
+// DO: be exhaustive within scope; use stable, ctrl-F-able structure;
+//     one heading per resource/CRD/command/field group.
+// DON'T: include tutorials, decision trees, or "why" explanations.
+// If a section drifts into "how would you do X" → move to how-to-guide.adoc.
+// If a section drifts into "why this exists" → move to explanation.adoc.
 
-== Full API Reference
+= AgentRuntimeConfiguration Reference
 
-https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+This reference covers the fields of the `AgentRuntimeConfiguration` resource. For all other CRDs in the `runtime.agentic-layer.ai` API group, see each feature module's own reference page.
 
-== CRDs
+== AgentRuntimeConfiguration
 
-The following Custom Resource Definitions (CRDs) are provided by the Agent Runtime Operator:
+`AgentRuntimeConfiguration` provides namespace-scoped, operator-wide defaults for the Agent Runtime Operator. It must be created in the operator's namespace (`agent-runtime-operator-system`); only one instance is allowed per namespace.
 
-* *Agent*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agents.yaml
-* *AgentRuntimeConfiguration*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentruntimeconfigurations.yaml
-* *AgenticWorkforce*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agenticworkforces.yaml
-* *AgentGateway*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgateways.yaml
-* *AgentGatewayClass*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgatewayclasses.yaml
-* *AIGateway*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_agentgateways.yaml
-* *AIGatewayClass*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_aigatewayclasses.yaml
-* *ToolRoute*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_toolroutes.yaml
-* *ToolServer*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_toolservers.yaml
-* *ToolGateway*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_toolgateways.yaml
-* *ToolGatewayClass*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_toolgatewayclasses.yaml
-* *Guard*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_guards.yaml
-* *GuardrailProvider*: https://github.com/agentic-layer/agent-runtime-operator/blob/main/config/crd/bases/runtime.agentic-layer.ai_guardrailproviders.yaml
+Full API reference: https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+
+=== spec
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `defaultFramework`
+| `string` — The framework applied to `Agent` resources that do not specify one. Allowed values: `google-adk`, `msaf`. Defaults to `google-adk` when omitted. When this value changes, the operator re-reconciles all agents without an explicit framework.
+
+| `agentTemplateImages`
+| `object` — Container images for template-based agents, keyed by framework. If a framework entry is omitted, the operator falls back to its built-in default image for that framework. See `agentTemplateImages` fields below.
+|===
+
+=== spec.agentTemplateImages
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `googleAdk`
+| `string` — Container image used for template-based agents with the `google-adk` framework. If omitted, the operator's compiled-in default is used.
+
+| `msaf`
+| `string` — Container image used for template-based agents with the `msaf` framework. If omitted, the operator's compiled-in default is used.
+|===
+
+== Related
+
+* xref:agent-runtime:how-to-guides/configure.adoc[]
+* xref:agent-runtime:explanation.adoc[]
