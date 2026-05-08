@@ -1,10 +1,14 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
 = Create an AI Gateway
 
 This guide walks you through deploying an instance of the `AiGateway` custom resource.
-
-An `AiGateway` is like a Kubernetes https://kubernetes.io/docs/concepts/services-networking/gateway/#api-kind-gateway[Gateway] in that there might be many different implementations (also known as "classes"). Example implementations of the Kubernetes Gateway specification include Envoy Gateway, Cilium, or `amazon-vpc-lattice`).
-
-One example implementation of the Agentic Layer `AiGateway` specification is based on LiteLLM. This guide explains how to instantiate one such instance of an `AiGateway`.
 
 TIP: Before following this guide, make sure you have some kind of AiGateway Operator installed. See xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[Install the AI Gateway LiteLLM Operator] for installation instructions of one such operator.
 
@@ -25,7 +29,7 @@ NOTE: The secret name must match the value configured in the operator. The defau
 
 == Create an AiGateway Resource
 
-. Create a AiGateway resource file:
+. Create an `AiGateway` resource file:
 +
 [source,yaml]
 ----
@@ -35,7 +39,7 @@ metadata:
   name: ai-gateway
   namespace: ai-gateway
 spec:
-  AiGatewayClassName: litellm
+  aiGatewayClassName: litellm
   aiModels:
     - provider: openai
       name: gpt-3.5-turbo
@@ -43,7 +47,7 @@ spec:
       name: gemini-1.5-pro
 ----
 
-Note: The `AiGatewayClassName` is optional.
+NOTE: `spec.aiGatewayClassName` is optional when only one implementation operator is installed.
 
 . Apply the configuration:
 +
@@ -97,7 +101,7 @@ metadata:
   name: ai-gateway
   namespace: ai-gateway
 spec:
-  AiGatewayClassName: litellm
+  aiGatewayClassName: litellm
   aiModels:
     - provider: openai
       name: gpt-3.5-turbo
@@ -114,7 +118,7 @@ For more information on LiteLLM-specific OpenTelemetry configuration, see the ht
 
 == Apply Guardrails (Optional)
 
-Attach `Guard` resources to the gateway to run content inspection (for example PII masking) on every request. The `AiGateway` CRD exposes `spec.guardrails` -- an ordered list of references to `Guard` resources:
+Attach `Guard` resources to the gateway to run content inspection (for example PII masking) on every request. The `AiGateway` CRD exposes `spec.guardrails` — an ordered list of references to `Guard` resources:
 
 [source,yaml]
 ----
@@ -125,3 +129,8 @@ spec:
 ----
 
 See xref:agent-runtime-operator:guardrails:how-to-guide.adoc[Create and Use Guardrails in Gateways] for a full walkthrough and the xref:agent-runtime-operator:guardrails:reference.adoc[Guardrails Reference] for the Guard and GuardrailProvider schema.
+
+== Related
+
+* xref:ai-gateways:reference.adoc[]
+* xref:ai-gateways:explanation.adoc[]

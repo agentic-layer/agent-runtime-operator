@@ -1,0 +1,51 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= AiGateway and the AI Model Routing Pattern
+
+== What it is
+
+An `AiGateway` is a Kubernetes custom resource in the `runtime.agentic-layer.ai` API group that declares a desired LLM routing gateway. It specifies *which* AI models should be reachable — across one or more providers such as OpenAI, Anthropic, Gemini, or Azure — without specifying *how* the routing is implemented. An `AiGatewayClass` is a companion cluster-scoped resource that maps a controller name to an implementation operator. Together the two CRDs form a pluggable model-routing contract: platform engineers declare an `AiGateway`; a separately installed implementation operator reconciles it into a running proxy.
+
+== Why it exists
+
+Agents in the Agentic Layer need a consistent, cluster-local endpoint for LLM calls regardless of which model provider or routing library runs beneath it. Without a gateway, each agent workload must carry its own provider credentials, retry logic, and model-selection configuration, duplicating that complexity across every deployed agent.
+
+Centralising model routing in an `AiGateway` solves several problems at once: credentials for LLM providers are held in a single `Secret` rather than scattered across agent pods; model availability can be changed by editing one resource rather than redeploying every agent; and cross-cutting concerns such as tracing, guardrails, and rate-limiting can be applied at the gateway rather than in application code.
+
+The gateway/class pattern also decouples the choice of routing library from agent manifests. Teams that already operate a preferred LLM proxy can integrate it by registering an `AiGatewayClass` with a matching controller name and deploying the corresponding implementation operator, without touching any agent definitions.
+
+== How it fits
+
+The `AiGateway` / `AiGatewayClass` pattern mirrors the gateway/class pattern used by `AgentGateway` and `AgentGatewayClass` in the same operator. Both pairs apply the same separation of concerns: agent-runtime-operator defines and ships the CRDs; reconciliation is delegated to implementation operators. For a detailed explanation of why this pattern is used and how it compares to alternatives, see xref:agent-gateways:explanation.adoc[].
+
+The LiteLLM-based AI gateway operator is the reference implementation. It reconciles `AiGateway` resources whose `spec.aiGatewayClassName` is set to `litellm`, creates a LiteLLM proxy `Deployment` and `Service`, and generates a LiteLLM configuration from the `spec.aiModels` list. Notably, the LiteLLM operator also reconciles `ToolGateway` resources alongside `AiGateway` resources — both capabilities are bundled in xref:ai-gateway-litellm-operator::index.adoc[].
+
+When an agent declares `spec.aiGatewayRef`, the agent-runtime-operator resolves the referenced `AiGateway` and injects the gateway's cluster-local endpoint into the agent pod. This means agents always call a local URL; the gateway handles provider selection, retries, and credential injection transparently.
+
+Guardrails listed in `spec.guardrails` are passed to the implementation operator, which applies the referenced `Guard` policies to every request flowing through the gateway. The same `Guard` resources used on agent gateways can be reused here, providing a unified content-inspection surface across both traffic paths.
+
+== Trade-offs and alternatives
+
+=== Centralised routing vs. per-agent provider calls
+
+An alternative is for each agent to call LLM providers directly, with credentials injected via environment variables. This is simpler for a single agent but does not scale: credential rotation requires updating every agent, changing models requires redeployment, and there is no single point to attach observability or guardrails. The gateway trades a small additional resource for significantly reduced operational complexity at scale.
+
+=== Pluggable class vs. a single built-in proxy
+
+Embedding a specific proxy (for example, LiteLLM) directly in agent-runtime-operator would reduce the number of components to install. The cost is lock-in: upgrading the proxy would require upgrading the core operator, and teams that prefer a different routing library (or already operate one) would carry a redundant workload. The class pattern preserves optionality and matches the established Kubernetes Gateway API convention.
+
+=== Single gateway vs. one gateway per namespace
+
+The `AiGateway` resource is namespace-scoped, so teams can deploy multiple gateways — one per namespace, or one shared gateway referenced from many namespaces via `spec.aiGatewayRef` on their agents. A shared gateway reduces resource overhead; per-namespace gateways allow different model sets or credential scopes per team without cross-namespace secret sharing.
+
+== Related
+
+* xref:ai-gateways:how-to-guide.adoc[]
+* xref:ai-gateways:reference.adoc[]
+* xref:agent-gateways:explanation.adoc[]
+* xref:ai-gateway-litellm-operator::index.adoc[]
