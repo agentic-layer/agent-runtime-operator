@@ -1,0 +1,55 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= AgentGateway and the Gateway/Class Pluggability Pattern
+
+== What it is
+
+An `AgentGateway` is a Kubernetes custom resource in the `runtime.agentic-layer.ai` API group that declares a desired gateway instance for the Agentic Layer. It specifies *what* the platform wants — how many replicas, what timeout, which guardrails to apply — without specifying *how* the gateway is implemented. An `AgentGatewayClass` is a companion cluster-scoped resource that maps a controller name to an implementation operator. Together the two CRDs form a pluggable gateway contract: operators select an `AgentGatewayClass` by name and the matching implementation operator reconciles each `AgentGateway` that claims that class.
+
+== Why it exists
+
+Agents in the Agentic Layer need a single, consistent endpoint for inbound traffic regardless of the gateway technology running beneath it. Different organisations have different preferences for their gateway stack — some already operate KrakenD, others prefer Envoy or Nginx — and forcing a single built-in implementation would make the platform hard to adopt.
+
+The gateway/class pattern solves this by separating declaration from implementation. Platform engineers declare an `AgentGateway` resource expressing their intent; a separately installed implementation operator (for example, the KrakenD operator) reads that resource and provisions the actual workload. When a team wants to switch implementations they can do so by changing the `AgentGatewayClass` reference without touching agent manifests or redeploying the core operator.
+
+The same separation-of-concerns rationale applies here as it does for `ToolRoute`: agent-runtime-operator defines and ships the CRD, which gives the entire ecosystem a stable, versioned API. Reconciliation is delegated to implementation operators so that the core operator has no runtime dependency on any particular gateway technology.
+
+== How it fits
+
+The gateway/class model mirrors the https://kubernetes.io/docs/concepts/services-networking/gateway/[Kubernetes Gateway API], where a `GatewayClass` selects an implementation (Envoy Gateway, Cilium, amazon-vpc-lattice, etc.) and a `Gateway` declares an instance. In the Agentic Layer:
+
+. **`AgentGatewayClass`** (cluster-scoped) — registered once by the implementation operator; its `spec.controller` field carries the operator's unique controller name.
+. **`AgentGateway`** (namespace-scoped) — created by platform engineers for each gateway instance they need; its optional `spec.agentGatewayClassName` field selects the class.
+. **Implementation operator** — watches `AgentGateway` resources whose claimed class it owns, creates the underlying `Deployment`, `Service`, and any implementation-specific configuration, and writes status conditions back to the resource.
+
+When only one implementation is installed in a cluster, `spec.agentGatewayClassName` can be omitted; the sole implementation claims all unclaimed gateways automatically. Multiple implementations can coexist as long as each `AgentGateway` names the class it wants.
+
+An `AgentGateway` that also lists guardrails in `spec.guardrails` delegates enforcement of those `Guard` policies to the implementation operator. The implementation is responsible for applying the guardrails at the traffic level.
+
+For the broader picture of how agent workloads, gateways, and tool routing compose in the Agentic Layer, see xref:agent-runtime:explanation.adoc[].
+
+== Trade-offs and alternatives
+
+=== Pluggable classes vs. a single built-in implementation
+
+Building a single gateway implementation directly into agent-runtime-operator would have been simpler to ship initially. The downside is lock-in: upgrading the gateway would require upgrading the core operator, and organisations that already operate their own gateway technology would carry a redundant workload. The class pattern trades a small amount of initial complexity for long-term flexibility and a clear extension point.
+
+=== Class selection vs. label-based dispatch
+
+An alternative design would have the implementation operator claim gateways using label selectors rather than a named class field. The named-class approach is easier to audit at a glance — the gateway manifest explicitly declares which implementation it expects — and matches the established Kubernetes Gateway API convention, reducing cognitive overhead for teams already familiar with that model.
+
+=== Adding a new implementation operator
+
+To add a new implementation operator, register an `AgentGatewayClass` with a unique `spec.controller` value, then deploy a controller that watches `AgentGateway` resources and reconciles any whose `spec.agentGatewayClassName` matches that class. The KrakenD-based operator at xref:agent-gateway-krakend-operator::index.adoc[] is the reference implementation and a good starting point for anyone building a custom implementation.
+
+== Related
+
+* xref:agent-gateways:how-to-guide.adoc[]
+* xref:agent-gateways:reference.adoc[]
+* xref:agent-gateway-krakend-operator::index.adoc[]
+* xref:agent-runtime:explanation.adoc[]
