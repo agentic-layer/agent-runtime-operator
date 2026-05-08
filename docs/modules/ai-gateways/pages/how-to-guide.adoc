@@ -10,7 +10,7 @@
 
 This guide walks you through deploying an instance of the `AiGateway` custom resource.
 
-TIP: Before following this guide, make sure you have some kind of AiGateway Operator installed. See xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[Install the AI Gateway LiteLLM Operator] for installation instructions of one such operator.
+TIP: Before following this guide, make sure you have some kind of AiGateway Operator installed. See xref:ai-gateway-litellm-operator::how-to-guides/install.adoc[Install the LiteLLM Gateway Operator] for installation instructions of one such operator.
 
 == Create API Key Secret
 

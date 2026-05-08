@@ -219,7 +219,7 @@ The field is present on:
 |Gateway | Implementing operator | Supported provider types | Notes
 
 |`AiGateway`
-|xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator]
+|xref:ai-gateway-litellm-operator::how-to-guides/install.adoc[LiteLLM Gateway Operator]
 |`presidio-api`
 |Generates LiteLLM `guardrails:` config from resolved Guards. `mode` maps directly to the LiteLLM `mode` field; `entityActions` map to LiteLLM's `pii_entities_config`; `scoreThresholds` map to `presidio_score_thresholds`. Output PII tokens are parsed back to the original values on responses.
 
