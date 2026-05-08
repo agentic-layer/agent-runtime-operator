@@ -1,12 +1,73 @@
-= Create a Tool Route
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
 
-A ToolRoute exposes a tool server (cluster-local or external) through a ToolGateway, with
-optional per-route filtering on which tools are visible.
+= Define a ToolRoute
 
-IMPORTANT: Before following this guide, install the Agent Runtime Operator and have a
-ToolGateway available. See the Agent Runtime Operator guide for installation.
+This guide shows you how to create a `ToolRoute` resource that exposes a tool server through a ToolGateway, and how to reference it from an `Agent`.
 
-== Expose a cluster-local ToolServer
+== Prerequisites
+
+* Agent Runtime Operator installed — see xref:agent-runtime:how-to-guides/install.adoc[].
+* A ToolGateway available in the cluster (provided by a tool-gateway operator implementation).
+
+== Define a ToolRoute against a cluster ToolServer
+
+Use `spec.upstream.toolServerRef` to expose a `ToolServer` that is already running in the cluster:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: context7-route
+  namespace: tools
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    toolServerRef:
+      name: context7-toolserver
+----
+
+[source,bash]
+----
+kubectl apply -f context7-route.yaml
+----
+
+The gateway implementation operator reconciles the route and populates `status.url` once the route is ready.
+
+== Define a ToolRoute against an external URL
+
+Use `spec.upstream.external.url` to expose an MCP server that runs outside the cluster:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: github-external-route
+  namespace: tools
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    external:
+      url: https://github-mcp.example.com/mcp
+----
+
+[source,bash]
+----
+kubectl apply -f github-external-route.yaml
+----
+
+== Apply tool filters
+
+Add `spec.toolFilter` to restrict which tools the route exposes. `allow` defines the candidate set; `deny` is applied after `allow` and wins on conflict. Both fields accept glob patterns (`*` matches any run of characters, `?` matches exactly one).
 
 [source,yaml]
 ----
@@ -26,47 +87,55 @@ spec:
     deny:  ["*delete*", force_push]
 ----
 
-== Expose an external MCP server
-
-[source,yaml]
-----
-apiVersion: runtime.agentic-layer.ai/v1alpha1
-kind: ToolRoute
-metadata:
-  name: github-readonly
-  namespace: tools
-spec:
-  toolGatewayRef:
-    name: tool-gateway
-  upstream:
-    external:
-      url: https://github-mcp.example.com/mcp
-  toolFilter:
-    allow: [search_issues, "get_*", "list_*"]
-----
-
-== Filter syntax
-
-Patterns match tool names using glob syntax:
-
-* `*` matches any run of characters
-* `?` matches exactly one character
-
-`allow` defines the candidate set (if nil or empty, every tool is a candidate).
-`deny` is applied after `allow` and wins on conflict.
+When `allow` is omitted or empty, all tools from the upstream are candidates.
 
 == Reference a ToolRoute from an Agent
+
+Once the route is ready, reference it from an `Agent` via `spec.tools[].upstream.toolRouteRef`. The agent framework receives the gateway URL from `status.url` at reconcile time.
 
 [source,yaml]
 ----
 apiVersion: runtime.agentic-layer.ai/v1alpha1
 kind: Agent
 metadata:
-  name: summarizer-agent
+  name: coding-assistant
 spec:
+  framework: google-adk
   tools:
-    - name: github
-      toolRouteRef:
-        name: github-readonly
-        namespace: tools
+    - name: context7_tools
+      upstream:
+        toolRouteRef:
+          name: context7-route
+          namespace: tools
+  protocols:
+    - type: A2A
+  replicas: 1
+  env:
+    - name: GEMINI_API_KEY
+      value: "your-gemini-api-key-here"
 ----
+
+[source,bash]
+----
+kubectl apply -f coding-assistant.yaml
+----
+
+== Verify
+
+[source,bash]
+----
+# Check that the route was accepted and its URL is populated
+kubectl get toolroute context7-route -n tools
+
+# Confirm the agent is running
+kubectl get agent coding-assistant
+kubectl get deployment coding-assistant
+----
+
+The route is ready when `status.url` is non-empty and the `Ready` condition is `True`.
+
+== Related
+
+* xref:tool-routes:reference.adoc[]
+* xref:tool-routes:explanation.adoc[]
+* xref:tool-servers:how-to-guide.adoc[]

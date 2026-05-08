@@ -1,0 +1,83 @@
+// REFERENCE — Diátaxis
+// This page is information-shaped: tables, field lists, full API surface.
+// DO: be exhaustive within scope; use stable, ctrl-F-able structure;
+//     one heading per resource/CRD/command/field group.
+// DON'T: include tutorials, decision trees, or "why" explanations.
+// If a section drifts into "how would you do X" → move to how-to-guide.adoc.
+// If a section drifts into "why this exists" → move to explanation.adoc.
+
+= ToolRoute Reference
+
+This reference covers all fields of the `ToolRoute` custom resource in the `runtime.agentic-layer.ai` API group.
+
+Full Go API: https://pkg.go.dev/github.com/agentic-layer/agent-runtime-operator/api/v1alpha1
+
+== ToolRoute
+
+`ToolRoute` declares a per-consumer route that exposes a tool server (cluster-local or external) through a ToolGateway. The CRD is owned by agent-runtime-operator; each tool-gateway implementation operator reconciles it.
+
+=== spec
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `toolGatewayRef`
+| `ObjectReference` — Optional. Identifies the `ToolGateway` that hosts this route. `namespace` defaults to the `ToolRoute`'s namespace if omitted. If not specified, any installed tool-gateway operator may attempt to claim a default `ToolGateway` in the cluster.
+
+| `upstream`
+| `object` — Required. Describes the MCP server this route proxies. Exactly one of `toolServerRef` or `external` must be set.
+
+| `toolFilter`
+| `object` — Optional. Restricts which tools are exposed through this route. If nil, all tools from the upstream pass through unfiltered. See `spec.toolFilter` fields below.
+|===
+
+=== spec.upstream
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `upstream.toolServerRef`
+| `ObjectReference` — References a cluster-local `ToolServer` resource. `namespace` defaults to the `ToolRoute`'s namespace if omitted. Mutually exclusive with `upstream.external`.
+
+| `upstream.external`
+| `object` — Describes a remote MCP server reachable at an HTTP URL. Mutually exclusive with `upstream.toolServerRef`.
+
+| `upstream.external.url`
+| `string (URI)` — Required when `external` is set. HTTP/HTTPS endpoint of the external MCP server. Must match `^https?://.+`.
+|===
+
+=== spec.toolFilter
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `toolFilter.allow`
+| `[]string` — Optional. Allowlist of tool names and glob patterns. If non-empty, only tools whose names match at least one pattern are exposed. If empty or nil, all tools from the upstream are candidates (subject to `deny`). Glob syntax: `*` matches any run of characters; `?` matches exactly one character.
+
+| `toolFilter.deny`
+| `[]string` — Optional. Denylist of tool names and glob patterns. Applied after `allow`; a tool matching any `deny` pattern is excluded even if it matches an `allow` pattern. Glob syntax: `*` matches any run of characters; `?` matches exactly one character.
+|===
+
+=== status
+
+The gateway implementation operator populates `status` after it reconciles the route.
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `url`
+| `string` — The reachable URL assigned by the gateway implementation. Agents consume this URL verbatim when the route is referenced via `spec.tools[].upstream.toolRouteRef`. Populated once the route is accepted and ready; empty until then.
+
+| `conditions`
+| `[]metav1.Condition` — Latest observations of the route's state. Known condition types: `Accepted`, `Ready`, `ResolutionFailed`. Inspect `type`, `status`, `reason`, and `message` fields for troubleshooting.
+|===
+
+== Related
+
+* xref:tool-routes:how-to-guide.adoc[]
+* xref:tool-routes:explanation.adoc[]
+* xref:tool-servers:reference.adoc[]

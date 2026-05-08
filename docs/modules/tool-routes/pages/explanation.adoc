@@ -1,0 +1,51 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= ToolRoute
+
+== What it is
+
+A `ToolRoute` is a Kubernetes custom resource in the `runtime.agentic-layer.ai` API group that declares a per-consumer route exposing an MCP tool server — either a cluster-local `ToolServer` or an external URL — through a `ToolGateway`. The gateway implementation operator reconciles the route and records the resulting endpoint in `status.url`. Agents reference a `ToolRoute` by name; the operator resolves the URL at reconcile time and passes it to the agent framework as a tool configuration.
+
+== Why it exists
+
+Before `ToolRoute`, an agent that needed a tool server had two options: reference the `ToolServer` directly (coupling the agent tightly to that specific server and bypassing any gateway) or inline a raw external URL (no filtering, no gateway, no access control). Neither option scales well in a multi-tenant cluster where many agents share the same tool servers but need different visibility into which tools are available.
+
+`ToolRoute` introduces an indirection layer. Each route can apply a `toolFilter` — an allow/deny list using glob patterns — so a read-only agent can be limited to `get_*` and `list_*` tools while a privileged agent on a different route sees the full tool catalog. The ToolGateway enforces these rules at the protocol level, so individual agents cannot circumvent them by reconfiguring themselves.
+
+== How it fits
+
+`ToolRoute` sits between `ToolServer` (or an external MCP URL) and an `Agent`. The full data flow is:
+
+. A `ToolServer` (or external URL) provides raw MCP tool calls.
+. A `ToolRoute` declares how that server is exposed through a specific `ToolGateway`, with an optional filter.
+. A tool-gateway implementation operator watches `ToolRoute` resources, programs the gateway, and writes the routed URL into `status.url`.
+. An `Agent` references the `ToolRoute` by name; the agent-runtime-operator reads `status.url` and injects it into the agent's tool configuration.
+
+An important ownership distinction: agent-runtime-operator *owns* the `ToolRoute` CRD (defines the schema, installs it) but does *not* reconcile it. Reconciliation belongs entirely to the tool-gateway implementation operator. This mirrors the split in the Kubernetes Gateway API between the core schema (owned by SIG Network) and the implementations (Envoy Gateway, Cilium, etc.). It lets multiple gateway implementations coexist in a cluster without conflicts, and means that upgrading agent-runtime-operator never silently changes how routes are programmed in the gateway.
+
+For the broader architecture of how tool servers, routes, and gateways relate, see xref:tool-servers:explanation.adoc[].
+
+== Trade-offs and alternatives
+
+=== ToolRoute vs. inline toolServerRef in Agent
+
+An `Agent` can reference a `ToolServer` directly via `spec.tools[].upstream.toolServerRef` without creating a `ToolRoute`. This is simpler for development and single-agent scenarios, but it bypasses the gateway entirely — no filter enforcement, no central access-control point, and a hard dependency between the agent manifest and the specific `ToolServer` name and namespace. Use inline `toolServerRef` only when gateway routing is unavailable or not needed; prefer `ToolRoute` in any shared-cluster or multi-agent environment.
+
+=== ToolRoute vs. inline external URL in Agent
+
+Similarly, `spec.tools[].upstream.external.url` in an `Agent` connects directly to an external MCP server without a gateway. A `ToolRoute` wrapping the same external URL routes the traffic through the gateway, enabling filtering and consistent observability across all tool calls.
+
+=== Per-route vs. per-server filtering
+
+`toolFilter` is intentionally per-route, not per-server. A single `ToolServer` can be exposed via multiple routes with different filter configurations — a wide route for trusted internal agents and a narrow route for externally-accessible agents — without duplicating the server workload.
+
+== Related
+
+* xref:tool-routes:how-to-guide.adoc[]
+* xref:tool-routes:reference.adoc[]
+* xref:tool-servers:explanation.adoc[]

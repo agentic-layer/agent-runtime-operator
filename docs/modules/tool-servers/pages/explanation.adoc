@@ -33,4 +33,4 @@ If an MCP server is already running outside your cluster (for example, a managed
 
 * xref:tool-servers:how-to-guide.adoc[]
 * xref:tool-servers:reference.adoc[]
-* xref:tool-routes:how-to-guide.adoc[]
+* xref:tool-routes:explanation.adoc[]

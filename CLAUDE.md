@@ -14,12 +14,14 @@ User Guides and How-To Guides
 - @docs/modules/agents/pages/how-to-guides/delegate-to-subagent.adoc
 - @docs/modules/agents/pages/how-to-guides/create-workforce.adoc
 - @docs/modules/tool-servers/pages/how-to-guide.adoc
+- @docs/modules/tool-routes/pages/how-to-guide.adoc
 - @docs/modules/agent-gateways/pages/how-to-guide.adoc
 
 Reference Documentation
 - @docs/modules/agent-runtime/pages/reference.adoc
 - @docs/modules/agents/pages/reference.adoc
 - @docs/modules/tool-servers/pages/reference.adoc
+- @docs/modules/tool-routes/pages/reference.adoc
 - Overall Agentic Layer Architecture: https://docs.agentic-layer.ai/architecture/main/index.html
 
 Documentation in AsciiDoc format is located in the `docs/` directory.
