@@ -209,7 +209,7 @@ The following fields are only meaningful for template-based agents (no `spec.ima
 | `[]ObjectReference` — Required. Minimum one entry. Each reference points to an `Agent` in the cluster. `namespace` defaults to the workforce's namespace if omitted. The operator resolves these agents and discovers all transitive sub-agents automatically.
 |===
 
-=== spec.tags
+=== spec metadata fields
 
 [cols="1,3"]
 |===

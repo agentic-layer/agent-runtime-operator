@@ -33,7 +33,7 @@ spec:
     - support
     - production
   entryPointAgents:
-    - name: my-first-agent
+    - name: customer-support-agent
     # Agent in a different namespace:
     # - name: specialist-agent
     #   namespace: ai-agents
