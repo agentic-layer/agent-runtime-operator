@@ -36,6 +36,7 @@ import (
 //   - AGENT_DESCRIPTION: Set to spec.Description (empty string if not specified)
 //   - AGENT_INSTRUCTION: Set to spec.Instruction (empty string if not specified)
 //   - AGENT_MODEL: Set to spec.Model (empty string if not specified)
+//   - OTEL_SEMCONV_STABILITY_OPT_IN: Defaults to "gen_ai_latest_experimental" (overridable via Spec.Env)
 //   - SUB_AGENTS: JSON-encoded map of sub-agent configurations (empty object if none)
 //   - AGENT_TOOLS: JSON-encoded map of MCP tool configurations (empty object if none)
 //
@@ -78,6 +79,14 @@ func buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgent
 	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 		Name:  "AGENT_MODEL",
 		Value: agent.Spec.Model,
+	})
+
+	// OTEL_SEMCONV_STABILITY_OPT_IN - default to gen_ai_latest_experimental so agent
+	// instrumentation emits the latest GenAI semantic conventions. Users can override
+	// via Spec.Env.
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "OTEL_SEMCONV_STABILITY_OPT_IN",
+		Value: "gen_ai_latest_experimental",
 	})
 
 	// AGENT_A2A_RPC_URL - construct URL from A2A protocol if present
