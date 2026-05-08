@@ -2,27 +2,6 @@
 
 The Agent Runtime Operator provides a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the management of AI agent deployments.
 
-== How-To Guides
-
-Step-by-step guides to get you up and running:
-
-* xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[] - Complete installation guide with prerequisites, setup steps, and verification
-* xref:agent-runtime-operator:agents:how-to-guide.adoc[] - Learn how to deploy template-based and custom agents with step-by-step examples
-
-== Advanced Topics
-
-For advanced routing and gateway patterns:
-
-* xref:agent-runtime-operator:agent-gateways:how-to-guide.adoc[] - Set up agent gateways to manage routing to agents
-* xref:agent-runtime-operator:ai-gateways:how-to-guide.adoc[] - Set up AI gateways to manage routing from agents to LLMs
-* xref:agent-runtime-operator:tool-gateways:how-to-guide.adoc[] - Set up tool gateways to manage routing from agents to tools
-
-== Reference
-
-Detailed reference information for all components:
-
-* xref:agent-runtime-operator:agent-runtime:reference.adoc[] - Complete API reference for all custom resources
-
 == External Resources
 
 * https://github.com/agentic-layer/agent-samples[Agent Samples] - Example implementations and starter templates
