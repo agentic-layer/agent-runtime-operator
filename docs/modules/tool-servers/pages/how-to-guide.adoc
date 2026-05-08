@@ -1,1 +1,94 @@
-include::partial$how-to-guide.adoc[]
+= Create a Tool Server
+
+This guide walks you through creating and deploying tool servers using the Agent Runtime Operator. Tool servers extend your agents' capabilities by providing external tools and functionality through the Model Context Protocol (MCP).
+
+IMPORTANT: Before following this guide, make sure you have the Agent Runtime Operator installed. See xref:agent-runtime-operator:agent-runtime:how-to-guide.adoc[Install the Agent Runtime Operator] for installation instructions.
+
+== Quick Start: Your First Tool Server
+
+Get your first tool server running in under 5 minutes.
+
+=== Deploy your first tool server
+
+[source,bash]
+----
+# Create a tool server using the Context7 MCP server (provides up-to-date code docs)
+cat <<EOF | kubectl apply -f -
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolServer
+metadata:
+  name: context7-toolserver
+spec:
+  protocol: mcp
+  transportType: http
+  image: mcp/context7:latest
+  port: 8080
+  replicas: 2
+  env:
+    - name: LOGLEVEL
+      value: INFO
+EOF
+----
+
+=== Verify your tool server is running
+
+[source,bash]
+----
+# Check the tool server resource
+kubectl get toolserver context7-toolserver
+
+# Check the deployment
+kubectl get deployment context7-toolserver
+
+# Check the service
+kubectl get service context7-toolserver
+----
+
+=== Check the logs
+
+[source,bash]
+----
+# View tool server logs
+kubectl logs -l app=context7-toolserver
+----
+
+🎉 *Congratulations!* You've successfully deployed your first tool server.
+
+== Using Tool Servers with Agents
+
+Tool servers are exposed to agents through a ToolRoute. Define a ToolRoute to expose a
+ToolServer via a ToolGateway, then reference the route from the agent:
+
+[source,yaml]
+----
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: ToolRoute
+metadata:
+  name: context7-route
+spec:
+  toolGatewayRef:
+    name: tool-gateway
+  upstream:
+    toolServerRef:
+      name: context7-toolserver
+---
+apiVersion: runtime.agentic-layer.ai/v1alpha1
+kind: Agent
+metadata:
+  name: coding-assistant
+spec:
+  framework: google-adk
+  tools:
+    - name: context7_tools
+      upstream:
+        toolRouteRef:
+          name: context7-route
+  protocols:
+    - type: A2A
+  replicas: 1
+  env:
+    - name: GEMINI_API_KEY
+      value: "your-gemini-api-key-here"
+----
+
+Happy tool server building! 🔧
