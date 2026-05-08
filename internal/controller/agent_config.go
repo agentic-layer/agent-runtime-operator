@@ -37,6 +37,7 @@ import (
 //   - AGENT_INSTRUCTION: Set to spec.Instruction (empty string if not specified)
 //   - AGENT_MODEL: Set to spec.Model (empty string if not specified)
 //   - OTEL_SEMCONV_STABILITY_OPT_IN: Defaults to "gen_ai_latest_experimental" (overridable via Spec.Env)
+//   - OTEL_SERVICE_NAME: Defaults to the agent's name (overridable via Spec.Env)
 //   - SUB_AGENTS: JSON-encoded map of sub-agent configurations (empty object if none)
 //   - AGENT_TOOLS: JSON-encoded map of MCP tool configurations (empty object if none)
 //
@@ -87,6 +88,13 @@ func buildTemplateEnvironmentVars(agent *runtimev1alpha1.Agent, resolvedSubAgent
 	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
 		Name:  "OTEL_SEMCONV_STABILITY_OPT_IN",
 		Value: "gen_ai_latest_experimental",
+	})
+
+	// OTEL_SERVICE_NAME - default to the agent's name so traces are attributed
+	// to the right service. Users can override via Spec.Env.
+	templateEnvVars = append(templateEnvVars, corev1.EnvVar{
+		Name:  "OTEL_SERVICE_NAME",
+		Value: agent.Name,
 	})
 
 	// AGENT_A2A_RPC_URL - construct URL from A2A protocol if present

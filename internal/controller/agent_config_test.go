@@ -38,7 +38,7 @@ var _ = Describe("Agent Config", func() {
 
 			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(envVars).To(HaveLen(7))
+			Expect(envVars).To(HaveLen(8))
 
 			// Verify all required template variables are present with correct values
 			agentNameVar := findEnvVar(envVars, "AGENT_NAME")
@@ -60,6 +60,10 @@ var _ = Describe("Agent Config", func() {
 			otelSemconvVar := findEnvVar(envVars, "OTEL_SEMCONV_STABILITY_OPT_IN")
 			Expect(otelSemconvVar).NotTo(BeNil())
 			Expect(otelSemconvVar.Value).To(Equal("gen_ai_latest_experimental"))
+
+			otelServiceNameVar := findEnvVar(envVars, "OTEL_SERVICE_NAME")
+			Expect(otelServiceNameVar).NotTo(BeNil())
+			Expect(otelServiceNameVar.Value).To(Equal("test-agent"))
 
 			subAgentsVar := findEnvVar(envVars, "SUB_AGENTS")
 			Expect(subAgentsVar).NotTo(BeNil())
@@ -105,7 +109,7 @@ var _ = Describe("Agent Config", func() {
 
 			envVars, err := buildTemplateEnvironmentVars(agent, resolvedSubAgents, resolvedTools, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(envVars).To(HaveLen(7))
+			Expect(envVars).To(HaveLen(8))
 
 			agentDescVar := findEnvVar(envVars, "AGENT_DESCRIPTION")
 			Expect(agentDescVar.Value).To(Equal("Test agent description"))
@@ -295,8 +299,8 @@ var _ = Describe("Agent Config", func() {
 			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, &gatewayUrl)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Should have base variables (7) + LiteLLM variables (3) = 10 total
-			Expect(envVars).To(HaveLen(10))
+			// Should have base variables (8) + LiteLLM variables (3) = 11 total
+			Expect(envVars).To(HaveLen(11))
 
 			// Verify LITELLM_PROXY_API_BASE is set
 			proxyBaseVar := findEnvVar(envVars, "LITELLM_PROXY_API_BASE")
@@ -326,8 +330,8 @@ var _ = Describe("Agent Config", func() {
 			envVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Should only have base variables (7), no LiteLLM variables
-			Expect(envVars).To(HaveLen(7))
+			// Should only have base variables (8), no LiteLLM variables
+			Expect(envVars).To(HaveLen(8))
 
 			// Verify LiteLLM variables are NOT present
 			Expect(findEnvVar(envVars, "LITELLM_PROXY_API_BASE")).To(BeNil())
@@ -391,6 +395,32 @@ var _ = Describe("Agent Config", func() {
 			otelSemconvVar := findEnvVar(result, "OTEL_SEMCONV_STABILITY_OPT_IN")
 			Expect(otelSemconvVar).NotTo(BeNil())
 			Expect(otelSemconvVar.Value).To(Equal("http"))
+		})
+
+		It("should allow user to override OTEL_SERVICE_NAME", func() {
+			agent := &runtimev1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "service-name-agent",
+					Namespace: "default",
+				},
+				Spec: runtimev1alpha1.AgentSpec{},
+			}
+
+			templateVars, err := buildTemplateEnvironmentVars(agent, map[string]ResolvedSubAgent{}, map[string]ResolvedTool{}, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Default uses agent name
+			Expect(findEnvVar(templateVars, "OTEL_SERVICE_NAME").Value).To(Equal("service-name-agent"))
+
+			userVars := []corev1.EnvVar{
+				{Name: "OTEL_SERVICE_NAME", Value: "custom-service"},
+			}
+
+			result := mergeEnvironmentVariables(templateVars, userVars)
+
+			otelServiceNameVar := findEnvVar(result, "OTEL_SERVICE_NAME")
+			Expect(otelServiceNameVar).NotTo(BeNil())
+			Expect(otelServiceNameVar.Value).To(Equal("custom-service"))
 		})
 	})
 
