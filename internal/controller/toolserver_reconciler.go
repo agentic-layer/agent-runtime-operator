@@ -45,11 +45,15 @@ const (
 
 // defaultToolServerEnvVars returns environment variables that are set on every
 // ToolServer container by default. Users can override any of these via Spec.Env.
-func defaultToolServerEnvVars() []corev1.EnvVar {
+func defaultToolServerEnvVars(toolServer *runtimev1alpha1.ToolServer) []corev1.EnvVar {
 	return []corev1.EnvVar{
 		{
 			Name:  "OTEL_SEMCONV_STABILITY_OPT_IN",
 			Value: "gen_ai_latest_experimental",
+		},
+		{
+			Name:  "OTEL_SERVICE_NAME",
+			Value: toolServer.Name,
 		},
 	}
 }
@@ -225,7 +229,7 @@ func (r *ToolServerReconciler) ensureDeployment(ctx context.Context, toolServer 
 		container.Command = toolServer.Spec.Command
 		container.Args = toolServer.Spec.Args
 		container.Ports = containerPorts
-		container.Env = mergeEnvironmentVariables(defaultToolServerEnvVars(), toolServer.Spec.Env)
+		container.Env = mergeEnvironmentVariables(defaultToolServerEnvVars(toolServer), toolServer.Spec.Env)
 		container.EnvFrom = toolServer.Spec.EnvFrom
 		container.ReadinessProbe = r.buildReadinessProbe(toolServer.Spec.Port)
 		container.Resources = getOrDefaultToolServerResourceRequirements(toolServer)

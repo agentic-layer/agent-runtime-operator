@@ -115,6 +115,10 @@ var _ = Describe("ToolServer Controller", func() {
 				Name:  "OTEL_SEMCONV_STABILITY_OPT_IN",
 				Value: "gen_ai_latest_experimental",
 			}))
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "OTEL_SERVICE_NAME",
+				Value: resourceName,
+			}))
 			Expect(container.ReadinessProbe).NotTo(BeNil())
 			Expect(container.ReadinessProbe.TCPSocket).NotTo(BeNil())
 			Expect(container.ReadinessProbe.TCPSocket.Port.IntValue()).To(Equal(8080))
