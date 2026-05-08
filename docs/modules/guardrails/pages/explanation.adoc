@@ -74,4 +74,4 @@ Sidecar-level inspection may be appropriate in high-trust environments where per
 * xref:agent-runtime-operator:guardrails:how-to-guide.adoc[]
 * xref:agent-runtime-operator:guardrails:reference.adoc[]
 * xref:agent-runtime-operator:ai-gateways:explanation.adoc[]
-* xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[]
+* xref:tool-gateway-agentgateway::how-to-guides/install.adoc[]

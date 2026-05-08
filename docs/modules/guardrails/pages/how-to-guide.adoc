@@ -11,7 +11,7 @@
 This guide walks you through configuring guardrails for traffic flowing through an Agentic Layer gateway using a Presidio-based PII guard on an `AiGateway` as the working example.
 
 TIP: Before following this guide, make sure you have the xref:agent-runtime-operator:agent-runtime:how-to-guides/install.adoc[Agent Runtime Operator] and a gateway operator that supports guardrails installed.
-Today, guardrails are implemented by the xref:ai-gateway-litellm-operator::how-to-guides/install.adoc[LiteLLM Gateway Operator] (Presidio-based PII guardrails on an `AiGateway`) and the xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator] (Presidio-based PII guardrails on a `ToolGateway`).
+Today, guardrails are implemented by the xref:ai-gateway-litellm-operator::how-to-guides/install.adoc[LiteLLM Gateway Operator] (Presidio-based PII guardrails on an `AiGateway`) and the xref:tool-gateway-agentgateway::how-to-guides/install.adoc[Tool Gateway Agentgateway Operator] (Presidio-based PII guardrails on a `ToolGateway`).
 
 == Quick Start: PII Guardrail on an AiGateway
 
@@ -149,5 +149,5 @@ The gateway operator is granted the RBAC permissions it needs to read `Guard` an
 * xref:agent-runtime-operator:guardrails:reference.adoc[]
 * xref:agent-runtime-operator:guardrails:explanation.adoc[]
 * xref:agent-runtime-operator:ai-gateways:how-to-guide.adoc[]
-* xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[]
+* xref:tool-gateway-agentgateway::how-to-guides/install.adoc[]
 * Presidio https://microsoft.github.io/presidio/supported_entities/[supported entity catalog]
