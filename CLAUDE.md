@@ -6,13 +6,13 @@ Project Overview and Developer Documentation
 - @README.md: audience is human developer only - consult only after explicitly asking user
 
 User Guides and How-To Guides
-- @docs/modules/agent-runtime/partials/how-to-guide.adoc
-- @docs/modules/agents/partials/how-to-guide.adoc
-- @docs/modules/tool-servers/partials/how-to-guide.adoc
-- @docs/modules/agent-gateways/partials/how-to-guide.adoc
+- @docs/modules/agent-runtime/pages/how-to-guide.adoc
+- @docs/modules/agents/pages/how-to-guide.adoc
+- @docs/modules/tool-servers/pages/how-to-guide.adoc
+- @docs/modules/agent-gateways/pages/how-to-guide.adoc
 
 Reference Documentation
-- @docs/modules/agent-runtime/partials/reference.adoc
+- @docs/modules/agent-runtime/pages/reference.adoc
 - Overall Agentic Layer Architecture: https://docs.agentic-layer.ai/architecture/main/index.html
 
 Documentation in AsciiDoc format is located in the `docs/` directory.
