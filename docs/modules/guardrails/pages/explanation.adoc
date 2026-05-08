@@ -1,0 +1,77 @@
+// EXPLANATION — Diátaxis
+// This page is understanding-shaped: "what is this, why, how does it fit?"
+// DO: discuss design choices, alternatives, trade-offs; cross-link to how-to and reference.
+// DON'T: give step-by-step instructions; provide exhaustive field listings.
+// If a section drifts into "how do I do X" → move to how-to-guide.adoc.
+// If a section drifts into "list of all fields" → move to reference.adoc.
+
+= Guardrails: Guard and GuardrailProvider
+
+== What it is
+
+Guardrails are a content-inspection capability built into the Agentic Layer gateway contracts.
+They let platform teams apply policies — PII masking, toxic-language detection, safety filters — to the traffic that flows through any gateway, without modifying the agents or tool servers on either side.
+
+The capability is expressed through two gateway-agnostic Custom Resource Definitions:
+
+* `GuardrailProvider` declares *where* a guardrail backend lives and how to authenticate to it.
+  It represents one of the supported API contracts: Presidio (PII detection), OpenAI Moderation (content safety), or AWS Bedrock Guardrails (enterprise policy enforcement).
+  One provider can back many guards.
+
+* `Guard` binds a provider to a concrete policy: *when* it runs (`pre_call`, `post_call`, or `during_call`), which entities or categories to check, what action to take on a hit (`MASK` or `BLOCK`), and at what confidence thresholds.
+  Each guard targets exactly one provider.
+
+Gateway CRDs (`AiGateway`, `AgentGateway`, `ToolGateway`) expose a uniform `spec.guardrails` field — an ordered list of references to `Guard` resources.
+The gateway's implementation operator resolves those references and programs the underlying gateway to invoke the guardrail at request time.
+
+== Why it exists
+
+Agents and tool servers should not need to implement content inspection themselves.
+An agent framework rarely has the context to know which data-handling regulation applies to a given deployment, and embedding provider-specific guardrail SDKs in every container image would tie the inspection logic to the agent lifecycle.
+
+Centralising guardrails at the gateway solves this cleanly.
+A platform team can declare a single `Guard` resource and attach it to any number of gateways; all traffic through those gateways is inspected consistently, regardless of which agent or tool server generated it.
+Policy changes take effect without redeploying agents.
+Guardrail provider credentials and endpoints are kept in `GuardrailProvider` resources managed by the platform team, not scattered across agent pods.
+
+The two-tier split between `GuardrailProvider` and `Guard` is deliberate.
+It lets a platform team own the infrastructure side (provider endpoints, credentials) while application teams own the per-gateway policies (which entities to catch, what to do with them), each without touching the other's resources.
+
+== How it fits
+
+At request time, the gateway runs each attached guard in the order they are listed.
+For `pre_call` mode, the outgoing prompt or tool-call arguments are forwarded to the provider before they reach the LLM or tool server.
+For `post_call` mode, the LLM or tool-server response is inspected before it is returned to the caller.
+The provider signals either a clean pass, a masked payload (with sensitive spans replaced by placeholders), or a block that terminates the request.
+
+The implementation is per-gateway.
+The LiteLLM-based AI gateway operator translates `Guard` resources into LiteLLM's native `guardrails:` configuration block, enabling PII detection and masking on `AiGateway` traffic.
+The agentgateway-based tool-gateway operator takes a different approach: for each `Guard` attached to a `ToolGateway`, it deploys a dedicated `guardrail-adapter` instance and wires it into the gateway via Envoy's `ext_proc` mechanism.
+This adapter is provided by the https://github.com/agentic-layer/guardrail-adapter[guardrail-adapter] project, which bridges Agentic Layer gateways to guardrail engines through the Envoy external processing API; its documentation will be integrated into this site in a later phase.
+
+== Trade-offs and alternatives
+
+=== Provider abstraction vs. native provider integration
+
+Wrapping multiple providers behind a common CRD interface means the CRD cannot expose every provider-specific knob directly.
+The design accepts this: `GuardrailProvider.spec.presidio`, `.openaiModeration`, and `.bedrock` carry only the fields that operators currently translate.
+The benefit is a uniform attachment point across all gateways that survives provider changes — swapping a Presidio deployment for an OpenAI Moderation endpoint is a `GuardrailProvider` edit, not an agent change.
+
+=== Guard-per-policy vs. a single embedded policy
+
+`Guard` is a separate, referenceable resource rather than an inline policy block on the gateway.
+This allows the same guard to be reused across multiple gateways, and it allows guardrail policy to be versioned and reviewed independently of gateway manifests.
+The cost is an additional resource to manage, but for any non-trivial deployment the reuse and separation benefits outweigh the overhead.
+
+=== Gateway-level inspection vs. sidecar / agent-side inspection
+
+An alternative is to run inspection logic in a sidecar container next to each agent or tool server, or inside the framework itself.
+Gateway-level inspection is preferred because it applies uniformly to all traffic, is independent of the agent framework, and can be updated by the platform team without any agent change.
+Sidecar-level inspection may be appropriate in high-trust environments where per-agent policy differentiation is needed at a finer granularity than per-gateway.
+
+== Related
+
+* xref:agent-runtime-operator:guardrails:how-to-guide.adoc[]
+* xref:agent-runtime-operator:guardrails:reference.adoc[]
+* xref:agent-runtime-operator:ai-gateways:explanation.adoc[]
+* xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[]

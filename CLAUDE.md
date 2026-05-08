@@ -18,6 +18,7 @@ User Guides and How-To Guides
 - @docs/modules/tool-gateways/pages/how-to-guide.adoc
 - @docs/modules/agent-gateways/pages/how-to-guide.adoc
 - @docs/modules/ai-gateways/pages/how-to-guide.adoc
+- @docs/modules/guardrails/pages/how-to-guide.adoc
 
 Reference Documentation
 - @docs/modules/agent-runtime/pages/reference.adoc
@@ -27,11 +28,13 @@ Reference Documentation
 - @docs/modules/tool-gateways/pages/reference.adoc
 - @docs/modules/agent-gateways/pages/reference.adoc
 - @docs/modules/ai-gateways/pages/reference.adoc
+- @docs/modules/guardrails/pages/reference.adoc
 
 Explanation Pages
 - @docs/modules/agent-gateways/pages/explanation.adoc
 - @docs/modules/ai-gateways/pages/explanation.adoc
 - @docs/modules/tool-gateways/pages/explanation.adoc
+- @docs/modules/guardrails/pages/explanation.adoc
 - Overall Agentic Layer Architecture: https://docs.agentic-layer.ai/architecture/main/index.html
 
 Documentation in AsciiDoc format is located in the `docs/` directory.

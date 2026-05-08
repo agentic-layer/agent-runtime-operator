@@ -1,45 +1,17 @@
+// HOW-TO GUIDE — Diátaxis
+// This page answers a goal-shaped question: "how do I do X?"
+// DO: assume context; give concrete steps; link to reference for fields.
+// DON'T: teach concepts; duplicate reference content; include long explanations.
+// If a section drifts into "what is this and why" → move to explanation.adoc.
+// If a section drifts into "exhaustive list of fields/values" → move to reference.adoc.
+// If a section turns into a from-zero walkthrough → move to a tutorial in a showcase repo.
+
 = Create and Use Guardrails in Gateways
 
-This guide walks you through configuring guardrails for traffic flowing through an Agentic Layer gateway.
-Guardrails inspect gateway traffic for content that should be masked or blocked -- for example, personally identifiable information (PII) in prompts or tool arguments.
-
-Guardrails are expressed through two gateway-agnostic CRDs:
-
-* *GuardrailProvider* -- declares a backend that implements a specific guardrail API contract (Presidio, OpenAI Moderation, AWS Bedrock).
-* *Guard* -- declares *when* and *how* a provider is applied to a single concern (PII, toxic language, content policy).
-
-A gateway resource (for example `AiGateway`) then references one or more `Guard` resources in its `spec.guardrails` list.
-The gateway's operator resolves those references and configures its underlying gateway implementation to invoke the guardrail at request time.
+This guide walks you through configuring guardrails for traffic flowing through an Agentic Layer gateway using a Presidio-based PII guard on an `AiGateway` as the working example.
 
 TIP: Before following this guide, make sure you have the xref:agent-runtime-operator:agent-runtime:how-to-guides/install.adoc[Agent Runtime Operator] and a gateway operator that supports guardrails installed.
 Today, guardrails are implemented by the xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[AI Gateway LiteLLM Operator] (Presidio-based PII guardrails on an `AiGateway`) and the xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator] (Presidio-based PII guardrails on a `ToolGateway`).
-
-== Implementation Status
-
-Guardrails are a *gateway capability* -- each gateway implementation translates Guard CRDs into its native guardrail mechanism.
-The Guard and GuardrailProvider CRDs are stable and gateway-agnostic, but runtime support is being rolled out per gateway.
-
-[cols="2,2,2,3"]
-|===
-|Gateway | Guardrail support | Supported providers | Notes
-
-|`AiGateway` (LiteLLM)
-|Yes
-|`presidio-api`
-|Request-time PII detection and masking; see xref:ai-gateway-litellm-operator:operator:how-to-guide.adoc[].
-
-|`AgentGateway` (KrakenD)
-|Not yet
-|--
-|`guardrails` field exists on the CRD but is not yet honored by the operator.
-
-|`ToolGateway` (agentgateway)
-|Yes
-|`presidio-api`
-|Implemented by the xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[Tool Gateway Agentgateway Operator]. The operator deploys a per-Guard `guardrail-adapter` instance and wires it into the gateway's `AgentgatewayPolicy` via `ext_proc`. Today, only one Guard per `ToolGateway` is supported.
-|===
-
-The rest of this guide uses an `AiGateway` backed by the LiteLLM operator and a Presidio analyzer as the working example.
 
 == Quick Start: PII Guardrail on an AiGateway
 
@@ -99,12 +71,7 @@ spec:
       PERSON: MASK
 ----
 
-Key fields:
-
-* `mode` -- when the guard runs. `pre_call` inspects the request before it reaches the LLM, `post_call` inspects the LLM response, `during_call` inspects both. You can combine modes, for example `[pre_call, post_call]`.
-* `providerRef` -- the `GuardrailProvider` that hosts this guard. Cross-namespace references are supported; `namespace` defaults to the Guard's own namespace when omitted.
-* `presidio.entityActions` -- maps https://microsoft.github.io/presidio/supported_entities/[Presidio entity types] to actions. `MASK` replaces the detected value with a placeholder; `BLOCK` rejects the whole request. When omitted entirely, every supported entity is detected and blocked by default.
-* `presidio.scoreThresholds` -- per-entity confidence cutoffs. Use `ALL` as a catch-all; specific entity keys override it.
+For the full field list see xref:agent-runtime-operator:guardrails:reference.adoc[].
 
 === Step 3: Attach the Guard to an AiGateway
 
@@ -177,8 +144,10 @@ This lets you centralize guardrail policy:
 
 The gateway operator is granted the RBAC permissions it needs to read `Guard` and `GuardrailProvider` resources across namespaces.
 
-== Next Steps
+== Related
 
-* Explore the xref:agent-runtime-operator:guardrails:reference.adoc[Guardrails Reference] for the full CRD schema.
-* See the xref:agent-runtime-operator:ai-gateways:how-to-guide.adoc[Create an AI Gateway] guide for the complete `AiGateway` configuration surface.
-* Review the Presidio https://microsoft.github.io/presidio/supported_entities/[supported entity catalog] to decide which entities to detect and how to act on them.
+* xref:agent-runtime-operator:guardrails:reference.adoc[]
+* xref:agent-runtime-operator:guardrails:explanation.adoc[]
+* xref:agent-runtime-operator:ai-gateways:how-to-guide.adoc[]
+* xref:tool-gateway-agentgateway:operator:how-to-guide.adoc[]
+* Presidio https://microsoft.github.io/presidio/supported_entities/[supported entity catalog]
