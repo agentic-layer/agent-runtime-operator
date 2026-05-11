@@ -17,6 +17,8 @@ Running LLM-based agents in Kubernetes without an operator means maintaining ad-
 
 The Agent Runtime Operator solves this by owning the CRDs that define the agentic layer's resource model. Platform teams declare an `Agent` resource; the operator reconciles the corresponding Deployment, Service, and readiness probes automatically, applying framework-specific defaults without requiring application developers to understand them.
 
+A second motivation is compliance. In larger organisations, traffic to LLM providers and external tools must flow through approved gateways — for audit logging, data-residency controls, or model-licence enforcement. Because the operator models those gateways as first-class CRDs (`AiGateway`, `AgentGateway`, `ToolGateway`) that agents reference declaratively, cluster administrators can enforce gateway usage through admission policies rather than trusting each agent container to call the right endpoint.
+
 == How it fits
 
 The operator occupies the bottom of the agentic layer stack. It owns the CRD schemas and is the single source of truth for the API group `runtime.agentic-layer.ai`. Other operators — such as the Agent Gateway KrakenD Operator or a ToolGateway implementation — watch the same API group but reconcile only the resources they own (for example, `AgentGateway` or `ToolRoute`). This separation of concerns means each implementation operator can evolve independently while sharing a common resource model.
@@ -27,9 +29,7 @@ The architecture overview at xref:home:architecture:index.adoc[] shows how the o
 
 == Trade-offs and alternatives
 
-*Single operator for all CRDs vs. one operator per CRD group*: The current design keeps all base CRDs in one operator to simplify installation — one `kubectl apply` is enough. The trade-off is that the operator binary is larger and carries reconciliation logic for several resource types. A future split (for example, separating gateway CRD ownership from agent CRD ownership) was considered but deferred until the API surface stabilises.
-
-*Namespace-scoped `AgentRuntimeConfiguration` vs. cluster-scoped*: A cluster-scoped configuration object would span all namespaces but introduce RBAC complexity (cluster-admin required to change defaults). The namespace-scoped design confines the configuration to the operator's own namespace, where operators already have full access, and limits the blast radius if the configuration is misconfigured.
+*Namespace-scoped `AgentRuntimeConfiguration` vs. cluster-scoped*: A cluster-scoped configuration object would span all namespaces but introduce RBAC complexity (cluster-admin required to change defaults). The namespace-scoped design confines the configuration to the operator's own namespace, where operators already have full access, and limits the blast radius if the configuration is misconfigured. It also leaves room for per-namespace overrides in the future: an additional `AgentRuntimeConfiguration` in a tenant namespace could refine the operator-level defaults for agents in that namespace without requiring cluster-wide changes.
 
 *Framework abstraction vs. direct container spec*: The `framework` field on `Agent` allows the operator to inject a known-good container image and runtime settings automatically. This is more opinionated than letting every team manage their own images, but it dramatically reduces the per-agent boilerplate and ensures consistent framework upgrades across the cluster.
 
