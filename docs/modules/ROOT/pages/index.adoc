@@ -2,6 +2,10 @@
 
 The Agent Runtime Operator provides a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the management of AI agent deployments.
 
+== Pages
+
+include::partial$nav.adoc[]
+
 == External Resources
 
 * https://github.com/agentic-layer/agent-samples[Agent Samples] - Example implementations and starter templates

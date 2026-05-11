@@ -1,0 +1,44 @@
+.Agent Runtime
+* xref:agent-runtime:how-to-guides/install.adoc[]
+* xref:agent-runtime:how-to-guides/configure.adoc[]
+* xref:agent-runtime:reference.adoc[]
+* xref:agent-runtime:explanation.adoc[]
+
+.Agents
+* xref:agents:how-to-guides/create-template-agent.adoc[]
+* xref:agents:how-to-guides/create-custom-image-agent.adoc[]
+* xref:agents:how-to-guides/propagate-headers.adoc[]
+* xref:agents:how-to-guides/delegate-to-subagent.adoc[]
+* xref:agents:how-to-guides/create-workforce.adoc[]
+* xref:agents:reference.adoc[]
+* xref:agents:explanation.adoc[]
+
+.Agent Gateways
+* xref:agent-gateways:how-to-guide.adoc[]
+* xref:agent-gateways:reference.adoc[]
+* xref:agent-gateways:explanation.adoc[]
+
+.AI Gateways
+* xref:ai-gateways:how-to-guide.adoc[]
+* xref:ai-gateways:reference.adoc[]
+* xref:ai-gateways:explanation.adoc[]
+
+.Tool Servers
+* xref:tool-servers:how-to-guide.adoc[]
+* xref:tool-servers:reference.adoc[]
+* xref:tool-servers:explanation.adoc[]
+
+.Tool Gateways
+* xref:tool-gateways:how-to-guide.adoc[]
+* xref:tool-gateways:reference.adoc[]
+* xref:tool-gateways:explanation.adoc[]
+
+.Tool Routes
+* xref:tool-routes:how-to-guide.adoc[]
+* xref:tool-routes:reference.adoc[]
+* xref:tool-routes:explanation.adoc[]
+
+.Guardrails
+* xref:guardrails:how-to-guide.adoc[]
+* xref:guardrails:reference.adoc[]
+* xref:guardrails:explanation.adoc[]
