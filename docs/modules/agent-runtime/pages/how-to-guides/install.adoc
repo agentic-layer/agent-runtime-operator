@@ -23,25 +23,27 @@ The Agent Runtime Operator requires cert-manager for webhook support:
 
 [source,bash]
 ----
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.1/cert-manager.yaml
+# Install cert-manager (always pulls the latest release)
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 
 # Wait for cert-manager to be ready
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
 ----
 
+Browse all cert-manager releases at https://github.com/cert-manager/cert-manager/releases.
+
 === Step 2: Install the Agent Runtime Operator
 
 [source,bash]
 ----
-# Install the operator
-kubectl apply -f https://github.com/agentic-layer/agent-runtime-operator/releases/download/v0.4.4/install.yaml
+# Install the operator (always pulls the latest release)
+kubectl apply -f https://github.com/agentic-layer/agent-runtime-operator/releases/latest/download/install.yaml
 
 # Wait for the operator to be ready
 kubectl wait --for=condition=Available --timeout=60s -n agent-runtime-operator-system deployment/agent-runtime-operator-controller-manager
 ----
 
-Find the latest version at https://github.com/agentic-layer/agent-runtime-operator/releases
+Browse all releases at https://github.com/agentic-layer/agent-runtime-operator/releases.
 
 == Install with Flux
 
