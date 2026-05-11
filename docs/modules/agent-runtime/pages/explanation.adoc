@@ -23,6 +23,11 @@ A second motivation is compliance. In larger organisations, traffic to LLM provi
 
 The operator occupies the bottom of the agentic layer stack. It owns the CRD schemas and is the single source of truth for the API group `runtime.agentic-layer.ai`. Other operators — such as the Agent Gateway KrakenD Operator or a ToolGateway implementation — watch the same API group but reconcile only the resources they own (for example, `AgentGateway` or `ToolRoute`). This separation of concerns means each implementation operator can evolve independently while sharing a common resource model.
 
+.CRDs in the `runtime.agentic-layer.ai` API group and the operators that reconcile them
+image::crds.svg[CRDs and their reconcilers,role=center]
+
+The diagram shows how the CRDs reference each other and which operator reconciles each one. The Agent Runtime Operator owns every CRD in the group, but only directly reconciles a subset — `Agent`, `AgenticWorkforce`, and `ToolServer` — together with `AgentRuntimeConfiguration` (not shown). The gateway-shaped CRDs (`AgentGateway`, `AiGateway`, `ToolGateway`) and `ToolRoute` are reconciled by implementation-specific operators that plug into the same API group via their corresponding `*Class` resources. See xref:agent-gateways:explanation.adoc[] for the pluggability pattern shared by all three gateway CRDs.
+
 `AgentRuntimeConfiguration` is a cluster-scoped defaults object that lives in the operator's own namespace. It lets a platform administrator set the default agent framework and pin template image versions once, rather than repeating those values in every `Agent` manifest. Individual `Agent` resources can always override the defaults by specifying their own `framework` or `image` fields.
 
 The architecture overview at xref:home:architecture:index.adoc[] shows how the operator relates to gateways, tool servers, and the broader Agentic Layer.
