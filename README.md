@@ -1,114 +1,57 @@
 # Agent Runtime Operator
 
-The Agent Runtime Operator is a Kubernetes operator that provides a unified, framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It uses Custom Resource Definitions (CRDs) to abstract away framework-specific configurations, simplifying the management of components like wiring of agents with a observability stack or model routers.
+The Agent Runtime Operator is a Kubernetes operator that provides a framework-agnostic way to deploy and manage agentic workloads on Kubernetes. It owns the `Agent`, `AgenticWorkforce`, `AgentGateway`, `AiGateway`, `ToolGateway`, `ToolServer`, `ToolRoute`, `Guard`, and `GuardrailProvider` CRDs that the rest of the Agentic Layer ecosystem builds on.
 
-The operator is built with the [Operator SDK](https://sdk.operatorframework.io/docs/) framework. Make sure to be familiar with the Operator SDK concepts when working with this project.
-
-## Getting Started
-
-Get started with the Agent Runtime Operator by following our comprehensive guides:
-
-- **[Install the Agent Runtime Operator](https://docs.agentic-layer.ai/agent-runtime-operator/agent-runtime/how-to-guide.html)** - Set up the operator on your Kubernetes cluster
-- **[Create your first Agent](https://docs.agentic-layer.ai/agent-runtime-operator/agents/how-to-guide.html)** - Deploy template-based and custom agents
+📖 **Documentation:** https://docs.agentic-layer.ai/agent-runtime-operator/
 
 ## Development
 
 ### Prerequisites
 
-Before contributing to this project, ensure you have the following tools installed:
+- **Go** 1.26+
+- **Docker**
+- **kubectl**
+- **kind** (used for local development and E2E tests)
+- **make**
 
-* **Go**: version 1.26.0 or higher
-* **Docker**: version 20.10+ (or a compatible alternative like Podman)
-* **kubectl**: The Kubernetes command-line tool
-* **kind**: For running Kubernetes locally in Docker
-* **make**: The build automation tool
-* **Git**: For version control
-
-### Local Environment
-
-Set up your local Kubernetes environment.
-You can use any Kubernetes cluster. Kind is used for E2E tests and is used exemplarily here for local development.
+### Build and deploy locally
 
 ```shell
-# Create a local Kubernetes cluster (or use an existing one)
+# Create a local cluster
 kind create cluster
-```
 
-Install cert-manager in the cluster, as it is required for webhook certificate management:
-```shell
-# Install cert-manager (always pulls the latest release;
-# see https://github.com/cert-manager/cert-manager/releases for the version list)
+# Install Cert Manager for webhook TLS
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-
-# Wait for cert-manager to be ready
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=60s
-```
 
-### Build and Deploy
-
-Build and deploy the operator locally:
-
-```shell
 # Install CRDs into the cluster
 make install
-
 # Build docker image
 make docker-build
-
 # Load image into kind cluster (not needed if using local registry)
 make kind-load
-
 # Deploy the operator to the cluster
 make deploy
 ```
 
-### Unit Tests, code formatting, and static analysis
-
-Run unit tests, code formatting checks, and static analysis whenever you make changes:
+### Test
 
 ```shell
-# Run unit tests, code formatter and static analysis
-make test
+make lint       # linting (use `make lint-fix` to auto-fix)
+make test       # unit + integration tests, formatter, static analysis
+make test-e2e   # E2E tests in a Kind cluster
 ```
 
-### Linting
+E2E tests keep the Kind cluster after running; clean up with `make cleanup-test-e2e`.
 
-Several linters are configured via `golangci-lint`. Run the linter to ensure code quality:
+### Verify the local deploy
 
-```shell
-# Run golangci-lint
-make lint
-````
-
-You can also auto-fix some issues:
+Apply the bundled CRD samples and inspect the resources the operator reconciles:
 
 ```shell
-# Auto-fix linting issues
-make lint-fix
+kubectl apply -k config/samples/
+kubectl get agents,agenticworkforces,toolservers,toolroutes
 ```
-
-### End-to-End Tests
-
-The E2E tests automatically create an isolated Kind cluster, deploy the operator and run e2e tests.
-Test cluster is kept after execution for faster reruns, so you may need to clean it up manually.
-
-```shell
-# Run complete E2E test suite
-make test-e2e
-```
-
-```shell
-# Clean up test cluster
-make cleanup-test-e2e
-```
-
-**E2E Test Features:**
-- Operator deployment verification
-- CRD installation testing
-- Webhook functionality testing
-- Metrics endpoint validation
-- Certificate management verification
-
 
 ### Create or Update API and Webhooks
 
@@ -124,6 +67,8 @@ operator-sdk create api --group runtime --version v1alpha1 --kind Agent
 operator-sdk create webhook --group runtime --version v1alpha1 --kind Agent --defaulting --programmatic-validation
 ```
 
-## Contribution
+After modifying CRD structs in `api/v1alpha1/*.go`, regenerate manifests with `make manifests && make generate`.
 
-See [Contribution Guide](https://github.com/agentic-layer/agent-runtime-operator?tab=contributing-ov-file) for details on contribution, and the process for submitting pull requests.
+## Contributing
+
+See the [Contribution Guide](https://github.com/agentic-layer/agent-runtime-operator?tab=contributing-ov-file).
